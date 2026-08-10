@@ -1,0 +1,29 @@
+# Environment / secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.sqlite3
+db.sqlite3
+
+# Django media / static
+media/
+staticfiles/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Frontend (also has its own .gitignore)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
