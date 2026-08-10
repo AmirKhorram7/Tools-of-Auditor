@@ -4,10 +4,71 @@ import { AuthProvider } from "@/lib/auth";
 
 import "./globals.css";
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://localhost";
+
+const titleDefault =
+  "تی‌ادیتور | ابزار حسابرسان داخلی و خارجی — تشریح سیستم، ریسک و کنترل";
+
+const description =
+  "تی‌ادیتور (Tauditor) پلتفرم تخصصی حسابرسان داخلی و خارجی برای تشریح سیستم، مستندسازی فرایندها، ریسک‌ها و کنترل‌ها. مناسب ممیزی ISO و تیم‌های تضمین کیفیت (QA) و کنترل کیفیت (QC).";
+
 export const metadata: Metadata = {
-  title: "تی‌ادیتور | پلتفرم حسابرسی داخلی",
-  description: "ابزار مستندسازی فرایندها، ریسک‌ها و کنترل‌ها برای حسابرسان داخلی",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: titleDefault,
+    template: "%s | تی‌ادیتور",
+  },
+  description,
   applicationName: "تی‌ادیتور",
+  keywords: [
+    "تی‌ادیتور",
+    "تی ادیتور",
+    "Tauditor",
+    "حسابرس داخلی",
+    "حسابرس خارجی",
+    "حسابرسی داخلی",
+    "حسابرسی خارجی",
+    "ابزار حسابرسی",
+    "تشریح سیستم",
+    "ریسک و کنترل",
+    "مستندسازی فرایند",
+    "ممیزی ISO",
+    "تضمین کیفیت",
+    "کنترل کیفیت",
+    "QA",
+    "QC",
+  ],
+  authors: [{ name: "تی‌ادیتور" }],
+  creator: "تی‌ادیتور",
+  publisher: "تی‌ادیتور",
+  category: "business software",
+  openGraph: {
+    type: "website",
+    locale: "fa_IR",
+    url: siteUrl,
+    siteName: "تی‌ادیتور",
+    title: "تی‌ادیتور | ابزار حسابرسان داخلی و خارجی",
+    description:
+      "تشریح سیستم و مستندسازی فرایند، ریسک و کنترل — برای حسابرسان داخلی و خارجی؛ قابل استفاده در ممیزی ISO و تیم‌های QA/QC.",
+  },
+  twitter: {
+    card: "summary",
+    title: "تی‌ادیتور | ابزار حسابرسان داخلی و خارجی",
+    description:
+      "پلتفرم Tauditor برای تشریح سیستم، ریسک و کنترل — حسابرسی داخلی و خارجی.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  alternates: {
+    canonical: siteUrl,
+  },
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },

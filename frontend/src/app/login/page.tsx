@@ -152,9 +152,9 @@ export default function LoginPage() {
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-ink">
             ت
           </div>
-          <h1 className="text-xl font-bold text-white">Tools of Auditor</h1>
+          <h1 className="text-xl font-bold text-white">تی‌ادیتور | Tauditor</h1>
           <p className="mt-1 text-sm text-gray-300">
-            ورود و ثبت‌نام حسابرسان داخلی با شماره موبایل
+            ابزار حسابرسان داخلی و خارجی — ورود با شماره موبایل
           </p>
         </div>
 

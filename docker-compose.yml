@@ -88,6 +88,8 @@ services:
       args:
         # Same-origin API via nginx → browser calls /api/v1/...
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/v1}
+        # Used at build time for SEO canonical / Open Graph / sitemap
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://localhost}
     restart: unless-stopped
     logging: *default-logging
     depends_on:
