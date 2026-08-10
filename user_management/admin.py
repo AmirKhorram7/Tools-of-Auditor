@@ -16,10 +16,10 @@ class ProfileInline(admin.StackedInline):
 @admin.register(CustomUser)
 class CustomUserAdmin(BaseUserAdmin):
     model = CustomUser
-    list_display = ("first_name","last_name", "phone_number", "is_phone_verified", "is_staff", "is_active")
+    list_display = ("phone_number", "is_phone_verified", "is_staff", "is_active")
     list_filter = ("is_phone_verified", "is_staff", "is_active")
     search_fields = ("phone_number", "first_name", "last_name")
-    ordering = ("created_at",)
+    ordering = ("phone_number",)
     fieldsets = (
         (None, {"fields": ("phone_number", "password")}),
         (_("Personal info"), {"fields": ("first_name", "last_name")}),
@@ -43,7 +43,7 @@ class CustomUserAdmin(BaseUserAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "first_name", "last_name", "company_name", "job_title", "created_at")
+    list_display = ("user", "company_name", "job_title", "created_at")
     search_fields = ("user__phone_number", "company_name", "job_title")
     readonly_fields = ("created_at", "updated_at")
 
