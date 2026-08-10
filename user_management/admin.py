@@ -44,7 +44,7 @@ class CustomUserAdmin(BaseUserAdmin):
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "user__first_name", "user__last_name", "company_name", "job_title", "created_at")
-    search_fields = ("user__phone_number", "company_name", "job_title")
+    search_fields = ("user__first_name", "user__last_name", "user__phone_number", "company_name", "job_title")
     readonly_fields = ("created_at", "updated_at")
 
 
