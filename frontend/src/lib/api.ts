@@ -3,19 +3,39 @@ import type { Paginated } from "./types";
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
 
-/** Origin of the Django server, used to resolve /media/... paths. */
+/**
+ * Origin derived from API_BASE.
+ * When API_BASE is same-origin (`/api/v1`), this is "" — media must stay relative
+ * so the browser loads `/media/...` via nginx (Docker), not `http://127.0.0.1:8000`.
+ */
 export const API_ORIGIN = API_BASE.replace(/\/api\/v\d+\/?$/, "");
 
 /**
- * DRF returns absolute URLs for uploaded files when the request is in the
- * serializer context, but falls back to a relative `/media/...` path otherwise.
- * Resolve both shapes to something an <img> tag can actually load.
+ * Resolve uploaded-file URLs for <img> tags.
+ * Always prefer same-origin `/media/...` so Docker/nginx serving works regardless
+ * of whether DRF returned a relative path or an absolute host:port URL.
  */
 export function mediaUrl(path: string | null | undefined): string | null {
   if (!path) return null;
-  if (/^(https?:)?\/\//i.test(path) || path.startsWith("blob:") || path.startsWith("data:")) {
-    return path;
+  if (path.startsWith("blob:") || path.startsWith("data:")) return path;
+
+  // Absolute or protocol-relative → keep only /media/... for same-origin nginx.
+  if (/^(https?:)?\/\//i.test(path)) {
+    try {
+      const url = new URL(path.startsWith("//") ? `http:${path}` : path);
+      if (url.pathname.startsWith("/media/")) {
+        return `${url.pathname}${url.search}`;
+      }
+      return path;
+    } catch {
+      return path;
+    }
   }
+
+  if (path.startsWith("/media/") || path.startsWith("media/")) {
+    return path.startsWith("/") ? path : `/${path}`;
+  }
+
   return `${API_ORIGIN}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 

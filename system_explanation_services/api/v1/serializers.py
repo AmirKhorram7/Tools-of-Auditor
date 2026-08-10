@@ -108,11 +108,8 @@ class StepMediaSerializer(serializers.ModelSerializer):
     def get_file_url(self, obj):
         if not obj.file:
             return None
-        request = self.context.get("request")
-        url = obj.file.url
-        if request:
-            return request.build_absolute_uri(url)
-        return url
+        # Relative /media/... so the browser loads via nginx (same origin).
+        return obj.file.url
 
     def validate(self, attrs):
         instance = getattr(self, "instance", None)

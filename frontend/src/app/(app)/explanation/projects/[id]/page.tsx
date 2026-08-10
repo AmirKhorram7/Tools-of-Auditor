@@ -15,13 +15,16 @@ import {
   Input,
   Modal,
   PageLoader,
+  Select,
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
   PROJECT_STATUS_LABELS,
+  PROJECT_STATUS_OPTIONS,
   type Process,
   type Project,
+  type ProjectStatus,
 } from "@/lib/types";
 
 type Pending =
@@ -54,6 +57,10 @@ export default function ProjectDetailPage() {
   const [pending, setPending] = useState<Pending>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusSuccess, setStatusSuccess] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(projectId)) return;
@@ -168,6 +175,27 @@ export default function ProjectDetailPage() {
     setPending(next);
   };
 
+  const changeStatus = async (nextStatus: ProjectStatus) => {
+    if (!project || nextStatus === project.status) return;
+    setStatusSaving(true);
+    setStatusError(null);
+    setStatusSuccess(null);
+    try {
+      const updated = await apiFetch<Project>(`/projects/${projectId}/`, {
+        method: "PATCH",
+        body: { status: nextStatus },
+      });
+      setProject(updated);
+      setStatusSuccess("وضعیت پروژه ذخیره شد.");
+    } catch (err) {
+      setStatusError(
+        err instanceof ApiError ? err.message : "تغییر وضعیت ناموفق بود.",
+      );
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
   if (loading) return <PageLoader />;
   if (error) return <Alert>{error}</Alert>;
   if (!project) return <Alert>پروژه پیدا نشد.</Alert>;
@@ -254,6 +282,40 @@ export default function ProjectDetailPage() {
           </Button>
         </div>
       </div>
+
+      <Card className="max-w-md">
+        <Field
+          label="وضعیت پروژه"
+          hint="با تغییر وضعیت، بلافاصله ذخیره می‌شود."
+        >
+          <Select
+            value={project.status}
+            disabled={statusSaving}
+            onChange={(event) =>
+              changeStatus(event.target.value as ProjectStatus)
+            }
+          >
+            {PROJECT_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {statusSaving && (
+          <p className="mt-2 text-xs text-gray-500">در حال ذخیره...</p>
+        )}
+        {statusError && (
+          <div className="mt-3">
+            <Alert tone="error">{statusError}</Alert>
+          </div>
+        )}
+        {statusSuccess && (
+          <div className="mt-3">
+            <Alert tone="success">{statusSuccess}</Alert>
+          </div>
+        )}
+      </Card>
 
       {project.is_root && (
         <section>

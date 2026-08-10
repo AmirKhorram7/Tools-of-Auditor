@@ -17,6 +17,23 @@ def validate_iran_phone(value):
     return value
 
 
+class RelativeImageField(serializers.ImageField):
+    """
+    Return storage-relative URLs (/media/...) instead of absolute host URLs.
+
+    Behind Docker/nginx the browser must load media from the public origin,
+    not from an internal backend host/port that DRF would bake into absolute URIs.
+    """
+
+    def to_representation(self, value):
+        if not value:
+            return None
+        try:
+            return value.url
+        except (AttributeError, ValueError):
+            return None
+
+
 class SendOTPSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=11)
 
@@ -140,6 +157,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source="user.first_name", required=False, allow_blank=True)
     last_name = serializers.CharField(source="user.last_name", required=False, allow_blank=True)
     has_password = serializers.SerializerMethodField()
+    profile_image = RelativeImageField(required=False, allow_null=True)
 
     class Meta:
         model = Profile

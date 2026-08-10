@@ -121,6 +121,10 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   cancelled: "لغو‌شده",
 };
 
+export const PROJECT_STATUS_OPTIONS = (
+  Object.entries(PROJECT_STATUS_LABELS) as [ProjectStatus, string][]
+).map(([value, label]) => ({ value, label }));
+
 export const SHAPE_LABELS: Record<ShapeType, string> = {
   square: "مربع",
   rectangle: "مستطیل",

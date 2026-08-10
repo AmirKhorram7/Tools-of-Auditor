@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# TLS certificates (place on server only)
+deploy/nginx/ssl/*
+!deploy/nginx/ssl/.gitkeep
+
 # Python
 __pycache__/
 *.py[cod]
