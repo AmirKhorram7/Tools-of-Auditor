@@ -28,6 +28,8 @@ class ProcessInline(admin.TabularInline):
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     list_display = (
+        "owner__first_name",
+        "owner__last_name",
         "name",
         "parent",
         "company_name",
@@ -37,7 +39,7 @@ class ProjectAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("status", "is_active", "is_deleted")
-    search_fields = ("name", "company_name", "owner__phone_number")
+    search_fields = ("name", "company_name", "owner__phone_number", "owner__first_name", "owner__last_name")
     autocomplete_fields = ("parent", "owner")
     inlines = [SubProjectInline, ProcessInline]
 
@@ -57,9 +59,9 @@ class StepConnectionInline(admin.TabularInline):
 
 @admin.register(Process)
 class ProcessAdmin(admin.ModelAdmin):
-    list_display = ("name", "project", "department", "order", "owner", "created_at")
+    list_display = ("owner__first_name", "owner__last_name", "name", "project", "department", "order", "owner", "created_at")
     list_filter = ("project", "is_deleted")
-    search_fields = ("name", "project__name")
+    search_fields = ("name", "project__name", "owner__first_name", "owner__last_name")
     inlines = [ProcessStepInline, StepConnectionInline]
 
 
@@ -81,22 +83,23 @@ class StepMediaInline(admin.TabularInline):
 
 @admin.register(ProcessStep)
 class ProcessStepAdmin(admin.ModelAdmin):
-    list_display = ("title", "process", "shape_type", "order", "created_at")
+    list_display = ("process__owner__first_name", "process__owner__last_name", "title", "process", "shape_type", "order", "created_at")
     list_filter = ("shape_type", "is_deleted")
-    search_fields = ("title", "process__name")
+    search_fields = ("title", "process__name", "process__owner__first_name", "process__owner__last_name")
     inlines = [StepRiskInline, StepControlInline, StepMediaInline]
 
 
 @admin.register(StepRisk)
 class StepRiskAdmin(admin.ModelAdmin):
-    list_display = ("title", "step", "order", "created_at")
-    search_fields = ("title", "step__title")
+    list_display = ("step__process__owner__first_name", "step__process__owner__last_name", "title", "step", "order", "created_at")
+    search_fields = ("title", "step__title", "step__process__owner__first_name", "step__process__owner__last_name")
 
 
 @admin.register(StepControl)
 class StepControlAdmin(admin.ModelAdmin):
-    list_display = ("title", "step", "order", "created_at")
-    search_fields = ("title", "step__title")
+    list_display = ("step__process__owner__first_name", "step__process__owner__last_name", "title", "step", "order", "created_at")
+    search_fields = ("title", "step__title", "step__process__owner__first_name", "step__process__owner__last_name")
+
 
 
 @admin.register(StepConnection)
@@ -108,6 +111,6 @@ class StepConnectionAdmin(admin.ModelAdmin):
 
 @admin.register(StepMedia)
 class StepMediaAdmin(admin.ModelAdmin):
-    list_display = ("title", "step", "section", "kind", "order", "created_at")
+    list_display = ("step__process__owner__first_name", "step__process__owner__last_name", "title", "step", "section", "kind", "order", "created_at")
     list_filter = ("section", "kind", "is_deleted")
-    search_fields = ("title", "step__title", "url")
+    search_fields = ("title", "step__title", "url", "step__process__owner__first_name", "step__process__owner__last_name")
