@@ -4,6 +4,7 @@ from system_explanation_services.models import (
     Process,
     ProcessStep,
     Project,
+    ProjectMember,
     StepConnection,
     StepControl,
     StepMedia,
@@ -25,6 +26,14 @@ class ProcessInline(admin.TabularInline):
     fields = ("name", "department", "order", "owner")
 
 
+class ProjectMemberInline(admin.TabularInline):
+    model = ProjectMember
+    extra = 0
+    autocomplete_fields = ("user", "invited_by")
+    fields = ("user", "role", "invited_by", "created_at")
+    readonly_fields = ("created_at",)
+
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     list_display = (
@@ -41,7 +50,20 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ("status", "is_active", "is_deleted")
     search_fields = ("name", "company_name", "owner__phone_number", "owner__first_name", "owner__last_name")
     autocomplete_fields = ("parent", "owner")
-    inlines = [SubProjectInline, ProcessInline]
+    inlines = [SubProjectInline, ProcessInline, ProjectMemberInline]
+
+
+@admin.register(ProjectMember)
+class ProjectMemberAdmin(admin.ModelAdmin):
+    list_display = ("project", "user", "role", "invited_by", "created_at")
+    list_filter = ("role",)
+    search_fields = (
+        "project__name",
+        "user__phone_number",
+        "user__first_name",
+        "user__last_name",
+    )
+    autocomplete_fields = ("project", "user", "invited_by")
 
 
 class ProcessStepInline(admin.TabularInline):

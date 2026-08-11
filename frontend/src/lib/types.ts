@@ -25,6 +25,8 @@ export type ProjectStatus =
   | "completed"
   | "cancelled";
 
+export type ProjectRole = "owner" | "editor" | "viewer";
+
 export type Project = {
   id: number;
   parent: number | null;
@@ -35,11 +37,30 @@ export type Project = {
   is_active: boolean;
   is_root: boolean;
   owner: number;
+  my_role?: ProjectRole | null;
+  is_shared_with_me?: boolean;
   process_count?: number;
   sub_project_count?: number;
   created_at: string;
   updated_at: string;
   sub_projects?: Project[];
+};
+
+export type ProjectMember = {
+  id: number;
+  user: number;
+  phone_number: string;
+  first_name: string;
+  last_name: string;
+  role: ProjectRole;
+  invited_by: number | null;
+  created_at: string;
+};
+
+export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
+  owner: "مالک",
+  editor: "ویرایشگر",
+  viewer: "بیننده",
 };
 
 export type Process = {
@@ -51,6 +72,7 @@ export type Process = {
   department: string;
   order: number;
   owner: number;
+  my_role?: ProjectRole | null;
   step_count?: number;
   created_at: string;
   updated_at: string;
@@ -124,6 +146,21 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
 export const PROJECT_STATUS_OPTIONS = (
   Object.entries(PROJECT_STATUS_LABELS) as [ProjectStatus, string][]
 ).map(([value, label]) => ({ value, label }));
+
+export const PROJECT_MEMBER_ROLE_OPTIONS: { value: Exclude<ProjectRole, "owner">; label: string }[] =
+  [
+    { value: "editor", label: PROJECT_ROLE_LABELS.editor },
+    { value: "viewer", label: PROJECT_ROLE_LABELS.viewer },
+  ];
+
+/** Owner and editor can change project content. */
+export function canEditProject(role?: ProjectRole | null): boolean {
+  return role === "owner" || role === "editor";
+}
+
+export function canManageMembers(role?: ProjectRole | null): boolean {
+  return role === "owner";
+}
 
 export const SHAPE_LABELS: Record<ShapeType, string> = {
   square: "مربع",

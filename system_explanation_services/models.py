@@ -108,6 +108,76 @@ class Project(BaseModel):
                 {"parent": _("Sub-projects can only be created under a root project.")}
             )
 
+    def get_root(self):
+        """Sharing is always at root-project level."""
+        if self.parent_id is None:
+            return self
+        return self.parent
+
+
+class ProjectMember(models.Model):
+    """
+    Access to a root project (and its full tree).
+
+    Roles:
+    - owner: invite/remove members, delete project, full edit
+    - editor: create/edit documentation
+    - viewer: read + download PDF
+    """
+
+    class Role(models.TextChoices):
+        OWNER = "owner", _("Owner")
+        EDITOR = "editor", _("Editor")
+        VIEWER = "viewer", _("Viewer")
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+        help_text=_("Must be a root project (parent is null)."),
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="project_memberships",
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default=Role.VIEWER,
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="project_invites_sent",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "user"],
+                name="uniq_project_member",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user", "role"]),
+            models.Index(fields=["project", "role"]),
+        ]
+
+    def __str__(self):
+        return f"{self.project_id}:{self.user_id}:{self.role}"
+
+    def clean(self):
+        if self.project_id and self.project.parent_id is not None:
+            raise ValidationError(
+                {"project": _("Members can only be attached to a root project.")}
+            )
+
 
 class Process(BaseModel):
     """

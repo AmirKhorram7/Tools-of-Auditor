@@ -8,9 +8,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# curl = healthcheck. No build-essential needed: psycopg/pillow use binary wheels.
+# curl = healthcheck. fonts-dejavu = Farsi-capable PDF export (reportlab).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends --fix-missing curl \
+    && apt-get install -y --no-install-recommends --fix-missing curl fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

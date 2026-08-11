@@ -1,20 +1,30 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from system_explanation_services.models import (
     Process,
     ProcessStep,
     Project,
+    ProjectMember,
     StepConnection,
     StepControl,
     StepMedia,
     StepRisk,
 )
+from system_explanation_services.services.access import (
+    can_edit_project,
+    user_role_on_project,
+)
+
+User = get_user_model()
 
 
 class ProjectSerializer(serializers.ModelSerializer):
     process_count = serializers.IntegerField(read_only=True, required=False)
     sub_project_count = serializers.IntegerField(read_only=True, required=False)
     is_root = serializers.BooleanField(read_only=True)
+    my_role = serializers.SerializerMethodField()
+    is_shared_with_me = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -28,6 +38,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "is_active",
             "is_root",
             "owner",
+            "my_role",
+            "is_shared_with_me",
             "process_count",
             "sub_project_count",
             "created_at",
@@ -35,12 +47,29 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["owner", "created_at", "updated_at"]
 
+    def get_my_role(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        return user_role_on_project(request.user, obj)
+
+    def get_is_shared_with_me(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        root = obj.get_root()
+        return root.owner_id != request.user.id and bool(
+            user_role_on_project(request.user, obj)
+        )
+
     def validate_parent(self, parent):
         if parent is None:
             return parent
         request = self.context.get("request")
-        if request and parent.owner_id != request.user.id:
-            raise serializers.ValidationError("You do not own the parent project.")
+        if request and not can_edit_project(request.user, parent):
+            raise serializers.ValidationError(
+                "You do not have edit access to the parent project."
+            )
         if parent.parent_id is not None:
             raise serializers.ValidationError(
                 "Sub-projects can only be created under a root project."
@@ -57,8 +86,53 @@ class ProjectDetailSerializer(ProjectSerializer):
         fields = ProjectSerializer.Meta.fields + ["sub_projects"]
 
 
+class ProjectMemberSerializer(serializers.ModelSerializer):
+    phone_number = serializers.CharField(source="user.phone_number", read_only=True)
+    first_name = serializers.CharField(source="user.first_name", read_only=True)
+    last_name = serializers.CharField(source="user.last_name", read_only=True)
+
+    class Meta:
+        model = ProjectMember
+        fields = [
+            "id",
+            "user",
+            "phone_number",
+            "first_name",
+            "last_name",
+            "role",
+            "invited_by",
+            "created_at",
+        ]
+        read_only_fields = ["user", "invited_by", "created_at"]
+
+
+class ProjectMemberInviteSerializer(serializers.Serializer):
+    phone_number = serializers.CharField(max_length=15)
+    role = serializers.ChoiceField(
+        choices=[
+            ProjectMember.Role.EDITOR,
+            ProjectMember.Role.VIEWER,
+        ],
+        default=ProjectMember.Role.VIEWER,
+    )
+
+    def validate_phone_number(self, value):
+        value = value.strip()
+        if not User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(
+                "No user with this phone number. They must register first."
+            )
+        return value
+
+    def validate_role(self, value):
+        if value == ProjectMember.Role.OWNER:
+            raise serializers.ValidationError("Cannot invite someone as owner.")
+        return value
+
+
 class ProcessSerializer(serializers.ModelSerializer):
     step_count = serializers.IntegerField(read_only=True, required=False)
+    my_role = serializers.SerializerMethodField()
 
     class Meta:
         model = Process
@@ -71,11 +145,18 @@ class ProcessSerializer(serializers.ModelSerializer):
             "department",
             "order",
             "owner",
+            "my_role",
             "step_count",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["owner", "created_at", "updated_at"]
+
+    def get_my_role(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        return user_role_on_project(request.user, obj.project)
 
 
 class StepMediaSerializer(serializers.ModelSerializer):

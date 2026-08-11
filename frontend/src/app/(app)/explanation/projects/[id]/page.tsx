@@ -18,12 +18,18 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
-import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { ApiError, apiDownload, apiFetch, apiList } from "@/lib/api";
 import {
+  PROJECT_MEMBER_ROLE_OPTIONS,
+  PROJECT_ROLE_LABELS,
   PROJECT_STATUS_LABELS,
   PROJECT_STATUS_OPTIONS,
+  canEditProject,
+  canManageMembers,
   type Process,
   type Project,
+  type ProjectMember,
+  type ProjectRole,
   type ProjectStatus,
 } from "@/lib/types";
 
@@ -61,6 +67,14 @@ export default function ProjectDetailPage() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusSuccess, setStatusSuccess] = useState<string | null>(null);
+
+  const [shareOpen, setShareOpen] = useState(false);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteRole, setInviteRole] = useState<Exclude<ProjectRole, "owner">>("viewer");
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareSaving, setShareSaving] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(projectId)) return;
@@ -196,9 +210,80 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const rootId = project?.parent ?? projectId;
+
+  const loadMembers = async () => {
+    setShareError(null);
+    try {
+      const data = await apiFetch<ProjectMember[]>(`/projects/${rootId}/members/`);
+      setMembers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setShareError(err instanceof ApiError ? err.message : "دریافت اعضا ناموفق بود.");
+    }
+  };
+
+  const openShare = async () => {
+    setShareOpen(true);
+    await loadMembers();
+  };
+
+  const inviteMember = async () => {
+    if (!invitePhone.trim()) {
+      setShareError("شماره موبایل الزامی است.");
+      return;
+    }
+    setShareSaving(true);
+    setShareError(null);
+    try {
+      await apiFetch(`/projects/${rootId}/members/`, {
+        method: "POST",
+        body: { phone_number: invitePhone.trim(), role: inviteRole },
+      });
+      setInvitePhone("");
+      await loadMembers();
+    } catch (err) {
+      setShareError(err instanceof ApiError ? err.message : "دعوت ناموفق بود.");
+    } finally {
+      setShareSaving(false);
+    }
+  };
+
+  const removeMember = async (memberId: number) => {
+    setShareSaving(true);
+    setShareError(null);
+    try {
+      await apiFetch(`/projects/${rootId}/members/${memberId}/`, {
+        method: "DELETE",
+      });
+      await loadMembers();
+    } catch (err) {
+      setShareError(err instanceof ApiError ? err.message : "حذف عضو ناموفق بود.");
+    } finally {
+      setShareSaving(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    setPdfLoading(true);
+    try {
+      await apiDownload(
+        `/projects/${projectId}/export-pdf/`,
+        `project-${projectId}.pdf`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "دانلود PDF ناموفق بود.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   if (loading) return <PageLoader />;
   if (error) return <Alert>{error}</Alert>;
   if (!project) return <Alert>پروژه پیدا نشد.</Alert>;
+
+  const editable = canEditProject(project.my_role);
+  const manageMembers = canManageMembers(project.my_role);
+  const canDeleteRoot = project.my_role === "owner";
 
   const confirmCopy =
     pending?.kind === "self"
@@ -239,10 +324,16 @@ export default function ProjectDetailPage() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-bold text-ink">{project.name}</h1>
             <Badge tone="blue">{PROJECT_STATUS_LABELS[project.status]}</Badge>
             {!project.is_root && <Badge>زیرپروژه</Badge>}
+            {project.my_role && (
+              <Badge tone={project.is_shared_with_me ? "amber" : "green"}>
+                {PROJECT_ROLE_LABELS[project.my_role]}
+              </Badge>
+            )}
+            {project.is_shared_with_me && <Badge>اشتراک‌شده با من</Badge>}
           </div>
           <p className="mt-1 text-sm text-gray-500">
             {project.company_name || "بدون نام شرکت"}
@@ -254,14 +345,24 @@ export default function ProjectDetailPage() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            className="text-red-600 hover:border-red-300 hover:bg-red-50"
-            onClick={() => askDelete({ kind: "self" })}
-          >
-            {project.is_root ? "حذف پروژه" : "حذف زیرپروژه"}
+          <Button variant="secondary" disabled={pdfLoading} onClick={downloadPdf}>
+            {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
           </Button>
-          {project.is_root && (
+          {manageMembers && (
+            <Button variant="secondary" onClick={openShare}>
+              اشتراک‌گذاری
+            </Button>
+          )}
+          {(canDeleteRoot || (editable && !project.is_root)) && (
+            <Button
+              variant="secondary"
+              className="text-red-600 hover:border-red-300 hover:bg-red-50"
+              onClick={() => askDelete({ kind: "self" })}
+            >
+              {project.is_root ? "حذف پروژه" : "حذف زیرپروژه"}
+            </Button>
+          )}
+          {editable && project.is_root && (
             <Button
               variant="secondary"
               onClick={() => {
@@ -272,25 +373,31 @@ export default function ProjectDetailPage() {
               + زیرپروژه
             </Button>
           )}
-          <Button
-            onClick={() => {
-              setFormError(null);
-              setProcessOpen(true);
-            }}
-          >
-            + فرایند
-          </Button>
+          {editable && (
+            <Button
+              onClick={() => {
+                setFormError(null);
+                setProcessOpen(true);
+              }}
+            >
+              + فرایند
+            </Button>
+          )}
         </div>
       </div>
 
       <Card className="max-w-md">
         <Field
           label="وضعیت پروژه"
-          hint="با تغییر وضعیت، بلافاصله ذخیره می‌شود."
+          hint={
+            editable
+              ? "با تغییر وضعیت، بلافاصله ذخیره می‌شود."
+              : "فقط مالک و ویرایشگر می‌توانند وضعیت را تغییر دهند."
+          }
         >
           <Select
             value={project.status}
-            disabled={statusSaving}
+            disabled={statusSaving || !editable}
             onChange={(event) =>
               changeStatus(event.target.value as ProjectStatus)
             }
@@ -340,20 +447,22 @@ export default function ProjectDetailPage() {
                   </Link>
                   <div className="mt-2 flex items-center text-xs text-gray-500">
                     <span>{sub.process_count ?? 0} فرایند</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ms-auto text-red-600 hover:bg-red-50"
-                      onClick={() =>
-                        askDelete({
-                          kind: "sub-project",
-                          id: sub.id,
-                          name: sub.name,
-                        })
-                      }
-                    >
-                      حذف
-                    </Button>
+                    {editable && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ms-auto text-red-600 hover:bg-red-50"
+                        onClick={() =>
+                          askDelete({
+                            kind: "sub-project",
+                            id: sub.id,
+                            name: sub.name,
+                          })
+                        }
+                      >
+                        حذف
+                      </Button>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -369,7 +478,9 @@ export default function ProjectDetailPage() {
             title="فرایندی ثبت نشده است"
             description="مثال: فرایند تدارکات، فرایند فروش، فرایند درآمد"
             action={
-              <Button onClick={() => setProcessOpen(true)}>ساخت فرایند</Button>
+              editable ? (
+                <Button onClick={() => setProcessOpen(true)}>ساخت فرایند</Button>
+              ) : undefined
             }
           />
         ) : (
@@ -390,20 +501,22 @@ export default function ProjectDetailPage() {
                 </p>
                 <div className="mt-3 flex items-center border-t border-gray-100 pt-3 text-xs text-gray-500">
                   <span>{process.step_count ?? 0} گام مستندشده</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ms-auto text-red-600 hover:bg-red-50"
-                    onClick={() =>
-                      askDelete({
-                        kind: "process",
-                        id: process.id,
-                        name: process.name,
-                      })
-                    }
-                  >
-                    حذف
-                  </Button>
+                  {editable && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ms-auto text-red-600 hover:bg-red-50"
+                      onClick={() =>
+                        askDelete({
+                          kind: "process",
+                          id: process.id,
+                          name: process.name,
+                        })
+                      }
+                    >
+                      حذف
+                    </Button>
+                  )}
                 </div>
               </Card>
             ))}
@@ -500,6 +613,83 @@ export default function ProjectDetailPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={shareOpen}
+        title="اشتراک‌گذاری پروژه"
+        onClose={() => setShareOpen(false)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            با دعوت از طریق شماره موبایل، کل این پروژه (و زیرپروژه‌ها و فرایندها)
+            برای همکار یا مدیر شما قابل مشاهده می‌شود.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
+            <Field label="شماره موبایل">
+              <Input
+                value={invitePhone}
+                onChange={(event) => setInvitePhone(event.target.value)}
+                placeholder="0912xxxxxxx"
+                dir="ltr"
+              />
+            </Field>
+            <Field label="نقش">
+              <Select
+                value={inviteRole}
+                onChange={(event) =>
+                  setInviteRole(event.target.value as Exclude<ProjectRole, "owner">)
+                }
+              >
+                {PROJECT_MEMBER_ROLE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div className="flex items-end">
+              <Button loading={shareSaving} onClick={inviteMember}>
+                دعوت
+              </Button>
+            </div>
+          </div>
+          {shareError && <Alert>{shareError}</Alert>}
+          <div className="space-y-2 border-t border-gray-100 pt-3">
+            <p className="text-sm font-medium text-ink">اعضای فعلی</p>
+            {members.length === 0 ? (
+              <p className="text-sm text-gray-500">هنوز عضوی دعوت نشده است.</p>
+            ) : (
+              members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-ink">
+                      {`${member.first_name} ${member.last_name}`.trim() ||
+                        member.phone_number}
+                    </p>
+                    <p className="text-xs text-gray-500" dir="ltr">
+                      {member.phone_number} · {PROJECT_ROLE_LABELS[member.role]}
+                    </p>
+                  </div>
+                  {member.role !== "owner" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600"
+                      disabled={shareSaving}
+                      onClick={() => removeMember(member.id)}
+                    >
+                      حذف
+                    </Button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </Modal>
 
       <ConfirmDialog

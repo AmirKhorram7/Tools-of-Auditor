@@ -196,3 +196,39 @@ export async function apiList<T>(path: string): Promise<T[]> {
   const data = await apiFetch<Paginated<T> | T[]>(path);
   return listResults(data);
 }
+
+/** Download a binary file (e.g. PDF export) with JWT auth. */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  const access = tokens.access;
+  if (access) headers.Authorization = `Bearer ${access}`;
+
+  let response = await fetch(`${API_BASE}${path}`, { headers });
+
+  if (response.status === 401 && tokens.refresh) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      const retryHeaders: Record<string, string> = {};
+      const next = tokens.access;
+      if (next) retryHeaders.Authorization = `Bearer ${next}`;
+      response = await fetch(`${API_BASE}${path}`, { headers: retryHeaders });
+    } else {
+      tokens.clear();
+    }
+  }
+
+  if (!response.ok) {
+    const data = await parseBody(response);
+    throw new ApiError(response.status, extractMessage(response.status, data), data);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

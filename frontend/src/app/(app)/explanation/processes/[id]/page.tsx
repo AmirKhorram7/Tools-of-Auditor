@@ -16,9 +16,10 @@ import {
   PageLoader,
   Select,
 } from "@/components/ui";
-import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { ApiError, apiDownload, apiFetch, apiList } from "@/lib/api";
 import {
   SHAPE_LABELS,
+  canEditProject,
   type Process,
   type ProcessStep,
   type ShapeType,
@@ -50,6 +51,7 @@ export default function ProcessCanvasPage() {
   const [pending, setPending] = useState<Pending>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(processId)) return;
@@ -194,22 +196,47 @@ export default function ProcessCanvasPage() {
         <div className="flex gap-2">
           <Button
             variant="secondary"
-            onClick={() => {
-              setDeleteError(null);
-              setPending({ kind: "process" });
+            disabled={pdfLoading}
+            onClick={async () => {
+              setPdfLoading(true);
+              try {
+                await apiDownload(
+                  `/processes/${processId}/export-pdf/`,
+                  `process-${processId}.pdf`,
+                );
+              } catch (err) {
+                setError(
+                  err instanceof ApiError ? err.message : "دانلود PDF ناموفق بود.",
+                );
+              } finally {
+                setPdfLoading(false);
+              }
             }}
-            className="text-red-600 hover:bg-red-50 hover:border-red-300"
           >
-            حذف فرایند
+            {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
           </Button>
-          <Button
-            onClick={() => {
-              setFormError(null);
-              setOpen(true);
-            }}
-          >
-            + افزودن گام
-          </Button>
+          {canEditProject(process.my_role) && (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setDeleteError(null);
+                  setPending({ kind: "process" });
+                }}
+                className="text-red-600 hover:bg-red-50 hover:border-red-300"
+              >
+                حذف فرایند
+              </Button>
+              <Button
+                onClick={() => {
+                  setFormError(null);
+                  setOpen(true);
+                }}
+              >
+                + افزودن گام
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -226,6 +253,7 @@ export default function ProcessCanvasPage() {
       <StepCanvas
         steps={steps}
         connections={connections}
+        readOnly={!canEditProject(process.my_role)}
         onMoved={handleMoved}
         onConnect={connect}
         onDeleteConnection={disconnect}

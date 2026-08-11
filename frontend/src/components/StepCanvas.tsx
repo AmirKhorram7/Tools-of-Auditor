@@ -47,6 +47,8 @@ type Props = {
   onConnect: (fromStep: number, toStep: number) => Promise<void>;
   onDeleteConnection: (id: number) => Promise<void>;
   onDeleteStep: (step: ProcessStep) => void;
+  /** Viewers: navigate only — no drag / connect / delete. */
+  readOnly?: boolean;
 };
 
 /**
@@ -63,6 +65,7 @@ export default function StepCanvas({
   onConnect,
   onDeleteConnection,
   onDeleteStep,
+  readOnly = false,
 }: Props) {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -141,7 +144,7 @@ export default function StepCanvas({
     event: React.PointerEvent<HTMLDivElement>,
     step: ProcessStep,
   ) => {
-    if (connectMode) return;
+    if (readOnly || connectMode) return;
 
     const shapeRect = event.currentTarget.getBoundingClientRect();
     dragState.current = {
@@ -234,33 +237,40 @@ export default function StepCanvas({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setConnectMode((mode) => !mode);
-            setLinkSource(null);
-          }}
-          className={cx(
-            "rounded-lg border px-3 py-1.5 text-sm font-medium transition",
-            connectMode
-              ? "border-brand-500 bg-brand-500 text-ink"
-              : "border-gray-300 bg-white text-navy-800 hover:border-navy-700",
-          )}
-        >
-          {connectMode ? "پایان اتصال" : "اتصال گام‌ها"}
-        </button>
+      {!readOnly && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setConnectMode((mode) => !mode);
+              setLinkSource(null);
+            }}
+            className={cx(
+              "rounded-lg border px-3 py-1.5 text-sm font-medium transition",
+              connectMode
+                ? "border-brand-500 bg-brand-500 text-ink"
+                : "border-gray-300 bg-white text-navy-800 hover:border-navy-700",
+            )}
+          >
+            {connectMode ? "پایان اتصال" : "اتصال گام‌ها"}
+          </button>
 
+          <p className="text-xs text-gray-500">
+            {connectMode
+              ? linkSource === null
+                ? "گام مبدأ را انتخاب کنید."
+                : "حالا گام مقصد را انتخاب کنید."
+              : "شکل‌ها را بکشید تا جابه‌جا شوند، یا کلیک کنید تا مستندسازی باز شود."}
+          </p>
+
+          {busy && <span className="text-xs text-gray-400">در حال ذخیره…</span>}
+        </div>
+      )}
+      {readOnly && (
         <p className="text-xs text-gray-500">
-          {connectMode
-            ? linkSource === null
-              ? "گام مبدأ را انتخاب کنید."
-              : "حالا گام مقصد را انتخاب کنید."
-            : "شکل‌ها را بکشید تا جابه‌جا شوند، یا کلیک کنید تا مستندسازی باز شود."}
+          حالت مشاهده: برای دیدن مستندات هر گام روی شکل کلیک کنید.
         </p>
-
-        {busy && <span className="text-xs text-gray-400">در حال ذخیره…</span>}
-      </div>
+      )}
 
       <div
         ref={canvasRef}
@@ -382,7 +392,7 @@ export default function StepCanvas({
                   </span>
                 </div>
 
-                {!connectMode && (
+                {!readOnly && !connectMode && (
                   <button
                     type="button"
                     onClick={() => onDeleteStep(step)}

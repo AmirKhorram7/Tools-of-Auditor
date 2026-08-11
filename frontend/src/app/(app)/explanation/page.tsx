@@ -17,7 +17,11 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
-import { PROJECT_STATUS_LABELS, type Project } from "@/lib/types";
+import {
+  PROJECT_ROLE_LABELS,
+  PROJECT_STATUS_LABELS,
+  type Project,
+} from "@/lib/types";
 
 export default function ExplanationServicePage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -130,9 +134,16 @@ export default function ExplanationServicePage() {
                 >
                   {project.name}
                 </Link>
-                <Badge tone="blue">
-                  {PROJECT_STATUS_LABELS[project.status]}
-                </Badge>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge tone="blue">
+                    {PROJECT_STATUS_LABELS[project.status]}
+                  </Badge>
+                  {project.is_shared_with_me && project.my_role && (
+                    <Badge tone="amber">
+                      {PROJECT_ROLE_LABELS[project.my_role]}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <p className="mt-1 text-xs text-gray-500">
                 {project.company_name || "بدون نام شرکت"}
@@ -145,17 +156,19 @@ export default function ExplanationServicePage() {
               <div className="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500">
                 <span>{project.sub_project_count ?? 0} زیرپروژه</span>
                 <span>{project.process_count ?? 0} فرایند</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ms-auto text-red-600 hover:bg-red-50"
-                  onClick={() => {
-                    setDeleteError(null);
-                    setPending(project);
-                  }}
-                >
-                  حذف
-                </Button>
+                {project.my_role === "owner" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ms-auto text-red-600 hover:bg-red-50"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setPending(project);
+                    }}
+                  >
+                    حذف
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
