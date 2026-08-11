@@ -259,6 +259,15 @@ class TicketViewSet(viewsets.ModelViewSet):
             return TicketCreateSerializer
         return TicketSerializer
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ticket = serializer.save()
+        return Response(
+            TicketSerializer(ticket, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=True, methods=["post"])
     def send_message(self, request, pk=None):
         ticket = self.get_object()
@@ -276,8 +285,16 @@ class TicketViewSet(viewsets.ModelViewSet):
             message=serializer.validated_data["message"],
             is_admin_message=False,
         )
-        ticket.save(update_fields=["updated_at"])
-        return Response({"detail": "Message sent successfully."}, status=status.HTTP_201_CREATED)
+        if ticket.status == TicketStatus.WAITING_FOR_USER:
+            ticket.status = TicketStatus.IN_PROGRESS
+            ticket.save(update_fields=["status", "updated_at"])
+        else:
+            ticket.save(update_fields=["updated_at"])
+        ticket.refresh_from_db()
+        return Response(
+            TicketSerializer(ticket, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"])
     def close(self, request, pk=None):

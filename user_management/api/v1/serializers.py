@@ -218,14 +218,34 @@ class TicketMessageSerializer(serializers.ModelSerializer):
 
 class TicketCreateSerializer(serializers.ModelSerializer):
     message = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, max_length=150
+    )
+    last_name = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, max_length=150
+    )
 
     class Meta:
         model = Ticket
-        fields = ("subject", "priority", "message")
+        fields = ("subject", "priority", "message", "first_name", "last_name")
 
     def create(self, validated_data):
         message = validated_data.pop("message")
+        first_name = (validated_data.pop("first_name", "") or "").strip()
+        last_name = (validated_data.pop("last_name", "") or "").strip()
         user = self.context["request"].user
+
+        # Fill missing profile names when the user submits them on contact form.
+        update_fields = []
+        if first_name and not (user.first_name or "").strip():
+            user.first_name = first_name
+            update_fields.append("first_name")
+        if last_name and not (user.last_name or "").strip():
+            user.last_name = last_name
+            update_fields.append("last_name")
+        if update_fields:
+            user.save(update_fields=update_fields)
+
         ticket = Ticket.objects.create(user=user, **validated_data)
         TicketMessage.objects.create(
             ticket=ticket,

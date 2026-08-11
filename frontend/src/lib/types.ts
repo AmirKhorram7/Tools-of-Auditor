@@ -18,6 +18,40 @@ export type Profile = {
   has_password: boolean;
 };
 
+export type TicketStatus =
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_USER"
+  | "CLOSED";
+
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export type TicketMessage = {
+  id: number;
+  sender: number;
+  sender_name: string;
+  message: string;
+  is_admin_message: boolean;
+  created_at: string;
+};
+
+export type Ticket = {
+  id: number;
+  subject: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  created_at: string;
+  updated_at: string;
+  messages: TicketMessage[];
+};
+
+export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
+  OPEN: "باز",
+  IN_PROGRESS: "در حال بررسی",
+  WAITING_FOR_USER: "پاسخ پشتیبانی",
+  CLOSED: "بسته",
+};
+
 export type ProjectStatus =
   | "draft"
   | "active"

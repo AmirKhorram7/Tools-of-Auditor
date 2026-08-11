@@ -214,6 +214,7 @@ export default function TopBar() {
             "تشریح سیستم",
             pathname.startsWith("/explanation"),
           )}
+          {navLink("/contact", "ارتباط با ما", pathname.startsWith("/contact"))}
           {navLink("/profile", "پروفایل", pathname === "/profile")}
         </nav>
       </div>

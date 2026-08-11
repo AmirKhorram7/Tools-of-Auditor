@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import SocialFooter from "@/components/SocialFooter";
 import { Alert, Button, Card, Field, Input, cx } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -325,9 +326,7 @@ export default function LoginPage() {
           )}
         </Card>
 
-        <p className="mt-4 text-center text-xs text-gray-400/90">
-          Developed with ❤️ by Amir Hossein Khorram
-        </p>
+        <SocialFooter className="mt-6" />
       </div>
     </main>
   );
