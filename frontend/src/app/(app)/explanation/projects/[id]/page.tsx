@@ -18,7 +18,7 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
-import { ApiError, apiDownload, apiFetch, apiList } from "@/lib/api";
+import { ApiError, apiDownload, apiFetch, apiList, mediaUrl } from "@/lib/api";
 import {
   PROJECT_MEMBER_ROLE_OPTIONS,
   PROJECT_ROLE_LABELS,
@@ -31,6 +31,7 @@ import {
   type ProjectMember,
   type ProjectRole,
   type ProjectStatus,
+  type UserLookupResult,
 } from "@/lib/types";
 
 type Pending =
@@ -75,6 +76,8 @@ export default function ProjectDetailPage() {
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareSaving, setShareSaving] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [lookupHits, setLookupHits] = useState<UserLookupResult[]>([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(projectId)) return;
@@ -224,7 +227,34 @@ export default function ProjectDetailPage() {
 
   const openShare = async () => {
     setShareOpen(true);
+    setLookupHits([]);
+    setInvitePhone("");
     await loadMembers();
+  };
+
+  const searchInviteUser = async (phone: string) => {
+    setInvitePhone(phone);
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 4) {
+      setLookupHits([]);
+      return;
+    }
+    setLookupLoading(true);
+    try {
+      const hits = await apiFetch<UserLookupResult[]>(
+        `/users/lookup/?phone=${encodeURIComponent(digits)}`,
+      );
+      setLookupHits(Array.isArray(hits) ? hits : []);
+    } catch {
+      setLookupHits([]);
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const pickLookupUser = (user: UserLookupResult) => {
+    setInvitePhone(user.phone_number);
+    setLookupHits([]);
   };
 
   const inviteMember = async () => {
@@ -240,6 +270,7 @@ export default function ProjectDetailPage() {
         body: { phone_number: invitePhone.trim(), role: inviteRole },
       });
       setInvitePhone("");
+      setLookupHits([]);
       await loadMembers();
     } catch (err) {
       setShareError(err instanceof ApiError ? err.message : "دعوت ناموفق بود.");
@@ -626,13 +657,60 @@ export default function ProjectDetailPage() {
             برای همکار یا مدیر شما قابل مشاهده می‌شود.
           </p>
           <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
-            <Field label="شماره موبایل">
-              <Input
-                value={invitePhone}
-                onChange={(event) => setInvitePhone(event.target.value)}
-                placeholder="0912xxxxxxx"
-                dir="ltr"
-              />
+            <Field
+              label="شماره موبایل"
+              hint="با تایپ شماره، کاربران ثبت‌شده پیشنهاد می‌شوند."
+            >
+              <div className="relative">
+                <Input
+                  value={invitePhone}
+                  onChange={(event) => searchInviteUser(event.target.value)}
+                  placeholder="0912xxxxxxx"
+                  dir="ltr"
+                  autoComplete="off"
+                />
+                {(lookupLoading || lookupHits.length > 0) && (
+                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md">
+                    {lookupLoading && lookupHits.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-gray-500">در حال جستجو...</p>
+                    )}
+                    {lookupHits.map((user) => {
+                      const name =
+                        `${user.first_name} ${user.last_name}`.trim() || "کاربر تی‌ادیتور";
+                      const avatar = mediaUrl(user.profile_image);
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => pickLookupUser(user)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition hover:bg-surface"
+                        >
+                          {avatar ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={avatar}
+                              alt=""
+                              className="size-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex size-8 items-center justify-center rounded-full bg-navy-800 text-xs font-medium text-white">
+                              {(user.first_name || user.phone_number).slice(0, 1)}
+                            </span>
+                          )}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-ink">
+                              {name}
+                            </span>
+                            <span className="block text-xs text-gray-500" dir="ltr">
+                              {user.phone_number}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </Field>
             <Field label="نقش">
               <Select
@@ -660,33 +738,50 @@ export default function ProjectDetailPage() {
             {members.length === 0 ? (
               <p className="text-sm text-gray-500">هنوز عضوی دعوت نشده است.</p>
             ) : (
-              members.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm"
-                >
-                  <div>
-                    <p className="font-medium text-ink">
-                      {`${member.first_name} ${member.last_name}`.trim() ||
-                        member.phone_number}
-                    </p>
-                    <p className="text-xs text-gray-500" dir="ltr">
-                      {member.phone_number} · {PROJECT_ROLE_LABELS[member.role]}
-                    </p>
+              members.map((member) => {
+                const name =
+                  `${member.first_name} ${member.last_name}`.trim() ||
+                  member.phone_number;
+                const avatar = mediaUrl(member.profile_image);
+                return (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      {avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={avatar}
+                          alt=""
+                          className="size-8 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-navy-800 text-xs font-medium text-white">
+                          {name.slice(0, 1)}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-ink">{name}</p>
+                        <p className="text-xs text-gray-500" dir="ltr">
+                          {member.phone_number} · {PROJECT_ROLE_LABELS[member.role]}
+                        </p>
+                      </div>
+                    </div>
+                    {member.role !== "owner" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600"
+                        disabled={shareSaving}
+                        onClick={() => removeMember(member.id)}
+                      >
+                        حذف
+                      </Button>
+                    )}
                   </div>
-                  {member.role !== "owner" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600"
-                      disabled={shareSaving}
-                      onClick={() => removeMember(member.id)}
-                    >
-                      حذف
-                    </Button>
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

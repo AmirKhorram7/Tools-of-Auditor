@@ -9,6 +9,7 @@ from user_management.api.v1.views import (
     SendOTPAPIView,
     SetPasswordAPIView,
     TicketViewSet,
+    UserLookupAPIView,
     VerifyOTPAPIView,
 )
 
@@ -23,5 +24,6 @@ urlpatterns = [
     path("auth/refresh/", RefreshTokenAPIView.as_view(), name="refresh-token"),
     path("auth/logout/", LogoutAPIView.as_view(), name="logout"),
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("users/lookup/", UserLookupAPIView.as_view(), name="users-lookup"),
     path("", include(router.urls)),
 ]

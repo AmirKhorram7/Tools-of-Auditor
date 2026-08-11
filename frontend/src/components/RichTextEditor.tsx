@@ -32,6 +32,7 @@ type Props = {
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: number;
+  readOnly?: boolean;
 };
 
 /**
@@ -43,6 +44,7 @@ export default function RichTextEditor({
   onChange,
   placeholder = "متن خود را وارد کنید...",
   minHeight = 180,
+  readOnly = false,
 }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -55,12 +57,14 @@ export default function RichTextEditor({
   }, [value]);
 
   const run = (action: ToolbarAction) => {
+    if (readOnly) return;
     editorRef.current?.focus();
     document.execCommand(action.command, false, action.value);
     onChange(editorRef.current?.innerHTML ?? "");
   };
 
   const addLink = () => {
+    if (readOnly) return;
     const url = window.prompt("آدرس لینک را وارد کنید:", "https://");
     if (!url) return;
     editorRef.current?.focus();
@@ -69,46 +73,61 @@ export default function RichTextEditor({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-300 bg-white focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-200">
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-1.5">
-        {ACTIONS.map((action) => (
+    <div
+      className={cx(
+        "overflow-hidden rounded-lg border border-gray-300 bg-white",
+        !readOnly &&
+          "focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-200",
+      )}
+    >
+      {!readOnly && (
+        <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-1.5">
+          {ACTIONS.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              title={action.title}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => run(action)}
+              className={cx(
+                "rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700",
+                action.command === "bold" && "font-bold",
+                action.command === "italic" && "italic",
+                action.command === "underline" && "underline",
+              )}
+            >
+              {action.label}
+            </button>
+          ))}
           <button
-            key={action.label}
             type="button"
-            title={action.title}
+            title="افزودن لینک"
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => run(action)}
-            className={cx(
-              "rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700",
-              action.command === "bold" && "font-bold",
-              action.command === "italic" && "italic",
-              action.command === "underline" && "underline",
-            )}
+            onClick={addLink}
+            className="rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700"
           >
-            {action.label}
+            🔗 لینک
           </button>
-        ))}
-        <button
-          type="button"
-          title="افزودن لینک"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={addLink}
-          className="rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700"
-        >
-          🔗 لینک
-        </button>
-      </div>
+        </div>
+      )}
 
       <div
         ref={editorRef}
-        contentEditable
+        contentEditable={!readOnly}
         dir="rtl"
         suppressContentEditableWarning
         data-placeholder={placeholder}
         style={{ minHeight }}
-        onInput={(event) => onChange(event.currentTarget.innerHTML)}
-        onBlur={(event) => onChange(event.currentTarget.innerHTML)}
-        className="rich-content max-h-[520px] overflow-y-auto px-3 py-2.5 text-sm outline-none"
+        onInput={(event) => {
+          if (!readOnly) onChange(event.currentTarget.innerHTML);
+        }}
+        onBlur={(event) => {
+          if (!readOnly) onChange(event.currentTarget.innerHTML);
+        }}
+        className={cx(
+          "rich-content max-h-[520px] overflow-y-auto px-3 py-2.5 text-sm outline-none",
+          readOnly && "bg-gray-50 text-gray-800",
+        )}
       />
     </div>
   );

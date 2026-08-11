@@ -19,6 +19,8 @@ type Props = {
   controlId?: number;
   items: StepMedia[];
   onChanged: () => void;
+  /** Viewers can open links/files but not upload or delete. */
+  readOnly?: boolean;
 };
 
 export default function MediaPanel({
@@ -28,6 +30,7 @@ export default function MediaPanel({
   controlId,
   items,
   onChanged,
+  readOnly = false,
 }: Props) {
   const [kind, setKind] = useState<MediaKind>("image");
   const [title, setTitle] = useState("");
@@ -109,16 +112,18 @@ export default function MediaPanel({
         <p className="text-xs font-semibold text-gray-700">
           پیوست‌ها (لینک، تصویر، فایل)
         </p>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            setOpen((value) => !value);
-            setError(null);
-          }}
-        >
-          {open ? "بستن" : "+ افزودن"}
-        </Button>
+        {!readOnly && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setOpen((value) => !value);
+              setError(null);
+            }}
+          >
+            {open ? "بستن" : "+ افزودن"}
+          </Button>
+        )}
       </div>
 
       {items.length > 0 && (
@@ -152,14 +157,16 @@ export default function MediaPanel({
                 ) : (
                   <span className="truncate text-gray-700">{item.title}</span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => remove(item.id)}
-                  className="ms-auto text-red-500 transition hover:text-red-700"
-                  title="حذف"
-                >
-                  ✕
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => remove(item.id)}
+                    className="ms-auto text-red-500 transition hover:text-red-700"
+                    title="حذف"
+                  >
+                    ✕
+                  </button>
+                )}
               </li>
             );
           })}
@@ -170,7 +177,7 @@ export default function MediaPanel({
         <p className="text-xs text-gray-500">پیوستی ثبت نشده است.</p>
       )}
 
-      {open && (
+      {!readOnly && open && (
         <div className="space-y-2 rounded-md border border-gray-200 bg-white p-2.5">
           <div className="grid gap-2 sm:grid-cols-3">
             <Select

@@ -25,6 +25,7 @@ from user_management.api.v1.serializers import (
     TicketCreateSerializer,
     TicketMessageSerializer,
     TicketSerializer,
+    UserLookupSerializer,
     VerifyOTPResponseSerializer,
     VerifyOTPSerializer,
 )
@@ -199,6 +200,46 @@ class ProfileView(RetrieveUpdateAPIView):
         # does not ask for a current password that was never set.
         self.request.user.ensure_unusable_password()
         return self.request.user.profile
+
+
+@extend_schema(
+    summary="Lookup registered users by phone prefix for invite UI",
+    tags=["Users"],
+    responses={200: UserLookupSerializer(many=True)},
+)
+class UserLookupAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        raw = (request.query_params.get("phone") or "").strip()
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        if len(digits) < 4:
+            return Response([])
+
+        users = (
+            CustomUser.objects.filter(phone_number__startswith=digits, is_active=True)
+            .select_related("profile")
+            .order_by("phone_number")[:5]
+        )
+        payload = []
+        for user in users:
+            image = None
+            profile = getattr(user, "profile", None)
+            if profile and profile.profile_image:
+                try:
+                    image = profile.profile_image.url
+                except (AttributeError, ValueError):
+                    image = None
+            payload.append(
+                {
+                    "id": user.id,
+                    "phone_number": user.phone_number,
+                    "first_name": user.first_name or "",
+                    "last_name": user.last_name or "",
+                    "profile_image": image,
+                }
+            )
+        return Response(UserLookupSerializer(payload, many=True).data)
 
 
 @extend_schema(tags=["Tickets"])

@@ -167,6 +167,8 @@ export default function ProcessCanvasPage() {
   if (error && !process) return <Alert>{error}</Alert>;
   if (!process) return <Alert>فرایند پیدا نشد.</Alert>;
 
+  const editable = canEditProject(process.my_role);
+
   return (
     <div className="space-y-5">
       <nav className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -215,7 +217,7 @@ export default function ProcessCanvasPage() {
           >
             {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
           </Button>
-          {canEditProject(process.my_role) && (
+          {editable && (
             <>
               <Button
                 variant="secondary"
@@ -244,16 +246,16 @@ export default function ProcessCanvasPage() {
 
       <Card className="bg-brand-50">
         <p className="text-xs text-brand-800">
-          شکل‌ها را با کشیدن جابه‌جا کنید و با کلیک روی هر شکل، صفحه مستندسازی آن
-          گام (تشریح، ریسک، کنترل) را باز کنید. برای رسم فلش بین دو گام، دکمه
-          «اتصال گام‌ها» را بزنید و ابتدا گام مبدأ و سپس گام مقصد را انتخاب کنید.
+          {editable
+            ? "شکل‌ها را با کشیدن جابه‌جا کنید و با کلیک روی هر شکل، صفحه مستندسازی آن گام (تشریح، ریسک، کنترل) را باز کنید. برای رسم فلش بین دو گام، دکمه «اتصال گام‌ها» را بزنید و ابتدا گام مبدأ و سپس گام مقصد را انتخاب کنید."
+            : "حالت مشاهده: روی هر شکل کلیک کنید تا تشریح، ریسک، کنترل و پیوست‌های آن گام را ببینید. امکان ویرایش یا بارگذاری فایل وجود ندارد."}
         </p>
       </Card>
 
       <StepCanvas
         steps={steps}
         connections={connections}
-        readOnly={!canEditProject(process.my_role)}
+        readOnly={!editable}
         onMoved={handleMoved}
         onConnect={connect}
         onDeleteConnection={disconnect}
@@ -284,17 +286,19 @@ export default function ProcessCanvasPage() {
                 <span className="ms-auto text-xs text-gray-400">
                   {SHAPE_LABELS[step.shape_type]}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:bg-red-50"
-                  onClick={() => {
-                    setDeleteError(null);
-                    setPending({ kind: "step", step });
-                  }}
-                >
-                  حذف
-                </Button>
+                {editable && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:bg-red-50"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setPending({ kind: "step", step });
+                    }}
+                  >
+                    حذف
+                  </Button>
+                )}
               </div>
             ))}
           </div>

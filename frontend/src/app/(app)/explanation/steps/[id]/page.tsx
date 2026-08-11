@@ -18,7 +18,11 @@ import {
   cx,
 } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
-import type { ProcessStepDetail, StepItem } from "@/lib/types";
+import {
+  canEditProject,
+  type ProcessStepDetail,
+  type StepItem,
+} from "@/lib/types";
 
 type Tab = "explanation" | "risk" | "control";
 
@@ -68,10 +72,15 @@ export default function StepDetailPage() {
     setSavingExplanation(true);
     setSavedNote(null);
     try {
-      await apiFetch(`/steps/${stepId}/`, {
+      const updated = await apiFetch<ProcessStepDetail>(`/steps/${stepId}/`, {
         method: "PATCH",
         body: { explanation },
       });
+      setStep((current) =>
+        current
+          ? { ...current, explanation: updated.explanation ?? explanation }
+          : current,
+      );
       setSavedNote("تشریح ذخیره شد.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "ذخیره تشریح ناموفق بود.");
@@ -93,7 +102,7 @@ export default function StepDetailPage() {
         itemModal === "risk"
           ? (step?.risks.length ?? 0)
           : (step?.controls.length ?? 0);
-      await apiFetch(path, {
+      const created = await apiFetch<StepItem>(path, {
         method: "POST",
         body: {
           step: stepId,
@@ -102,9 +111,15 @@ export default function StepDetailPage() {
           order: count + 1,
         },
       });
+      setStep((current) => {
+        if (!current) return current;
+        if (itemModal === "risk") {
+          return { ...current, risks: [...current.risks, created] };
+        }
+        return { ...current, controls: [...current.controls, created] };
+      });
       setItemModal(null);
       setItemTitle("");
-      await load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "ثبت ناموفق بود.");
     } finally {
@@ -115,6 +130,9 @@ export default function StepDetailPage() {
   if (loading) return <PageLoader />;
   if (error && !step) return <Alert>{error}</Alert>;
   if (!step) return <Alert>گام پیدا نشد.</Alert>;
+
+  // Missing my_role (older API) keeps the editor open; API still enforces writes.
+  const editable = step.my_role == null || canEditProject(step.my_role);
 
   return (
     <div className="space-y-5">
@@ -136,7 +154,9 @@ export default function StepDetailPage() {
       <div>
         <h1 className="text-lg font-bold text-ink">{step.title}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          این گام را در سه بخش تشریح، ریسک و کنترل مستند کنید.
+          {editable
+            ? "این گام را در سه بخش تشریح، ریسک و کنترل مستند کنید."
+            : "حالت مشاهده: می‌توانید محتوا و پیوست‌ها را ببینید، اما ویرایش غیرفعال است."}
         </p>
       </div>
 
@@ -169,6 +189,7 @@ export default function StepDetailPage() {
             onChange={setExplanation}
             placeholder="شرح کامل این گام از فرایند را بنویسید..."
             minHeight={240}
+            readOnly={!editable}
           />
 
           <MediaPanel
@@ -176,15 +197,18 @@ export default function StepDetailPage() {
             section="explanation"
             items={step.explanation_media}
             onChanged={load}
+            readOnly={!editable}
           />
 
           {savedNote && <Alert tone="success">{savedNote}</Alert>}
 
-          <div className="flex justify-end">
-            <Button loading={savingExplanation} onClick={saveExplanation}>
-              ذخیره تشریح
-            </Button>
-          </div>
+          {editable && (
+            <div className="flex justify-end">
+              <Button loading={savingExplanation} onClick={saveExplanation}>
+                ذخیره تشریح
+              </Button>
+            </div>
+          )}
         </Card>
       )}
 
@@ -193,11 +217,31 @@ export default function StepDetailPage() {
           kind="risk"
           items={step.risks}
           stepId={step.id}
+          editable={editable}
           onAdd={() => {
             setFormError(null);
             setItemModal("risk");
           }}
           onChanged={load}
+          onItemUpdated={(updated) =>
+            setStep((current) =>
+              current
+                ? {
+                    ...current,
+                    risks: current.risks.map((item) =>
+                      item.id === updated.id ? { ...item, ...updated } : item,
+                    ),
+                  }
+                : current,
+            )
+          }
+          onItemRemoved={(id) =>
+            setStep((current) =>
+              current
+                ? { ...current, risks: current.risks.filter((item) => item.id !== id) }
+                : current,
+            )
+          }
         />
       )}
 
@@ -206,11 +250,34 @@ export default function StepDetailPage() {
           kind="control"
           items={step.controls}
           stepId={step.id}
+          editable={editable}
           onAdd={() => {
             setFormError(null);
             setItemModal("control");
           }}
           onChanged={load}
+          onItemUpdated={(updated) =>
+            setStep((current) =>
+              current
+                ? {
+                    ...current,
+                    controls: current.controls.map((item) =>
+                      item.id === updated.id ? { ...item, ...updated } : item,
+                    ),
+                  }
+                : current,
+            )
+          }
+          onItemRemoved={(id) =>
+            setStep((current) =>
+              current
+                ? {
+                    ...current,
+                    controls: current.controls.filter((item) => item.id !== id),
+                  }
+                : current,
+            )
+          }
         />
       )}
 
@@ -261,14 +328,20 @@ function ItemSection({
   kind,
   items,
   stepId,
+  editable,
   onAdd,
   onChanged,
+  onItemUpdated,
+  onItemRemoved,
 }: {
   kind: "risk" | "control";
   items: StepItem[];
   stepId: number;
+  editable: boolean;
   onAdd: () => void;
   onChanged: () => void;
+  onItemUpdated: (item: StepItem) => void;
+  onItemRemoved: (id: number) => void;
 }) {
   const labels =
     kind === "risk"
@@ -279,16 +352,28 @@ function ItemSection({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-ink">{labels.title}</h2>
-        <Button size="sm" onClick={onAdd}>
-          {labels.add}
-        </Button>
+        {editable && (
+          <Button size="sm" onClick={onAdd}>
+            {labels.add}
+          </Button>
+        )}
       </div>
 
       {items.length === 0 ? (
         <EmptyState
           title={labels.empty}
-          description="برای این گام موارد شناسایی‌شده را ثبت کنید."
-          action={<Button size="sm" onClick={onAdd}>{labels.add}</Button>}
+          description={
+            editable
+              ? "برای این گام موارد شناسایی‌شده را ثبت کنید."
+              : "برای این گام موردی ثبت نشده است."
+          }
+          action={
+            editable ? (
+              <Button size="sm" onClick={onAdd}>
+                {labels.add}
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         items.map((item) => (
@@ -297,7 +382,10 @@ function ItemSection({
             kind={kind}
             item={item}
             stepId={stepId}
+            editable={editable}
             onChanged={onChanged}
+            onUpdated={onItemUpdated}
+            onRemoved={onItemRemoved}
           />
         ))
       )}
@@ -309,12 +397,18 @@ function ItemEditor({
   kind,
   item,
   stepId,
+  editable,
   onChanged,
+  onUpdated,
+  onRemoved,
 }: {
   kind: "risk" | "control";
   item: StepItem;
   stepId: number;
+  editable: boolean;
   onChanged: () => void;
+  onUpdated: (item: StepItem) => void;
+  onRemoved: (id: number) => void;
 }) {
   const [content, setContent] = useState(item.content ?? "");
   const [title, setTitle] = useState(item.title);
@@ -324,14 +418,27 @@ function ItemEditor({
 
   const basePath = kind === "risk" ? "/risks" : "/controls";
 
+  // Keep local fields in sync when parent reloads (e.g. after media upload).
+  useEffect(() => {
+    setContent(item.content ?? "");
+    setTitle(item.title);
+  }, [item.id, item.content, item.title]);
+
   const save = async () => {
     setSaving(true);
     setNote(null);
     setError(null);
     try {
-      await apiFetch(`${basePath}/${item.id}/`, {
+      const updated = await apiFetch<StepItem>(`${basePath}/${item.id}/`, {
         method: "PATCH",
         body: { title, content },
+      });
+      onUpdated({
+        ...item,
+        ...updated,
+        title,
+        content,
+        media_items: updated.media_items ?? item.media_items,
       });
       setNote("ذخیره شد.");
     } catch (err) {
@@ -345,7 +452,7 @@ function ItemEditor({
     if (!window.confirm("این مورد حذف شود؟")) return;
     try {
       await apiFetch(`${basePath}/${item.id}/`, { method: "DELETE" });
-      onChanged();
+      onRemoved(item.id);
     } catch {
       setError("حذف ناموفق بود.");
     }
@@ -354,14 +461,20 @@ function ItemEditor({
   return (
     <Card className="space-y-3">
       <div className="flex items-center gap-2">
-        <Input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          className="font-medium"
-        />
-        <Button variant="ghost" size="sm" onClick={remove} className="text-red-600">
-          حذف
-        </Button>
+        {editable ? (
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            className="font-medium"
+          />
+        ) : (
+          <h3 className="flex-1 text-sm font-semibold text-ink">{item.title}</h3>
+        )}
+        {editable && (
+          <Button variant="ghost" size="sm" onClick={remove} className="text-red-600">
+            حذف
+          </Button>
+        )}
       </div>
 
       <RichTextEditor
@@ -373,6 +486,7 @@ function ItemEditor({
             : "توضیح کنترل، نوع و دوره اجرا..."
         }
         minHeight={150}
+        readOnly={!editable}
       />
 
       <MediaPanel
@@ -382,16 +496,19 @@ function ItemEditor({
         controlId={kind === "control" ? item.id : undefined}
         items={item.media_items}
         onChanged={onChanged}
+        readOnly={!editable}
       />
 
       {note && <Alert tone="success">{note}</Alert>}
       {error && <Alert>{error}</Alert>}
 
-      <div className="flex justify-end">
-        <Button size="sm" loading={saving} onClick={save}>
-          ذخیره
-        </Button>
-      </div>
+      {editable && (
+        <div className="flex justify-end">
+          <Button size="sm" loading={saving} onClick={save}>
+            ذخیره
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

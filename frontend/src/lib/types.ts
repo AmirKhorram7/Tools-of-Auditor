@@ -52,9 +52,19 @@ export type ProjectMember = {
   phone_number: string;
   first_name: string;
   last_name: string;
+  profile_image?: string | null;
   role: ProjectRole;
   invited_by: number | null;
   created_at: string;
+};
+
+/** Lightweight user hit for invite-by-phone autocomplete. */
+export type UserLookupResult = {
+  id: number;
+  phone_number: string;
+  first_name: string;
+  last_name: string;
+  profile_image: string | null;
 };
 
 export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
@@ -133,6 +143,7 @@ export type ProcessStepDetail = ProcessStep & {
   explanation_media: StepMedia[];
   risks: StepItem[];
   controls: StepItem[];
+  my_role?: ProjectRole | null;
 };
 
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {

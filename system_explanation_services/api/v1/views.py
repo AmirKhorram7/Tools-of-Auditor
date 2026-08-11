@@ -154,7 +154,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         if request.method == "GET":
             _require_view(request.user, root)
-            members = root.memberships.select_related("user").order_by("created_at")
+            members = root.memberships.select_related("user", "user__profile").order_by(
+                "created_at"
+            )
             return Response(ProjectMemberSerializer(members, many=True).data)
 
         if not can_manage_members(request.user, root):

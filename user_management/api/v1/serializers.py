@@ -34,6 +34,16 @@ class RelativeImageField(serializers.ImageField):
             return None
 
 
+class UserLookupSerializer(serializers.Serializer):
+    """Public-enough card for invite autocomplete (no secrets)."""
+
+    id = serializers.IntegerField()
+    phone_number = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    profile_image = serializers.CharField(allow_null=True, allow_blank=True)
+
+
 class SendOTPSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=11)
 

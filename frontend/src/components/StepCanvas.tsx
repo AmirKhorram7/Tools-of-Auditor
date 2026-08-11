@@ -144,8 +144,9 @@ export default function StepCanvas({
     event: React.PointerEvent<HTMLDivElement>,
     step: ProcessStep,
   ) => {
-    if (readOnly || connectMode) return;
+    if (connectMode) return;
 
+    // Viewers: still track the gesture so a click (not a drag) can open the step.
     const shapeRect = event.currentTarget.getBoundingClientRect();
     dragState.current = {
       id: step.id,
@@ -155,13 +156,15 @@ export default function StepCanvas({
       startY: event.clientY,
       moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (!readOnly) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const state = dragState.current;
     const canvas = canvasRef.current;
-    if (!state || !canvas) return;
+    if (!state || !canvas || readOnly) return;
 
     const travelled =
       Math.abs(event.clientX - state.startX) + Math.abs(event.clientY - state.startY);
@@ -180,7 +183,7 @@ export default function StepCanvas({
     dragState.current = null;
     if (!state) return;
 
-    if (!state.moved) {
+    if (!state.moved || readOnly) {
       setDragPos(null);
       router.push(`/explanation/steps/${step.id}`);
       return;
@@ -367,7 +370,7 @@ export default function StepCanvas({
                   className={cx(
                     "absolute flex touch-none select-none items-center justify-center border-2 p-2 text-center shadow-sm transition",
                     SHAPE_STYLE[step.shape_type],
-                    connectMode
+                    connectMode || readOnly
                       ? "cursor-pointer"
                       : "cursor-grab hover:shadow-md active:cursor-grabbing",
                     isSource
@@ -378,7 +381,9 @@ export default function StepCanvas({
                   title={
                     connectMode
                       ? "برای اتصال کلیک کنید"
-                      : "برای جابه‌جایی بکشید، برای باز کردن کلیک کنید"
+                      : readOnly
+                        ? "برای دیدن مستندات کلیک کنید"
+                        : "برای جابه‌جایی بکشید، برای باز کردن کلیک کنید"
                   }
                 >
                   <span

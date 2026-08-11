@@ -90,6 +90,7 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     first_name = serializers.CharField(source="user.first_name", read_only=True)
     last_name = serializers.CharField(source="user.last_name", read_only=True)
+    profile_image = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectMember
@@ -99,11 +100,22 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
             "phone_number",
             "first_name",
             "last_name",
+            "profile_image",
             "role",
             "invited_by",
             "created_at",
         ]
         read_only_fields = ["user", "invited_by", "created_at"]
+
+    def get_profile_image(self, obj):
+        profile = getattr(obj.user, "profile", None)
+        image = getattr(profile, "profile_image", None) if profile else None
+        if not image:
+            return None
+        try:
+            return image.url
+        except (AttributeError, ValueError):
+            return None
 
 
 class ProjectMemberInviteSerializer(serializers.Serializer):
@@ -299,6 +311,7 @@ class ProcessStepDetailSerializer(serializers.ModelSerializer):
     risks = StepRiskSerializer(many=True, read_only=True)
     controls = StepControlSerializer(many=True, read_only=True)
     explanation_media = serializers.SerializerMethodField()
+    my_role = serializers.SerializerMethodField()
 
     class Meta:
         model = ProcessStep
@@ -314,10 +327,17 @@ class ProcessStepDetailSerializer(serializers.ModelSerializer):
             "explanation_media",
             "risks",
             "controls",
+            "my_role",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+    def get_my_role(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        return user_role_on_project(request.user, obj.process.project)
 
     def get_explanation_media(self, obj):
         items = [
