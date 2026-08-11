@@ -15,7 +15,7 @@ type AuthResponse = {
   has_password?: boolean;
 };
 
-const RESEND_SECONDS = 60;
+const RESEND_SECONDS = 120;
 
 type Mode = "otp" | "password";
 

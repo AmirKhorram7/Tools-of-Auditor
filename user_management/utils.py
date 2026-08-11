@@ -22,7 +22,7 @@ class OTPService:
     ATTEMPT_PREFIX = "otp_attempts:"
 
     OTP_TTL = 120
-    LOCK_TTL = 60
+    LOCK_TTL = 120
     ATTEMPT_TTL = 300
     MAX_ATTEMPTS = 5
 
