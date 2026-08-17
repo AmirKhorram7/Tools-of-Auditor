@@ -87,7 +87,7 @@ export default function TopBar() {
               className="flex items-center gap-2 rounded px-1.5 py-1 transition hover:bg-navy-700"
             >
               <span className="flex size-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-ink">
-                ت
+                T
               </span>
               <span className="text-base font-bold text-white">تی‌ادیتور</span>
             </Link>
