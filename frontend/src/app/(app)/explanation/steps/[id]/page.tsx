@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import BackButton from "@/components/BackButton";
 import MediaPanel from "@/components/MediaPanel";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
@@ -136,20 +137,23 @@ export default function StepDetailPage() {
 
   return (
     <div className="space-y-5">
-      <nav className="flex items-center gap-1.5 text-xs text-gray-500">
-        <Link href="/explanation" className="hover:text-link">
-          تشریح سیستم
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/explanation/processes/${step.process}`}
-          className="hover:text-link"
-        >
-          فرایند
-        </Link>
-        <span>/</span>
-        <span className="text-ink">{step.title}</span>
-      </nav>
+      <div className="flex flex-wrap items-center gap-2">
+        <BackButton fallbackHref={`/explanation/processes/${step.process}`} />
+        <nav className="flex items-center gap-1.5 text-xs text-gray-500">
+          <Link href="/explanation" className="hover:text-link">
+            تشریح سیستم
+          </Link>
+          <span>/</span>
+          <Link
+            href={`/explanation/processes/${step.process}`}
+            className="hover:text-link"
+          >
+            فرایند
+          </Link>
+          <span>/</span>
+          <span className="text-ink">{step.title}</span>
+        </nav>
+      </div>
 
       <div>
         <h1 className="text-lg font-bold text-ink">{step.title}</h1>

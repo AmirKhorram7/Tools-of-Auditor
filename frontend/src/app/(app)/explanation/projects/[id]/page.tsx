@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import BackButton from "@/components/BackButton";
 import {
   Alert,
   Badge,
@@ -60,6 +61,18 @@ export default function ProjectDetailPage() {
   const [processDescription, setProcessDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [editTarget, setEditTarget] = useState<
+    | { kind: "project"; item: Project }
+    | { kind: "sub-project"; item: Project }
+    | { kind: "process"; item: Process }
+    | null
+  >(null);
+  const [editName, setEditName] = useState("");
+  const [editCompany, setEditCompany] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDepartment, setEditDepartment] = useState("");
+  const [editOwnerName, setEditOwnerName] = useState("");
 
   const [pending, setPending] = useState<Pending>(null);
   const [deleting, setDeleting] = useState(false);
@@ -190,6 +203,88 @@ export default function ProjectDetailPage() {
   const askDelete = (next: Pending) => {
     setDeleteError(null);
     setPending(next);
+  };
+
+  const openEdit = (
+    target:
+      | { kind: "project"; item: Project }
+      | { kind: "sub-project"; item: Project }
+      | { kind: "process"; item: Process },
+  ) => {
+    setFormError(null);
+    setEditTarget(target);
+    if (target.kind === "process") {
+      setEditName(target.item.name);
+      setEditDepartment(target.item.department ?? "");
+      setEditOwnerName(target.item.process_owner_name ?? "");
+      setEditDescription(target.item.description ?? "");
+      return;
+    }
+    setEditName(target.item.name);
+    setEditCompany(target.item.company_name ?? "");
+    setEditDescription(target.item.description ?? "");
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    if (!editName.trim()) {
+      setFormError("نام الزامی است.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      if (editTarget.kind === "process") {
+        const updated = await apiFetch<Process>(
+          `/processes/${editTarget.item.id}/`,
+          {
+            method: "PATCH",
+            body: {
+              name: editName.trim(),
+              department: editDepartment.trim(),
+              process_owner_name: editOwnerName.trim(),
+              description: editDescription.trim(),
+            },
+          },
+        );
+        setProcesses((current) =>
+          current.map((item) =>
+            item.id === updated.id ? { ...item, ...updated } : item,
+          ),
+        );
+      } else if (editTarget.kind === "sub-project") {
+        const updated = await apiFetch<Project>(
+          `/projects/${editTarget.item.id}/`,
+          {
+            method: "PATCH",
+            body: { name: editName.trim() },
+          },
+        );
+        setSubProjects((current) =>
+          current.map((item) =>
+            item.id === updated.id ? { ...item, ...updated } : item,
+          ),
+        );
+      } else {
+        const updated = await apiFetch<Project>(
+          `/projects/${editTarget.item.id}/`,
+          {
+            method: "PATCH",
+            body: {
+              name: editName.trim(),
+              company_name: editCompany.trim(),
+              description: editDescription.trim(),
+            },
+          },
+        );
+        setProject(updated);
+      }
+      setEditTarget(null);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "ذخیره ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const changeStatus = async (nextStatus: ProjectStatus) => {
@@ -334,24 +429,33 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
-      <nav className="flex items-center gap-1.5 text-xs text-gray-500">
-        <Link href="/explanation" className="hover:text-link">
-          تشریح سیستم
-        </Link>
-        {project.parent && (
-          <>
-            <span>/</span>
-            <Link
-              href={`/explanation/projects/${project.parent}`}
-              className="hover:text-link"
-            >
-              پروژه اصلی
-            </Link>
-          </>
-        )}
-        <span>/</span>
-        <span className="text-ink">{project.name}</span>
-      </nav>
+      <div className="flex flex-wrap items-center gap-2">
+        <BackButton
+          fallbackHref={
+            project.parent
+              ? `/explanation/projects/${project.parent}`
+              : "/explanation"
+          }
+        />
+        <nav className="flex items-center gap-1.5 text-xs text-gray-500">
+          <Link href="/explanation" className="hover:text-link">
+            تشریح سیستم
+          </Link>
+          {project.parent && (
+            <>
+              <span>/</span>
+              <Link
+                href={`/explanation/projects/${project.parent}`}
+                className="hover:text-link"
+              >
+                پروژه اصلی
+              </Link>
+            </>
+          )}
+          <span>/</span>
+          <span className="text-ink">{project.name}</span>
+        </nav>
+      </div>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -376,6 +480,14 @@ export default function ProjectDetailPage() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {editable && (
+            <Button
+              variant="secondary"
+              onClick={() => openEdit({ kind: "project", item: project })}
+            >
+              ویرایش
+            </Button>
+          )}
           <Button variant="secondary" disabled={pdfLoading} onClick={downloadPdf}>
             {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
           </Button>
@@ -479,20 +591,31 @@ export default function ProjectDetailPage() {
                   <div className="mt-2 flex items-center text-xs text-gray-500">
                     <span>{sub.process_count ?? 0} فرایند</span>
                     {editable && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="ms-auto text-red-600 hover:bg-red-50"
-                        onClick={() =>
-                          askDelete({
-                            kind: "sub-project",
-                            id: sub.id,
-                            name: sub.name,
-                          })
-                        }
-                      >
-                        حذف
-                      </Button>
+                      <div className="ms-auto flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            openEdit({ kind: "sub-project", item: sub })
+                          }
+                        >
+                          ویرایش
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={() =>
+                            askDelete({
+                              kind: "sub-project",
+                              id: sub.id,
+                              name: sub.name,
+                            })
+                          }
+                        >
+                          حذف
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </Card>
@@ -533,20 +656,31 @@ export default function ProjectDetailPage() {
                 <div className="mt-3 flex items-center border-t border-gray-100 pt-3 text-xs text-gray-500">
                   <span>{process.step_count ?? 0} گام مستندشده</span>
                   {editable && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ms-auto text-red-600 hover:bg-red-50"
-                      onClick={() =>
-                        askDelete({
-                          kind: "process",
-                          id: process.id,
-                          name: process.name,
-                        })
-                      }
-                    >
-                      حذف
-                    </Button>
+                    <div className="ms-auto flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          openEdit({ kind: "process", item: process })
+                        }
+                      >
+                        ویرایش
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={() =>
+                          askDelete({
+                            kind: "process",
+                            id: process.id,
+                            name: process.name,
+                          })
+                        }
+                      >
+                        حذف
+                      </Button>
+                    </div>
                   )}
                 </div>
               </Card>
@@ -785,6 +919,100 @@ export default function ProjectDetailPage() {
             )}
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={editTarget !== null}
+        title={
+          editTarget?.kind === "process"
+            ? "ویرایش فرایند"
+            : editTarget?.kind === "sub-project"
+              ? "ویرایش زیرپروژه"
+              : "ویرایش پروژه"
+        }
+        onClose={() => setEditTarget(null)}
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveEdit();
+          }}
+        >
+          <Field
+            label={
+              editTarget?.kind === "process"
+                ? "نام فرایند"
+                : editTarget?.kind === "sub-project"
+                  ? "نام زیرپروژه"
+                  : "نام پروژه"
+            }
+          >
+            <Input
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+              autoFocus
+            />
+          </Field>
+
+          {editTarget?.kind === "project" && (
+            <>
+              <Field label="نام شرکت">
+                <Input
+                  value={editCompany}
+                  onChange={(event) => setEditCompany(event.target.value)}
+                />
+              </Field>
+              <Field label="توضیحات">
+                <Textarea
+                  rows={3}
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                />
+              </Field>
+            </>
+          )}
+
+          {editTarget?.kind === "process" && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="واحد سازمانی">
+                  <Input
+                    value={editDepartment}
+                    onChange={(event) => setEditDepartment(event.target.value)}
+                  />
+                </Field>
+                <Field label="مالک فرایند">
+                  <Input
+                    value={editOwnerName}
+                    onChange={(event) => setEditOwnerName(event.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="توضیحات">
+                <Textarea
+                  rows={3}
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                />
+              </Field>
+            </>
+          )}
+
+          {formError && <Alert>{formError}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setEditTarget(null)}
+            >
+              انصراف
+            </Button>
+            <Button type="submit" loading={saving}>
+              ذخیره
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       <ConfirmDialog

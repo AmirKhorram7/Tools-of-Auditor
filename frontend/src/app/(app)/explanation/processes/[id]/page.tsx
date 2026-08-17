@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import BackButton from "@/components/BackButton";
 import StepCanvas from "@/components/StepCanvas";
 import {
   Alert,
@@ -15,6 +16,7 @@ import {
   Modal,
   PageLoader,
   Select,
+  Textarea,
 } from "@/components/ui";
 import { ApiError, apiDownload, apiFetch, apiList } from "@/lib/api";
 import {
@@ -52,6 +54,14 @@ export default function ProcessCanvasPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDepartment, setEditDepartment] = useState("");
+  const [editOwnerName, setEditOwnerName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(processId)) return;
@@ -136,6 +146,42 @@ export default function ProcessCanvasPage() {
     }
   };
 
+  const openEdit = () => {
+    if (!process) return;
+    setEditError(null);
+    setEditName(process.name);
+    setEditDepartment(process.department ?? "");
+    setEditOwnerName(process.process_owner_name ?? "");
+    setEditDescription(process.description ?? "");
+    setEditOpen(true);
+  };
+
+  const saveProcessEdit = async () => {
+    if (!editName.trim()) {
+      setEditError("نام فرایند الزامی است.");
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const updated = await apiFetch<Process>(`/processes/${processId}/`, {
+        method: "PATCH",
+        body: {
+          name: editName.trim(),
+          department: editDepartment.trim(),
+          process_owner_name: editOwnerName.trim(),
+          description: editDescription.trim(),
+        },
+      });
+      setProcess(updated);
+      setEditOpen(false);
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : "ذخیره ناموفق بود.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!pending) return;
     setDeleting(true);
@@ -171,20 +217,23 @@ export default function ProcessCanvasPage() {
 
   return (
     <div className="space-y-5">
-      <nav className="flex items-center gap-1.5 text-xs text-gray-500">
-        <Link href="/explanation" className="hover:text-link">
-          تشریح سیستم
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/explanation/projects/${process.project}`}
-          className="hover:text-link"
-        >
-          پروژه
-        </Link>
-        <span>/</span>
-        <span className="text-ink">{process.name}</span>
-      </nav>
+      <div className="flex flex-wrap items-center gap-2">
+        <BackButton fallbackHref={`/explanation/projects/${process.project}`} />
+        <nav className="flex items-center gap-1.5 text-xs text-gray-500">
+          <Link href="/explanation" className="hover:text-link">
+            تشریح سیستم
+          </Link>
+          <span>/</span>
+          <Link
+            href={`/explanation/projects/${process.project}`}
+            className="hover:text-link"
+          >
+            پروژه
+          </Link>
+          <span>/</span>
+          <span className="text-ink">{process.name}</span>
+        </nav>
+      </div>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -219,6 +268,9 @@ export default function ProcessCanvasPage() {
           </Button>
           {editable && (
             <>
+              <Button variant="secondary" onClick={openEdit}>
+                ویرایش
+              </Button>
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -344,6 +396,62 @@ export default function ProcessCanvasPage() {
             </Button>
             <Button type="submit" loading={saving}>
               افزودن
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={editOpen}
+        title="ویرایش فرایند"
+        onClose={() => setEditOpen(false)}
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveProcessEdit();
+          }}
+        >
+          <Field label="نام فرایند">
+            <Input
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+              autoFocus
+            />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="واحد سازمانی">
+              <Input
+                value={editDepartment}
+                onChange={(event) => setEditDepartment(event.target.value)}
+              />
+            </Field>
+            <Field label="مالک فرایند">
+              <Input
+                value={editOwnerName}
+                onChange={(event) => setEditOwnerName(event.target.value)}
+              />
+            </Field>
+          </div>
+          <Field label="توضیحات">
+            <Textarea
+              rows={3}
+              value={editDescription}
+              onChange={(event) => setEditDescription(event.target.value)}
+            />
+          </Field>
+          {editError && <Alert>{editError}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setEditOpen(false)}
+            >
+              انصراف
+            </Button>
+            <Button type="submit" loading={editSaving}>
+              ذخیره
             </Button>
           </div>
         </form>

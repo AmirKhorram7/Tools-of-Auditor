@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import TopBar from "@/components/TopBar";
-import { PageLoader } from "@/components/ui";
+import { PageLoader, cx } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 
 export default function AppLayout({
@@ -14,6 +14,8 @@ export default function AppLayout({
 }) {
   const { ready, isAuthenticated } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const wide = pathname.startsWith("/explanation");
 
   useEffect(() => {
     if (ready && !isAuthenticated) router.replace("/login");
@@ -24,7 +26,11 @@ export default function AppLayout({
   return (
     <div className="min-h-screen">
       <TopBar />
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main
+        className={cx("mx-auto px-4 py-6", wide ? "max-w-7xl" : "max-w-6xl")}
+      >
+        {children}
+      </main>
     </div>
   );
 }

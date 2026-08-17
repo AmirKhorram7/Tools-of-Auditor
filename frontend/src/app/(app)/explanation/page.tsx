@@ -20,6 +20,7 @@ import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
   PROJECT_ROLE_LABELS,
   PROJECT_STATUS_LABELS,
+  canEditProject,
   type Project,
 } from "@/lib/types";
 
@@ -34,6 +35,11 @@ export default function ExplanationServicePage() {
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCompany, setEditCompany] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   const [pending, setPending] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -78,6 +84,42 @@ export default function ExplanationServicePage() {
       await load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "ساخت پروژه ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEdit = (project: Project) => {
+    setFormError(null);
+    setEditProject(project);
+    setEditName(project.name);
+    setEditCompany(project.company_name ?? "");
+    setEditDescription(project.description ?? "");
+  };
+
+  const saveEdit = async () => {
+    if (!editProject) return;
+    if (!editName.trim()) {
+      setFormError("نام پروژه الزامی است.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      const updated = await apiFetch<Project>(`/projects/${editProject.id}/`, {
+        method: "PATCH",
+        body: {
+          name: editName.trim(),
+          company_name: editCompany.trim(),
+          description: editDescription.trim(),
+        },
+      });
+      setProjects((current) =>
+        current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+      );
+      setEditProject(null);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "ذخیره پروژه ناموفق بود.");
     } finally {
       setSaving(false);
     }
@@ -153,22 +195,33 @@ export default function ExplanationServicePage() {
                   {project.description}
                 </p>
               )}
-              <div className="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500">
+              <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500">
                 <span>{project.sub_project_count ?? 0} زیرپروژه</span>
                 <span>{project.process_count ?? 0} فرایند</span>
-                {project.my_role === "owner" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ms-auto text-red-600 hover:bg-red-50"
-                    onClick={() => {
-                      setDeleteError(null);
-                      setPending(project);
-                    }}
-                  >
-                    حذف
-                  </Button>
-                )}
+                <div className="ms-auto flex items-center gap-1">
+                  {canEditProject(project.my_role) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEdit(project)}
+                    >
+                      ویرایش
+                    </Button>
+                  )}
+                  {project.my_role === "owner" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:bg-red-50"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setPending(project);
+                      }}
+                    >
+                      حذف
+                    </Button>
+                  )}
+                </div>
               </div>
             </Card>
           ))}
@@ -223,6 +276,54 @@ export default function ExplanationServicePage() {
             </Button>
             <Button type="submit" loading={saving}>
               ساخت پروژه
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={editProject !== null}
+        title="ویرایش پروژه"
+        onClose={() => setEditProject(null)}
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveEdit();
+          }}
+        >
+          <Field label="نام پروژه">
+            <Input
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+              autoFocus
+            />
+          </Field>
+          <Field label="نام شرکت">
+            <Input
+              value={editCompany}
+              onChange={(event) => setEditCompany(event.target.value)}
+            />
+          </Field>
+          <Field label="توضیحات">
+            <Textarea
+              rows={3}
+              value={editDescription}
+              onChange={(event) => setEditDescription(event.target.value)}
+            />
+          </Field>
+          {formError && <Alert>{formError}</Alert>}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setEditProject(null)}
+            >
+              انصراف
+            </Button>
+            <Button type="submit" loading={saving}>
+              ذخیره
             </Button>
           </div>
         </form>
