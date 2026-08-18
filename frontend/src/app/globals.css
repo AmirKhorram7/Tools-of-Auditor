@@ -51,10 +51,22 @@
 .rich-content a {
   color: #007185;
   text-decoration: underline;
+  cursor: pointer;
+  word-break: break-word;
 }
 
 .rich-content a:hover {
   color: #c7511f;
+}
+
+/* Keep named links readable; avoid forcing long URLs onto two lines. */
+.rich-content a[href] {
+  white-space: normal;
+}
+
+.rich-content span[style*="font-size"],
+.rich-content font {
+  line-height: 1.6;
 }
 
 .rich-content blockquote {
