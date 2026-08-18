@@ -106,6 +106,10 @@ class VerifyOTPAPIView(APIView):
             user.is_phone_verified = True
             user.save(update_fields=["is_phone_verified"])
 
+        from team_manage_services.services.org import attach_pending_invites
+
+        attach_pending_invites(user)
+
         return Response(issue_tokens(user, is_new_user=created))
 
 
@@ -123,6 +127,9 @@ class PasswordLoginAPIView(APIView):
         serializer = PasswordLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
+        from team_manage_services.services.org import attach_pending_invites
+
+        attach_pending_invites(user)
         return Response(issue_tokens(user, is_new_user=False))
 
 

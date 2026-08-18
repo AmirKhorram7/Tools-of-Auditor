@@ -3,20 +3,23 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Avatar, Badge, Button, Card, Spinner } from "@/components/ui";
-import { apiList } from "@/lib/api";
+import { Avatar, Badge, Button, Card, Modal, Spinner } from "@/components/ui";
+import { apiFetch, apiList } from "@/lib/api";
 import { displayName, useAuth } from "@/lib/auth";
 import {
   PROJECT_ROLE_LABELS,
   PROJECT_STATUS_LABELS,
   type Project,
 } from "@/lib/types";
+import type { WorkDashboard } from "@/lib/work";
 
 export default function DashboardPage() {
   const { profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [sharedProjects, setSharedProjects] = useState<Project[]>([]);
+  const [work, setWork] = useState<WorkDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,12 +27,14 @@ export default function DashboardPage() {
     Promise.all([
       apiList<Project>("/projects/?roots_only=true"),
       apiList<Project>("/projects/?roots_only=true&shared=true"),
+      apiFetch<WorkDashboard>("/work/dashboard/").catch(() => null),
     ])
-      .then(([mine, shared]) => {
+      .then(([mine, shared, dashboard]) => {
         if (cancelled) return;
         // Owned / all accessible roots for "recent"; shared section uses shared-only.
         setProjects(mine.filter((p) => !p.is_shared_with_me));
         setSharedProjects(shared);
+        setWork(dashboard);
       })
       .catch(() => {
         if (!cancelled) {
@@ -48,6 +53,14 @@ export default function DashboardPage() {
 
   const profileIncomplete =
     !profile?.first_name || !profile?.last_name || !profile?.company_name;
+
+  useEffect(() => {
+    if (!profile || !profileIncomplete) return;
+    if (typeof window !== "undefined" && sessionStorage.getItem("ta_profile_nudge") === "1") {
+      return;
+    }
+    setProfileOpen(true);
+  }, [profile, profileIncomplete]);
 
   const totalProcesses =
     projects.reduce((sum, project) => sum + (project.process_count ?? 0), 0) +
@@ -73,6 +86,11 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/work">
+            <Button variant="secondary" size="sm">
+              ورود به مدیریت کار
+            </Button>
+          </Link>
           <Link href="/explanation">
             <Button variant="secondary" size="sm">
               ورود به تشریح سیستم
@@ -107,6 +125,38 @@ export default function DashboardPage() {
             {loading ? <Spinner className="size-5" /> : totalProcesses}
           </p>
         </Card>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">مدیریت کار</h2>
+          <Link
+            href="/work"
+            className="text-sm text-link hover:text-link-hover hover:underline"
+          >
+            پیشخوان کار
+          </Link>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <p className="text-sm text-gray-500">کارهای باز من</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">
+              {loading ? <Spinner className="size-5" /> : work?.employee.counts.assigned ?? 0}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-gray-500">سررسید امروز</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">
+              {loading ? <Spinner className="size-5" /> : work?.employee.counts.today ?? 0}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-gray-500">عقب‌افتاده</p>
+            <p className="mt-1 text-2xl font-bold text-red-600">
+              {loading ? <Spinner className="size-5" /> : work?.employee.counts.overdue ?? 0}
+            </p>
+          </Card>
+        </div>
       </section>
 
       <section>
@@ -174,6 +224,33 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+
+      <Modal
+        open={profileOpen}
+        title="تکمیل پروفایل"
+        onClose={() => {
+          sessionStorage.setItem("ta_profile_nudge", "1");
+          setProfileOpen(false);
+        }}
+      >
+        <p className="text-sm text-gray-600">
+          برای همکاری راحت‌تر با دیگران، پروفایل خود را تکمیل کنید.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              sessionStorage.setItem("ta_profile_nudge", "1");
+              setProfileOpen(false);
+            }}
+          >
+            بعداً
+          </Button>
+          <Link href="/profile" onClick={() => sessionStorage.setItem("ta_profile_nudge", "1")}>
+            <Button>تکمیل پروفایل</Button>
+          </Link>
+        </div>
+      </Modal>
     </div>
   );
 }

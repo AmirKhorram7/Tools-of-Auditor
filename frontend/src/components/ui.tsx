@@ -185,7 +185,7 @@ export function Modal({
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative z-10 w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+      <div className="relative z-10 w-full max-w-lg overflow-visible rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
           <button

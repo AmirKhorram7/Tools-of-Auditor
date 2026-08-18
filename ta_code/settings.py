@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     # local
     "user_management.apps.UserManagementConfig",
     "system_explanation_services",
+    "team_manage_services.apps.TeamManageServicesConfig",
 ]
 
 MIDDLEWARE = [

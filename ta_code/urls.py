@@ -11,6 +11,7 @@ urlpatterns = [
     path("healthz/", health, name="health"),
     path("api/v1/", include("user_management.api.v1.urls")),
     path("api/v1/", include("system_explanation_services.api.v1.urls")),
+    path("api/v1/work/", include("team_manage_services.api.v1.urls")),
 ]
 
 if settings.ENABLE_API_DOCS:

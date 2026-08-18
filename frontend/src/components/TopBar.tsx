@@ -7,8 +7,15 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar, cx } from "@/components/ui";
 import { displayName, useAuth } from "@/lib/auth";
 
-/** Services shown in the top bar picker. Only the first one ships in the MVP. */
+/** Services shown in the top bar picker. */
 const SERVICES = [
+  {
+    key: "work",
+    label: "مدیریت کار",
+    description: "کار روشن، پیشرفت قابل اندازه‌گیری",
+    href: "/work",
+    available: true,
+  },
   {
     key: "system-explanation",
     label: "تشریح سیستم",
@@ -66,7 +73,7 @@ export default function TopBar() {
     <Link
       href={href}
       className={cx(
-        "rounded px-3 py-1.5 text-sm transition",
+        "rounded px-3 py-1.5 text-sm whitespace-nowrap transition",
         active
           ? "bg-navy-700 font-medium text-white"
           : "text-gray-200 hover:bg-navy-700 hover:text-white",
@@ -101,7 +108,9 @@ export default function TopBar() {
                 }}
                 className={cx(
                   "flex items-center gap-1.5 rounded px-3 py-1.5 text-sm transition",
-                  servicesOpen || pathname.startsWith("/explanation")
+                  servicesOpen ||
+                    pathname.startsWith("/explanation") ||
+                    pathname.startsWith("/work")
                     ? "bg-navy-700 font-medium text-white"
                     : "text-gray-200 hover:bg-navy-700 hover:text-white",
                 )}
@@ -207,8 +216,9 @@ export default function TopBar() {
 
       {/* Secondary bar — Amazon nav navy */}
       <div className="bg-navy-800">
-        <nav className="mx-auto flex h-10 max-w-6xl items-center gap-1 px-4">
+        <nav className="mx-auto flex h-10 max-w-6xl items-center gap-1 overflow-x-auto px-4">
           {navLink("/dashboard", "خانه", pathname === "/dashboard")}
+          {navLink("/work", "مدیریت کار", pathname.startsWith("/work"))}
           {navLink(
             "/explanation",
             "تشریح سیستم",

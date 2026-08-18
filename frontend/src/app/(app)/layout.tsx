@@ -15,7 +15,8 @@ export default function AppLayout({
   const { ready, isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const wide = pathname.startsWith("/explanation");
+  const wide =
+    pathname.startsWith("/explanation") || pathname.startsWith("/work");
 
   useEffect(() => {
     if (ready && !isAuthenticated) router.replace("/login");

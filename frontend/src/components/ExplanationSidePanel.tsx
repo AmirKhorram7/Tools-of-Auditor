@@ -226,9 +226,23 @@ export default function ExplanationSidePanel() {
             سرویس‌ها
           </p>
           <Link
-            href="/explanation"
+            href="/work"
             className={cx(
               "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition",
+              pathname.startsWith("/work")
+                ? "bg-navy-700 font-medium text-white"
+                : "text-gray-200 hover:bg-navy-800",
+            )}
+          >
+            <span className="flex size-6 items-center justify-center rounded-md bg-navy-700 text-[11px] font-bold">
+              ک
+            </span>
+            <span className="min-w-0 flex-1">مدیریت کار</span>
+          </Link>
+          <Link
+            href="/explanation"
+            className={cx(
+              "mt-1 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition",
               pathname.startsWith("/explanation")
                 ? "bg-navy-700 font-medium text-white"
                 : "text-gray-200 hover:bg-navy-800",
