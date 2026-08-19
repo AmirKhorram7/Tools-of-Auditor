@@ -14,7 +14,7 @@ export default function ExplanationLayout({
 }) {
   const { dir } = useI18n();
   return (
-    <div className="flex items-start gap-2" dir="ltr">
+    <div className="flex items-start gap-2.5" dir="ltr">
       <div className="min-w-0 flex-1" dir={dir}>
         {children}
       </div>

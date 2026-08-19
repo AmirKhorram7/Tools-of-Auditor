@@ -88,7 +88,7 @@ export default function TopBar() {
     <header ref={containerRef} className="sticky top-0 z-40">
       {/* Primary bar — Amazon dark navy */}
       <div className="bg-navy-900 text-white">
-        <div className="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-4 px-2">
+        <div className="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-4 px-2.5">
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard"
@@ -220,7 +220,7 @@ export default function TopBar() {
 
       {/* Secondary bar — Amazon nav navy */}
       <div className="bg-navy-800">
-        <nav className="mx-auto flex h-10 max-w-screen-2xl items-center gap-1 overflow-x-auto px-2">
+        <nav className="mx-auto flex h-10 max-w-screen-2xl items-center gap-1 overflow-x-auto px-2.5">
           {navLink("/dashboard", t("nav.home"), pathname === "/dashboard")}
           {navLink("/work", t("nav.work"), pathname.startsWith("/work"))}
           {navLink(
