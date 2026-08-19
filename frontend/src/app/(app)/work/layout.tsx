@@ -16,7 +16,7 @@ export default function WorkLayout({ children }: { children: React.ReactNode }) 
   ];
 
   return (
-    <div className="flex items-start gap-4" dir="ltr">
+    <div className="flex items-start gap-2" dir="ltr">
       <div className="min-w-0 flex-1 pb-16 md:pb-0" dir={dir}>
         {children}
       </div>
