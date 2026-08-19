@@ -137,7 +137,7 @@ def build_project_pdf(project: Project) -> io.BytesIO:
     _append_processes(story, root, h1, h2, body)
 
     for sub in root.sub_projects.filter(is_deleted=False).order_by("name"):
-        story.append(Paragraph(_fa(f"زیرپروژه: {sub.name}"), h1))
+        story.append(Paragraph(_fa(f"زیرپوشه: {sub.name}"), h1))
         if sub.description:
             story.append(Paragraph(_fa(sub.description), body))
         _append_processes(story, sub, h1, h2, body)
@@ -191,7 +191,7 @@ def build_process_pdf(process: Process) -> io.BytesIO:
 
     story = [
         Paragraph(_fa(f"فرایند: {process.name}"), title_style),
-        Paragraph(_fa(f"پروژه: {process.project.name}"), body),
+        Paragraph(_fa(f"پوشه: {process.project.name}"), body),
     ]
     if process.department:
         story.append(Paragraph(_fa(f"واحد: {process.department}"), body))

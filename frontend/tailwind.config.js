@@ -32,7 +32,15 @@ module.exports = {
         surface: "#eaeded",
       },
       fontFamily: {
-        sans: ["Tahoma", "Segoe UI", "Arial", "sans-serif"],
+        sans: [
+          "var(--font-vazirmatn)",
+          "Tahoma",
+          "Segoe UI",
+          "Arial",
+          "sans-serif",
+        ],
+        vazir: ["var(--font-vazirmatn)", "Tahoma", "sans-serif"],
+        inter: ["var(--font-inter)", "Segoe UI", "Arial", "sans-serif"],
       },
     },
   },

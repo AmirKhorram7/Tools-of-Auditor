@@ -1,8 +1,24 @@
 import type { Metadata } from "next";
+import { Inter, Vazirmatn } from "next/font/google";
 
 import { AuthProvider } from "@/lib/auth";
+import { LocaleProvider } from "@/lib/i18n";
 
 import "./globals.css";
+
+/** Farsi UI font. */
+const vazirmatn = Vazirmatn({
+  subsets: ["arabic", "latin"],
+  variable: "--font-vazirmatn",
+  display: "swap",
+});
+
+/** English UI font. */
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://localhost";
@@ -84,9 +100,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl">
+    <html
+      lang="fa"
+      dir="rtl"
+      className={`${vazirmatn.variable} ${inter.variable}`}
+    >
       <body className="min-h-screen antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var l=localStorage.getItem("ta_locale");if(l==="en"){document.documentElement.lang="en";document.documentElement.dir="ltr";}}catch(e){}`,
+          }}
+        />
+        <LocaleProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

@@ -7,6 +7,7 @@ import SocialFooter from "@/components/SocialFooter";
 import { Alert, Button, Card, Field, Input, cx } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { LanguageSwitch, useI18n } from "@/lib/i18n";
 
 type AuthResponse = {
   access: string;
@@ -23,6 +24,7 @@ type Mode = "otp" | "password";
 export default function LoginPage() {
   const router = useRouter();
   const { ready, isAuthenticated, signIn } = useAuth();
+  const { t } = useI18n();
 
   const [mode, setMode] = useState<Mode>("otp");
   const [step, setStep] = useState<"phone" | "code">("phone");
@@ -70,7 +72,7 @@ export default function LoginPage() {
     setInfo(null);
 
     if (!/^09\d{9}$/.test(phone)) {
-      setError("شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.");
+      setError(t("login.phoneInvalid"));
       return;
     }
 
@@ -84,9 +86,9 @@ export default function LoginPage() {
       setStep("code");
       setCountdown(RESEND_SECONDS);
       setCode("");
-      setInfo("کد تایید پیامک شد. پیامک را بررسی کنید.");
+      setInfo(t("login.otpSent"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ارسال کد ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("login.sendFail"));
     } finally {
       setLoading(false);
     }
@@ -97,7 +99,7 @@ export default function LoginPage() {
     setInfo(null);
 
     if (!/^\d{6}$/.test(code)) {
-      setError("کد تایید باید ۶ رقم باشد.");
+      setError(t("login.codeInvalid"));
       return;
     }
 
@@ -110,7 +112,7 @@ export default function LoginPage() {
       });
       await afterLogin(data);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "کد تایید نامعتبر است.");
+      setError(err instanceof ApiError ? err.message : t("login.codeWrong"));
     } finally {
       setLoading(false);
     }
@@ -121,11 +123,11 @@ export default function LoginPage() {
     setInfo(null);
 
     if (!/^09\d{9}$/.test(phone)) {
-      setError("شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.");
+      setError(t("login.phoneInvalid"));
       return;
     }
     if (!password) {
-      setError("رمز عبور را وارد کنید.");
+      setError(t("login.passwordRequired"));
       return;
     }
 
@@ -139,7 +141,7 @@ export default function LoginPage() {
       await afterLogin(data);
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "شماره موبایل یا رمز عبور نادرست است.",
+        err instanceof ApiError ? err.message : t("login.badCredentials"),
       );
     } finally {
       setLoading(false);
@@ -149,14 +151,15 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-navy-900 to-navy-800 p-4">
       <div className="w-full max-w-md">
+        <div className="mb-4 flex justify-center">
+          <LanguageSwitch />
+        </div>
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-ink">
-            ت
+            T
           </div>
-          <h1 className="text-xl font-bold text-white">تی‌ادیتور | Tauditor</h1>
-          <p className="mt-1 text-sm text-gray-300">
-            ابزار حسابرسان داخلی و خارجی — ورود با شماره موبایل
-          </p>
+          <h1 className="text-xl font-bold text-white">{t("login.title")}</h1>
+          <p className="mt-1 text-sm text-gray-300">{t("login.subtitle")}</p>
         </div>
 
         <Card>
@@ -171,7 +174,7 @@ export default function LoginPage() {
                   : "text-gray-600 hover:text-ink",
               )}
             >
-              ورود با کد پیامک
+              {t("login.otp")}
             </button>
             <button
               type="button"
@@ -183,7 +186,7 @@ export default function LoginPage() {
                   : "text-gray-600 hover:text-ink",
               )}
             >
-              ورود با رمز عبور
+              {t("login.password")}
             </button>
           </div>
 
@@ -195,7 +198,7 @@ export default function LoginPage() {
                 loginWithPassword();
               }}
             >
-              <Field label="شماره موبایل" hint="مثال: 09121234567">
+              <Field label={t("login.phone")} hint={t("login.phoneHint")}>
                 <Input
                   value={phone}
                   onChange={(event) =>
@@ -209,12 +212,12 @@ export default function LoginPage() {
                 />
               </Field>
 
-              <Field label="رمز عبور">
+              <Field label={t("login.passwordLabel")}>
                 <Input
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="رمز عبور"
+                  placeholder={t("login.passwordPlaceholder")}
                   dir="ltr"
                   autoComplete="current-password"
                 />
@@ -223,11 +226,11 @@ export default function LoginPage() {
               {error && <Alert>{error}</Alert>}
 
               <Button type="submit" loading={loading} className="w-full">
-                ورود به تی‌ادیتور
+                {t("login.submit")}
               </Button>
 
               <p className="text-center text-xs text-gray-500">
-                هنوز رمز عبور ندارید؟ با کد پیامک وارد شوید و در پروفایل رمز بسازید.
+                {t("login.noPassword")}
               </p>
             </form>
           ) : step === "phone" ? (
@@ -238,7 +241,7 @@ export default function LoginPage() {
                 sendOtp();
               }}
             >
-              <Field label="شماره موبایل" hint="مثال: 09121234567">
+              <Field label={t("login.phone")} hint={t("login.phoneHint")}>
                 <Input
                   value={phone}
                   onChange={(event) =>
@@ -255,11 +258,11 @@ export default function LoginPage() {
               {error && <Alert>{error}</Alert>}
 
               <Button type="submit" loading={loading} className="w-full">
-                دریافت کد تایید
+                {t("login.getCode")}
               </Button>
 
               <p className="text-center text-xs text-gray-500">
-                با ورود، شرایط استفاده از سرویس را می‌پذیرید.
+                {t("login.accept")}
               </p>
             </form>
           ) : (
@@ -271,7 +274,7 @@ export default function LoginPage() {
               }}
             >
               <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                کد ارسال‌شده به <span dir="ltr">{phone}</span> را وارد کنید.
+                {t("login.codeSent", { phone })}
                 <button
                   type="button"
                   className="ms-2 text-link hover:text-link-hover hover:underline"
@@ -282,11 +285,11 @@ export default function LoginPage() {
                     setInfo(null);
                   }}
                 >
-                  تغییر شماره
+                  {t("login.changePhone")}
                 </button>
               </div>
 
-              <Field label="کد تایید">
+              <Field label={t("login.code")}>
                 <Input
                   value={code}
                   onChange={(event) =>
@@ -304,13 +307,13 @@ export default function LoginPage() {
               {error && <Alert>{error}</Alert>}
 
               <Button type="submit" loading={loading} className="w-full">
-                ورود به تی‌ادیتور
+                {t("login.submit")}
               </Button>
 
               <div className="text-center text-sm">
                 {countdown > 0 ? (
                   <span className="text-gray-500">
-                    ارسال مجدد کد تا {countdown} ثانیه دیگر
+                    {t("login.resendIn", { seconds: countdown })}
                   </span>
                 ) : (
                   <button
@@ -318,7 +321,7 @@ export default function LoginPage() {
                     className="text-link hover:text-link-hover hover:underline"
                     onClick={sendOtp}
                   >
-                    ارسال مجدد کد
+                    {t("login.resend")}
                   </button>
                 )}
               </div>

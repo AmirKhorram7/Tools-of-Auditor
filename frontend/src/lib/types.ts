@@ -64,12 +64,15 @@ export type ProjectRole = "owner" | "editor" | "viewer";
 export type Project = {
   id: number;
   parent: number | null;
+  parent_name?: string | null;
   name: string;
   company_name: string;
   description: string;
   status: ProjectStatus;
   is_active: boolean;
   is_root: boolean;
+  /** Card background palette key (see CARD_COLORS in lib/explanation.ts). */
+  color?: string;
   owner: number;
   my_role?: ProjectRole | null;
   is_shared_with_me?: boolean;
@@ -110,11 +113,14 @@ export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
 export type Process = {
   id: number;
   project: number;
+  project_name?: string;
   name: string;
   description: string;
   process_owner_name: string;
   department: string;
   order: number;
+  /** Card background palette key (see CARD_COLORS in lib/explanation.ts). */
+  color?: string;
   owner: number;
   my_role?: ProjectRole | null;
   step_count?: number;
@@ -173,6 +179,9 @@ export type StepItem = {
 };
 
 export type ProcessStepDetail = ProcessStep & {
+  process_name?: string;
+  project?: number;
+  project_name?: string;
   explanation: string;
   explanation_media: StepMedia[];
   risks: StepItem[];

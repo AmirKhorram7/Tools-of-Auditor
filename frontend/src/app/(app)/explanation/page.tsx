@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import FolderCard from "@/components/explanation/FolderCard";
 import {
   Alert,
   Badge,
   Button,
-  Card,
   ConfirmDialog,
   EmptyState,
   Field,
@@ -17,14 +17,12 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
-import {
-  PROJECT_ROLE_LABELS,
-  PROJECT_STATUS_LABELS,
-  canEditProject,
-  type Project,
-} from "@/lib/types";
+import { faNum, type CardColor } from "@/lib/explanation";
+import { useI18n } from "@/lib/i18n";
+import { canEditProject, type Project } from "@/lib/types";
 
 export default function ExplanationServicePage() {
+  const { t, n, locale } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +42,7 @@ export default function ExplanationServicePage() {
   const [pending, setPending] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [colorBusy, setColorBusy] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,7 +50,7 @@ export default function ExplanationServicePage() {
     try {
       setProjects(await apiList<Project>("/projects/?roots_only=true"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "دریافت پروژه‌ها ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("exp.loadFoldersFail"));
     } finally {
       setLoading(false);
     }
@@ -63,7 +62,7 @@ export default function ExplanationServicePage() {
 
   const createProject = async () => {
     if (!name.trim()) {
-      setFormError("نام پروژه الزامی است.");
+      setFormError(t("exp.nameRequired"));
       return;
     }
     setSaving(true);
@@ -83,7 +82,7 @@ export default function ExplanationServicePage() {
       setDescription("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت پروژه ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("exp.createFail"));
     } finally {
       setSaving(false);
     }
@@ -100,7 +99,7 @@ export default function ExplanationServicePage() {
   const saveEdit = async () => {
     if (!editProject) return;
     if (!editName.trim()) {
-      setFormError("نام پروژه الزامی است.");
+      setFormError(t("exp.nameRequired"));
       return;
     }
     setSaving(true);
@@ -119,9 +118,32 @@ export default function ExplanationServicePage() {
       );
       setEditProject(null);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ذخیره پروژه ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("exp.saveFail"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const changeColor = async (project: Project, color: CardColor) => {
+    const previous = project.color;
+    setColorBusy(project.id);
+    setProjects((current) =>
+      current.map((item) => (item.id === project.id ? { ...item, color } : item)),
+    );
+    try {
+      await apiFetch(`/projects/${project.id}/`, {
+        method: "PATCH",
+        body: { color },
+      });
+    } catch {
+      setProjects((current) =>
+        current.map((item) =>
+          item.id === project.id ? { ...item, color: previous } : item,
+        ),
+      );
+      setError(t("exp.colorFail"));
+    } finally {
+      setColorBusy(null);
     }
   };
 
@@ -134,7 +156,7 @@ export default function ExplanationServicePage() {
       setProjects((current) => current.filter((item) => item.id !== pending.id));
       setPending(null);
     } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : "حذف پروژه ناموفق بود.");
+      setDeleteError(err instanceof ApiError ? err.message : t("exp.deleteFail"));
     } finally {
       setDeleting(false);
     }
@@ -144,12 +166,15 @@ export default function ExplanationServicePage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-ink">تشریح سیستم</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            پروژه اصلی شرکت را بسازید، زیرپروژه‌ها و فرایندها را در آن مستند کنید.
-          </p>
+          <h1 className="text-lg font-bold text-ink">{t("exp.title")}</h1>
+          <p className="mt-1 text-sm text-gray-500">{t("exp.subtitle")}</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>+ پروژه جدید</Button>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/explanation/tree">
+            <Button variant="secondary">{t("exp.treeView")}</Button>
+          </Link>
+          <Button onClick={() => setModalOpen(true)}>+ {t("exp.newFolder")}</Button>
+        </div>
       </div>
 
       {error && <Alert>{error}</Alert>}
@@ -158,81 +183,62 @@ export default function ExplanationServicePage() {
         <PageLoader />
       ) : projects.length === 0 ? (
         <EmptyState
-          title="هنوز پروژه‌ای ندارید"
-          description="برای شروع، یک پروژه اصلی مثل «سیستم دوشه» بسازید."
-          action={<Button onClick={() => setModalOpen(true)}>ساخت پروژه</Button>}
+          title={t("exp.emptyTitle")}
+          description={t("exp.emptyDesc")}
+          action={<Button onClick={() => setModalOpen(true)}>{t("exp.createFolder")}</Button>}
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
-            <Card
+            <FolderCard
               key={project.id}
-              className="flex h-full flex-col transition hover:border-brand-500 hover:shadow-md"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <Link
-                  href={`/explanation/projects/${project.id}`}
-                  className="font-semibold text-link hover:text-link-hover hover:underline"
-                >
-                  {project.name}
-                </Link>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge tone="blue">
-                    {PROJECT_STATUS_LABELS[project.status]}
-                  </Badge>
+              name={project.name}
+              href={`/explanation/projects/${project.id}`}
+              color={project.color}
+              kindLabel={t("common.folder")}
+              subtitle={project.company_name || null}
+              editable={canEditProject(project.my_role)}
+              busy={colorBusy === project.id}
+              onColor={(color) => changeColor(project, color)}
+              onEdit={() => openEdit(project)}
+              onDelete={
+                project.my_role === "owner"
+                  ? () => {
+                      setDeleteError(null);
+                      setPending(project);
+                    }
+                  : undefined
+              }
+              badge={
+                <>
+                  <Badge tone="blue">{t(`status.${project.status}`)}</Badge>
                   {project.is_shared_with_me && project.my_role && (
-                    <Badge tone="amber">
-                      {PROJECT_ROLE_LABELS[project.my_role]}
-                    </Badge>
+                    <Badge tone="amber">{t(`role.${project.my_role}`)}</Badge>
                   )}
-                </div>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                {project.company_name || "بدون نام شرکت"}
-              </p>
-              {project.description && (
-                <p className="mt-2 line-clamp-2 text-sm text-gray-600">
-                  {project.description}
-                </p>
-              )}
-              <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500">
-                <span>{project.sub_project_count ?? 0} زیرپروژه</span>
-                <span>{project.process_count ?? 0} فرایند</span>
-                <div className="ms-auto flex items-center gap-1">
-                  {canEditProject(project.my_role) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEdit(project)}
-                    >
-                      ویرایش
-                    </Button>
+                </>
+              }
+              meta={
+                <>
+                  {(project.sub_project_count ?? 0) > 0 && (
+                    <span>
+                      {t("dash.subfolders", {
+                        count: locale === "fa" ? faNum(project.sub_project_count ?? 0) : n(project.sub_project_count ?? 0),
+                      })}
+                    </span>
                   )}
-                  {project.my_role === "owner" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:bg-red-50"
-                      onClick={() => {
-                        setDeleteError(null);
-                        setPending(project);
-                      }}
-                    >
-                      حذف
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </Card>
+                  <span>
+                    {t("dash.processes", {
+                      count: locale === "fa" ? faNum(project.process_count ?? 0) : n(project.process_count ?? 0),
+                    })}
+                  </span>
+                </>
+              }
+            />
           ))}
         </div>
       )}
 
-      <Modal
-        open={modalOpen}
-        title="پروژه جدید"
-        onClose={() => setModalOpen(false)}
-      >
+      <Modal open={modalOpen} title={t("exp.newFolder")} onClose={() => setModalOpen(false)}>
         <form
           className="space-y-3"
           onSubmit={(event) => {
@@ -240,27 +246,27 @@ export default function ExplanationServicePage() {
             createProject();
           }}
         >
-          <Field label="نام پروژه">
+          <Field label={t("exp.folderName")} hint={t("exp.folderHint")}>
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="مثال: سیستم دوشه"
+              placeholder={t("exp.folderPlaceholder")}
               autoFocus
             />
           </Field>
-          <Field label="نام شرکت">
+          <Field label={t("exp.companyOptional")}>
             <Input
               value={company}
               onChange={(event) => setCompany(event.target.value)}
-              placeholder="مثال: شرکت دوشه"
+              placeholder={t("exp.companyPlaceholder")}
             />
           </Field>
-          <Field label="توضیحات">
+          <Field label={t("exp.description")}>
             <Textarea
               rows={3}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="هدف و دامنه این پروژه"
+              placeholder={t("exp.folderGoal")}
             />
           </Field>
 
@@ -272,10 +278,10 @@ export default function ExplanationServicePage() {
               variant="secondary"
               onClick={() => setModalOpen(false)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              ساخت پروژه
+              {t("exp.createFolder")}
             </Button>
           </div>
         </form>
@@ -283,7 +289,7 @@ export default function ExplanationServicePage() {
 
       <Modal
         open={editProject !== null}
-        title="ویرایش پروژه"
+        title={t("exp.editFolder")}
         onClose={() => setEditProject(null)}
       >
         <form
@@ -293,20 +299,20 @@ export default function ExplanationServicePage() {
             saveEdit();
           }}
         >
-          <Field label="نام پروژه">
+          <Field label={t("exp.folderName")}>
             <Input
               value={editName}
               onChange={(event) => setEditName(event.target.value)}
               autoFocus
             />
           </Field>
-          <Field label="نام شرکت">
+          <Field label={t("exp.companyOptional")}>
             <Input
               value={editCompany}
               onChange={(event) => setEditCompany(event.target.value)}
             />
           </Field>
-          <Field label="توضیحات">
+          <Field label={t("exp.description")}>
             <Textarea
               rows={3}
               value={editDescription}
@@ -320,10 +326,10 @@ export default function ExplanationServicePage() {
               variant="secondary"
               onClick={() => setEditProject(null)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              ذخیره
+              {t("common.save")}
             </Button>
           </div>
         </form>
@@ -331,8 +337,9 @@ export default function ExplanationServicePage() {
 
       <ConfirmDialog
         open={pending !== null}
-        title="حذف پروژه"
-        description={`پروژه «${pending?.name ?? ""}» به همراه زیرپروژه‌ها و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟`}
+        title={t("exp.deleteFolder")}
+        description={t("exp.deleteFolderConfirm", { name: pending?.name ?? "" })}
+        confirmLabel={t("common.delete")}
         loading={deleting}
         error={deleteError}
         onConfirm={confirmDelete}

@@ -5,11 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import BackButton from "@/components/BackButton";
+import ColorPicker from "@/components/explanation/ColorPicker";
+import FolderCard from "@/components/explanation/FolderCard";
+import ProcessCard from "@/components/explanation/ProcessCard";
 import {
   Alert,
   Badge,
   Button,
-  Card,
   ConfirmDialog,
   EmptyState,
   Field,
@@ -20,10 +22,11 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiDownload, apiFetch, apiList, mediaUrl } from "@/lib/api";
+import { cardPalette, faNum, type CardColor } from "@/lib/explanation";
+import { useI18n } from "@/lib/i18n";
 import {
   PROJECT_MEMBER_ROLE_OPTIONS,
   PROJECT_ROLE_LABELS,
-  PROJECT_STATUS_LABELS,
   PROJECT_STATUS_OPTIONS,
   canEditProject,
   canManageMembers,
@@ -44,6 +47,7 @@ type Pending =
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useI18n();
   const projectId = Number(params.id);
 
   const [project, setProject] = useState<Project | null>(null);
@@ -81,6 +85,9 @@ export default function ProjectDetailPage() {
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusSuccess, setStatusSuccess] = useState<string | null>(null);
+  /** Non-fatal errors (colour changes) — shown inline, page stays usable. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [colorBusy, setColorBusy] = useState<string | null>(null);
 
   const [shareOpen, setShareOpen] = useState(false);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -118,7 +125,7 @@ export default function ProjectDetailPage() {
 
   const createSubProject = async () => {
     if (!subName.trim()) {
-      setFormError("نام زیرپروژه الزامی است.");
+      setFormError("نام زیرپوشه الزامی است.");
       return;
     }
     setSaving(true);
@@ -132,7 +139,7 @@ export default function ProjectDetailPage() {
       setSubName("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت زیرپروژه ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : "ساخت زیرپوشه ناموفق بود.");
     } finally {
       setSaving(false);
     }
@@ -298,13 +305,80 @@ export default function ProjectDetailPage() {
         body: { status: nextStatus },
       });
       setProject(updated);
-      setStatusSuccess("وضعیت پروژه ذخیره شد.");
+      setStatusSuccess("وضعیت پوشه ذخیره شد.");
     } catch (err) {
       setStatusError(
         err instanceof ApiError ? err.message : "تغییر وضعیت ناموفق بود.",
       );
     } finally {
       setStatusSaving(false);
+    }
+  };
+
+  const changeSelfColor = async (color: CardColor) => {
+    if (!project) return;
+    const previous = project.color;
+    setColorBusy("self");
+    setActionError(null);
+    setProject({ ...project, color });
+    try {
+      await apiFetch(`/projects/${project.id}/`, {
+        method: "PATCH",
+        body: { color },
+      });
+    } catch {
+      setProject({ ...project, color: previous });
+      setActionError("تغییر رنگ پوشه ناموفق بود.");
+    } finally {
+      setColorBusy(null);
+    }
+  };
+
+  const changeSubColor = async (sub: Project, color: CardColor) => {
+    const previous = sub.color;
+    setColorBusy(`sub-${sub.id}`);
+    setActionError(null);
+    setSubProjects((current) =>
+      current.map((item) => (item.id === sub.id ? { ...item, color } : item)),
+    );
+    try {
+      await apiFetch(`/projects/${sub.id}/`, {
+        method: "PATCH",
+        body: { color },
+      });
+    } catch {
+      setSubProjects((current) =>
+        current.map((item) =>
+          item.id === sub.id ? { ...item, color: previous } : item,
+        ),
+      );
+      setActionError("تغییر رنگ زیرپوشه ناموفق بود.");
+    } finally {
+      setColorBusy(null);
+    }
+  };
+
+  const changeProcessColor = async (target: Process, color: CardColor) => {
+    const previous = target.color;
+    setColorBusy(`process-${target.id}`);
+    setActionError(null);
+    setProcesses((current) =>
+      current.map((item) => (item.id === target.id ? { ...item, color } : item)),
+    );
+    try {
+      await apiFetch(`/processes/${target.id}/`, {
+        method: "PATCH",
+        body: { color },
+      });
+    } catch {
+      setProcesses((current) =>
+        current.map((item) =>
+          item.id === target.id ? { ...item, color: previous } : item,
+        ),
+      );
+      setActionError("تغییر رنگ فرایند ناموفق بود.");
+    } finally {
+      setColorBusy(null);
     }
   };
 
@@ -405,22 +479,25 @@ export default function ProjectDetailPage() {
 
   if (loading) return <PageLoader />;
   if (error) return <Alert>{error}</Alert>;
-  if (!project) return <Alert>پروژه پیدا نشد.</Alert>;
+  if (!project) return <Alert>پوشه پیدا نشد.</Alert>;
 
   const editable = canEditProject(project.my_role);
   const manageMembers = canManageMembers(project.my_role);
   const canDeleteRoot = project.my_role === "owner";
 
+  const palette = cardPalette(project.color);
+  const kindLabel = project.is_root ? t("common.folder") : t("common.subfolder");
+
   const confirmCopy =
     pending?.kind === "self"
       ? {
-          title: project.is_root ? "حذف پروژه" : "حذف زیرپروژه",
-          description: `«${project.name}» به همراه همه زیرپروژه‌ها و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟`,
+          title: project.is_root ? "حذف پوشه" : "حذف زیرپوشه",
+          description: `«${project.name}» به همراه همه زیرپوشه‌ها و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟`,
         }
       : pending?.kind === "sub-project"
         ? {
-            title: "حذف زیرپروژه",
-            description: `زیرپروژه «${pending.name}» و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟`,
+            title: "حذف زیرپوشه",
+            description: `زیرپوشه «${pending.name}» و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟`,
           }
         : {
             title: "حذف فرایند",
@@ -437,7 +514,7 @@ export default function ProjectDetailPage() {
               : "/explanation"
           }
         />
-        <nav className="flex items-center gap-1.5 text-xs text-gray-500">
+        <nav className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
           <Link href="/explanation" className="hover:text-link">
             تشریح سیستم
           </Link>
@@ -448,180 +525,204 @@ export default function ProjectDetailPage() {
                 href={`/explanation/projects/${project.parent}`}
                 className="hover:text-link"
               >
-                پروژه اصلی
+                {project.parent_name || "پوشه اصلی"}
               </Link>
             </>
           )}
           <span>/</span>
-          <span className="text-ink">{project.name}</span>
+          <span className="font-medium text-ink">{project.name}</span>
         </nav>
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-ink">{project.name}</h1>
-            <Badge tone="blue">{PROJECT_STATUS_LABELS[project.status]}</Badge>
-            {!project.is_root && <Badge>زیرپروژه</Badge>}
-            {project.my_role && (
-              <Badge tone={project.is_shared_with_me ? "amber" : "green"}>
-                {PROJECT_ROLE_LABELS[project.my_role]}
-              </Badge>
-            )}
-            {project.is_shared_with_me && <Badge>اشتراک‌شده با من</Badge>}
+      <div
+        className="rounded-2xl border p-5"
+        style={{ backgroundColor: palette.bg, borderColor: palette.border }}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
+              style={{ backgroundColor: palette.accent }}
+            >
+              <svg viewBox="0 0 24 24" className="size-6" aria-hidden>
+                <path
+                  fill="currentColor"
+                  d="M4 5.5A2.5 2.5 0 0 1 6.5 3h3.2c.7 0 1.35.33 1.76.9l.72 1.02c.15.2.38.33.63.33h4.69A2.5 2.5 0 0 1 20 7.75v9.75A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5z"
+                />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <p
+                className="text-[11px] font-semibold tracking-wide opacity-70"
+                style={{ color: palette.text }}
+              >
+                {kindLabel}
+              </p>
+              <h1
+                className="mt-0.5 text-xl font-bold"
+                style={{ color: palette.text }}
+              >
+                {project.name}
+              </h1>
+              <p className="mt-1 text-sm" style={{ color: palette.muted }}>
+                {project.company_name || t("dash.noCompany")}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge tone="blue">{t(`status.${project.status}`)}</Badge>
+                {project.my_role && (
+                  <Badge tone={project.is_shared_with_me ? "amber" : "green"}>
+                    {t(`role.${project.my_role}`)}
+                  </Badge>
+                )}
+                {project.is_shared_with_me && <Badge>{t("exp.sharedWithMe")}</Badge>}
+                <span
+                  className="text-xs opacity-80"
+                  style={{ color: palette.text }}
+                >
+                  {faNum(processes.length)} فرایند
+                </span>
+              </div>
+              {project.description && (
+                <p className="mt-2 max-w-2xl text-sm text-gray-600">
+                  {project.description}
+                </p>
+              )}
+            </div>
           </div>
-          <p className="mt-1 text-sm text-gray-500">
-            {project.company_name || "بدون نام شرکت"}
+          {editable && (
+            <ColorPicker
+              value={project.color}
+              busy={colorBusy === "self"}
+              onSelect={changeSelfColor}
+              title="رنگ این پوشه"
+            />
+          )}
+        </div>
+
+        {!project.is_root && (
+          <p className="mt-4 rounded-lg bg-white/70 px-3 py-2 text-xs text-gray-600">
+            دسترسی اعضا در پوشه اصلی تنظیم می‌شود.{" "}
+            {project.parent && (
+              <Link
+                href={`/explanation/projects/${project.parent}`}
+                className="font-medium text-link hover:text-link-hover"
+              >
+                رفتن به پوشه اصلی
+              </Link>
+            )}
           </p>
-          {project.description && (
-            <p className="mt-2 max-w-2xl text-sm text-gray-600">
-              {project.description}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {editable && (
-            <Button
-              variant="secondary"
-              onClick={() => openEdit({ kind: "project", item: project })}
-            >
-              ویرایش
-            </Button>
-          )}
-          <Button variant="secondary" disabled={pdfLoading} onClick={downloadPdf}>
-            {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
-          </Button>
-          {manageMembers && (
-            <Button variant="secondary" onClick={openShare}>
-              اشتراک‌گذاری
-            </Button>
-          )}
-          {(canDeleteRoot || (editable && !project.is_root)) && (
-            <Button
-              variant="secondary"
-              className="text-red-600 hover:border-red-300 hover:bg-red-50"
-              onClick={() => askDelete({ kind: "self" })}
-            >
-              {project.is_root ? "حذف پروژه" : "حذف زیرپروژه"}
-            </Button>
-          )}
-          {editable && project.is_root && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setFormError(null);
-                setSubOpen(true);
-              }}
-            >
-              + زیرپروژه
-            </Button>
-          )}
-          {editable && (
-            <Button
-              onClick={() => {
-                setFormError(null);
-                setProcessOpen(true);
-              }}
-            >
-              + فرایند
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
-      <Card className="max-w-md">
-        <Field
-          label="وضعیت پروژه"
-          hint={
-            editable
-              ? "با تغییر وضعیت، بلافاصله ذخیره می‌شود."
-              : "فقط مالک و ویرایشگر می‌توانند وضعیت را تغییر دهند."
-          }
-        >
-          <Select
+      <div className="flex flex-wrap items-center gap-2">
+        {editable && (
+          <Button
+            onClick={() => {
+              setFormError(null);
+              setProcessOpen(true);
+            }}
+          >
+            + فرایند
+          </Button>
+        )}
+        {editable && project.is_root && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setFormError(null);
+              setSubOpen(true);
+            }}
+          >
+            + زیرپوشه
+          </Button>
+        )}
+        <Link href={`/explanation/tree?root=${rootId}`}>
+          <Button variant="secondary">نمای درختی</Button>
+        </Link>
+        {editable && (
+          <Button
+            variant="secondary"
+            onClick={() => openEdit({ kind: "project", item: project })}
+          >
+            ویرایش
+          </Button>
+        )}
+        <Button variant="secondary" disabled={pdfLoading} onClick={downloadPdf}>
+          {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
+        </Button>
+        {manageMembers && (
+          <Button variant="secondary" onClick={openShare}>
+            اشتراک‌گذاری
+          </Button>
+        )}
+        {(canDeleteRoot || (editable && !project.is_root)) && (
+          <Button
+            variant="secondary"
+            className="text-red-600 hover:border-red-300 hover:bg-red-50"
+            onClick={() => askDelete({ kind: "self" })}
+          >
+            {project.is_root ? "حذف پوشه" : "حذف زیرپوشه"}
+          </Button>
+        )}
+
+        <div className="ms-auto flex items-center gap-1.5">
+          <span className="text-[11px] text-gray-500">{t("common.status")}</span>
+          <select
             value={project.status}
             disabled={statusSaving || !editable}
+            title={
+              editable
+                ? "با تغییر وضعیت، بلافاصله ذخیره می‌شود."
+                : "فقط مالک و ویرایشگر می‌توانند وضعیت را تغییر دهند."
+            }
+            className="h-8 w-[7.25rem] rounded-md border border-gray-300 bg-white px-2 text-xs text-ink outline-none transition focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
             onChange={(event) =>
               changeStatus(event.target.value as ProjectStatus)
             }
           >
             {PROJECT_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(`status.${option.value}`)}
               </option>
             ))}
-          </Select>
-        </Field>
-        {statusSaving && (
-          <p className="mt-2 text-xs text-gray-500">در حال ذخیره...</p>
-        )}
-        {statusError && (
-          <div className="mt-3">
-            <Alert tone="error">{statusError}</Alert>
-          </div>
-        )}
-        {statusSuccess && (
-          <div className="mt-3">
-            <Alert tone="success">{statusSuccess}</Alert>
-          </div>
-        )}
-      </Card>
-
-      {project.is_root && (
-        <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">زیرپروژه‌ها</h2>
-          {subProjects.length === 0 ? (
-            <EmptyState
-              title="زیرپروژه‌ای ثبت نشده است"
-              description="برای گروه‌بندی فرایندها می‌توانید زیرپروژه بسازید (اختیاری)."
-            />
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {subProjects.map((sub) => (
-                <Card
-                  key={sub.id}
-                  className="flex h-full flex-col transition hover:border-brand-500 hover:shadow-md"
-                >
-                  <Link
-                    href={`/explanation/projects/${sub.id}`}
-                    className="font-medium text-link hover:text-link-hover hover:underline"
-                  >
-                    {sub.name}
-                  </Link>
-                  <div className="mt-2 flex items-center text-xs text-gray-500">
-                    <span>{sub.process_count ?? 0} فرایند</span>
-                    {editable && (
-                      <div className="ms-auto flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            openEdit({ kind: "sub-project", item: sub })
-                          }
-                        >
-                          ویرایش
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:bg-red-50"
-                          onClick={() =>
-                            askDelete({
-                              kind: "sub-project",
-                              id: sub.id,
-                              name: sub.name,
-                            })
-                          }
-                        >
-                          حذف
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
+          </select>
+          {statusSaving && (
+            <span className="text-[11px] text-gray-500">ذخیره...</span>
           )}
+        </div>
+      </div>
+
+      {actionError && <Alert>{actionError}</Alert>}
+      {statusError && <Alert tone="error">{statusError}</Alert>}
+      {statusSuccess && <Alert tone="success">{statusSuccess}</Alert>}
+
+      {/* Sub-folders are optional, so the section only appears once one exists. */}
+      {project.is_root && subProjects.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-base font-semibold text-ink">زیرپوشه‌ها</h2>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {subProjects.map((sub) => (
+              <FolderCard
+                key={sub.id}
+                name={sub.name}
+                href={`/explanation/projects/${sub.id}`}
+                color={sub.color}
+                kindLabel={t("common.subfolder")}
+                editable={editable}
+                busy={colorBusy === `sub-${sub.id}`}
+                onColor={(color) => changeSubColor(sub, color)}
+                onEdit={() => openEdit({ kind: "sub-project", item: sub })}
+                onDelete={() =>
+                  askDelete({
+                    kind: "sub-project",
+                    id: sub.id,
+                    name: sub.name,
+                  })
+                }
+                meta={<span>{faNum(sub.process_count ?? 0)} فرایند</span>}
+              />
+            ))}
+          </div>
         </section>
       )}
 
@@ -638,58 +739,33 @@ export default function ProjectDetailPage() {
             }
           />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {processes.map((process) => (
-              <Card
+              <ProcessCard
                 key={process.id}
-                className="flex h-full flex-col transition hover:border-brand-500 hover:shadow-md"
-              >
-                <Link
-                  href={`/explanation/processes/${process.id}`}
-                  className="font-medium text-link hover:text-link-hover hover:underline"
-                >
-                  {process.name}
-                </Link>
-                <p className="mt-1 text-xs text-gray-500">
-                  {process.department || "بدون واحد سازمانی"}
-                </p>
-                <div className="mt-3 flex items-center border-t border-gray-100 pt-3 text-xs text-gray-500">
-                  <span>{process.step_count ?? 0} گام مستندشده</span>
-                  {editable && (
-                    <div className="ms-auto flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          openEdit({ kind: "process", item: process })
-                        }
-                      >
-                        ویرایش
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:bg-red-50"
-                        onClick={() =>
-                          askDelete({
-                            kind: "process",
-                            id: process.id,
-                            name: process.name,
-                          })
-                        }
-                      >
-                        حذف
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </Card>
+                name={process.name}
+                href={`/explanation/processes/${process.id}`}
+                color={process.color}
+                department={process.department}
+                stepCount={process.step_count ?? 0}
+                editable={editable}
+                busy={colorBusy === `process-${process.id}`}
+                onColor={(color) => changeProcessColor(process, color)}
+                onEdit={() => openEdit({ kind: "process", item: process })}
+                onDelete={() =>
+                  askDelete({
+                    kind: "process",
+                    id: process.id,
+                    name: process.name,
+                  })
+                }
+              />
             ))}
           </div>
         )}
       </section>
 
-      <Modal open={subOpen} title="زیرپروژه جدید" onClose={() => setSubOpen(false)}>
+      <Modal open={subOpen} title="زیرپوشه جدید" onClose={() => setSubOpen(false)}>
         <form
           className="space-y-3"
           onSubmit={(event) => {
@@ -697,7 +773,7 @@ export default function ProjectDetailPage() {
             createSubProject();
           }}
         >
-          <Field label="نام زیرپروژه">
+          <Field label="نام زیرپوشه">
             <Input
               value={subName}
               onChange={(event) => setSubName(event.target.value)}
@@ -782,12 +858,12 @@ export default function ProjectDetailPage() {
 
       <Modal
         open={shareOpen}
-        title="اشتراک‌گذاری پروژه"
+        title="اشتراک‌گذاری پوشه"
         onClose={() => setShareOpen(false)}
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            با دعوت از طریق شماره موبایل، کل این پروژه (و زیرپروژه‌ها و فرایندها)
+            با دعوت از طریق شماره موبایل، کل این پوشه (و زیرپوشه‌ها و فرایندها)
             برای همکار یا مدیر شما قابل مشاهده می‌شود.
           </p>
           <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
@@ -927,8 +1003,8 @@ export default function ProjectDetailPage() {
           editTarget?.kind === "process"
             ? "ویرایش فرایند"
             : editTarget?.kind === "sub-project"
-              ? "ویرایش زیرپروژه"
-              : "ویرایش پروژه"
+              ? "ویرایش زیرپوشه"
+              : "ویرایش پوشه"
         }
         onClose={() => setEditTarget(null)}
       >
@@ -944,8 +1020,8 @@ export default function ProjectDetailPage() {
               editTarget?.kind === "process"
                 ? "نام فرایند"
                 : editTarget?.kind === "sub-project"
-                  ? "نام زیرپروژه"
-                  : "نام پروژه"
+                  ? "نام زیرپوشه"
+                  : "نام پوشه"
             }
           >
             <Input

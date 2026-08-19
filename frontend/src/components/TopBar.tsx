@@ -6,47 +6,48 @@ import { useEffect, useRef, useState } from "react";
 
 import { Avatar, cx } from "@/components/ui";
 import { displayName, useAuth } from "@/lib/auth";
-
-/** Services shown in the top bar picker. */
-const SERVICES = [
-  {
-    key: "work",
-    label: "مدیریت کار",
-    description: "کار روشن، پیشرفت قابل اندازه‌گیری",
-    href: "/work",
-    available: true,
-  },
-  {
-    key: "system-explanation",
-    label: "تشریح سیستم",
-    description: "مستندسازی فرایند، ریسک و کنترل",
-    href: "/explanation",
-    available: true,
-  },
-  {
-    key: "audit-plan",
-    label: "برنامه حسابرسی",
-    description: "به‌زودی",
-    href: "#",
-    available: false,
-  },
-  {
-    key: "working-papers",
-    label: "کاربرگ‌ها",
-    description: "به‌زودی",
-    href: "#",
-    available: false,
-  },
-];
+import { LanguageSwitch, useI18n } from "@/lib/i18n";
 
 export default function TopBar() {
   const { profile, signOut } = useAuth();
+  const { t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
 
   const [servicesOpen, setServicesOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const services = [
+    {
+      key: "work",
+      label: t("nav.work"),
+      description: t("nav.workDesc"),
+      href: "/work",
+      available: true,
+    },
+    {
+      key: "system-explanation",
+      label: t("nav.explanation"),
+      description: t("nav.explanationDesc"),
+      href: "/explanation",
+      available: true,
+    },
+    {
+      key: "audit-plan",
+      label: t("nav.auditPlan"),
+      description: t("nav.soon"),
+      href: "#",
+      available: false,
+    },
+    {
+      key: "working-papers",
+      label: t("nav.workingPapers"),
+      description: t("nav.soon"),
+      href: "#",
+      available: false,
+    },
+  ];
 
   useEffect(() => {
     const onClickOutside = (event: MouseEvent) => {
@@ -96,7 +97,7 @@ export default function TopBar() {
               <span className="flex size-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-ink">
                 T
               </span>
-              <span className="text-base font-bold text-white">تی‌ادیتور</span>
+              <span className="text-base font-bold text-white">{t("brand.name")}</span>
             </Link>
 
             <div className="relative">
@@ -115,13 +116,13 @@ export default function TopBar() {
                     : "text-gray-200 hover:bg-navy-700 hover:text-white",
                 )}
               >
-                سرویس‌ها
+                {t("nav.services")}
                 <span className="text-[10px] text-brand-400">▾</span>
               </button>
 
               {servicesOpen && (
                 <div className="absolute start-0 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
-                  {SERVICES.map((service) =>
+                  {services.map((service) =>
                     service.available ? (
                       <Link
                         key={service.key}
@@ -154,7 +155,9 @@ export default function TopBar() {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="flex items-center gap-2">
+            <LanguageSwitch />
+            <div className="relative">
             <button
               type="button"
               onClick={() => {
@@ -199,17 +202,18 @@ export default function TopBar() {
                   href="/profile"
                   className="block rounded-lg px-3 py-2 text-sm text-ink transition hover:bg-surface"
                 >
-                  پروفایل من
+                  {t("nav.myProfile")}
                 </Link>
                 <button
                   type="button"
                   onClick={handleSignOut}
                   className="block w-full rounded-lg px-3 py-2 text-start text-sm text-red-600 transition hover:bg-red-50"
                 >
-                  خروج از حساب
+                  {t("nav.signOut")}
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>
@@ -217,15 +221,15 @@ export default function TopBar() {
       {/* Secondary bar — Amazon nav navy */}
       <div className="bg-navy-800">
         <nav className="mx-auto flex h-10 max-w-6xl items-center gap-1 overflow-x-auto px-4">
-          {navLink("/dashboard", "خانه", pathname === "/dashboard")}
-          {navLink("/work", "مدیریت کار", pathname.startsWith("/work"))}
+          {navLink("/dashboard", t("nav.home"), pathname === "/dashboard")}
+          {navLink("/work", t("nav.work"), pathname.startsWith("/work"))}
           {navLink(
             "/explanation",
-            "تشریح سیستم",
+            t("nav.explanation"),
             pathname.startsWith("/explanation"),
           )}
-          {navLink("/contact", "ارتباط با ما", pathname.startsWith("/contact"))}
-          {navLink("/profile", "پروفایل", pathname === "/profile")}
+          {navLink("/contact", t("nav.contact"), pathname.startsWith("/contact"))}
+          {navLink("/profile", t("nav.profile"), pathname === "/profile")}
         </nav>
       </div>
     </header>

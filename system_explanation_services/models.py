@@ -35,9 +35,30 @@ def retire(queryset, timestamp):
     )
 
 
+class CardColor(models.TextChoices):
+    """
+    Card background palette for folders and processes.
+
+    Only the key is stored; the frontend owns the exact shades so the
+    palette can be restyled without a migration.
+    """
+
+    DEFAULT = "default", _("Default")
+    SLATE = "slate", _("Slate")
+    NAVY = "navy", _("Navy")
+    SKY = "sky", _("Sky")
+    TEAL = "teal", _("Teal")
+    GREEN = "green", _("Green")
+    LIME = "lime", _("Lime")
+    AMBER = "amber", _("Amber")
+    ORANGE = "orange", _("Orange")
+    ROSE = "rose", _("Rose")
+    PURPLE = "purple", _("Purple")
+
+
 class Project(BaseModel):
     """
-    Documentation project tree.
+    Documentation project tree. Surfaced to users as «پوشه» (folder).
 
     - Root project: parent=null  (e.g. dooshe_system)
     - Sub-project: parent=<root> (group under the root)
@@ -73,6 +94,12 @@ class Project(BaseModel):
         related_name="owned_projects",
     )
     is_active = models.BooleanField(default=True)
+    color = models.CharField(
+        max_length=20,
+        choices=CardColor.choices,
+        default=CardColor.DEFAULT,
+        help_text=_("Card background color shown in the UI."),
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -204,6 +231,12 @@ class Process(BaseModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="owned_processes",
+    )
+    color = models.CharField(
+        max_length=20,
+        choices=CardColor.choices,
+        default=CardColor.DEFAULT,
+        help_text=_("Card background color shown in the UI."),
     )
 
     class Meta:

@@ -3,19 +3,17 @@
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
 
 type Props = {
-  /** Used when browser history is empty (e.g. opened in new tab). */
   fallbackHref: string;
   label?: string;
 };
 
-/** Simple back control — prefers history, otherwise goes to a safe parent page. */
-export default function BackButton({
-  fallbackHref,
-  label = "بازگشت",
-}: Props) {
+export default function BackButton({ fallbackHref, label }: Props) {
   const router = useRouter();
+  const { t } = useI18n();
+  const text = label ?? t("common.back");
 
   return (
     <Button
@@ -30,7 +28,7 @@ export default function BackButton({
         router.push(fallbackHref);
       }}
     >
-      ← {label}
+      ← {text}
     </Button>
   );
 }

@@ -23,6 +23,10 @@ class ProjectSerializer(serializers.ModelSerializer):
     process_count = serializers.IntegerField(read_only=True, required=False)
     sub_project_count = serializers.IntegerField(read_only=True, required=False)
     is_root = serializers.BooleanField(read_only=True)
+    # Lets the UI show the real parent name in breadcrumbs instead of a placeholder.
+    parent_name = serializers.CharField(
+        source="parent.name", read_only=True, default=None
+    )
     my_role = serializers.SerializerMethodField()
     is_shared_with_me = serializers.SerializerMethodField()
 
@@ -31,12 +35,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "parent",
+            "parent_name",
             "name",
             "company_name",
             "description",
             "status",
             "is_active",
             "is_root",
+            "color",
             "owner",
             "my_role",
             "is_shared_with_me",
@@ -144,6 +150,7 @@ class ProjectMemberInviteSerializer(serializers.Serializer):
 
 class ProcessSerializer(serializers.ModelSerializer):
     step_count = serializers.IntegerField(read_only=True, required=False)
+    project_name = serializers.CharField(source="project.name", read_only=True)
     my_role = serializers.SerializerMethodField()
 
     class Meta:
@@ -151,11 +158,13 @@ class ProcessSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "project",
+            "project_name",
             "name",
             "description",
             "process_owner_name",
             "department",
             "order",
+            "color",
             "owner",
             "my_role",
             "step_count",
@@ -311,6 +320,9 @@ class ProcessStepDetailSerializer(serializers.ModelSerializer):
     risks = StepRiskSerializer(many=True, read_only=True)
     controls = StepControlSerializer(many=True, read_only=True)
     explanation_media = serializers.SerializerMethodField()
+    process_name = serializers.CharField(source="process.name", read_only=True)
+    project = serializers.IntegerField(source="process.project_id", read_only=True)
+    project_name = serializers.CharField(source="process.project.name", read_only=True)
     my_role = serializers.SerializerMethodField()
 
     class Meta:
@@ -318,6 +330,9 @@ class ProcessStepDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "process",
+            "process_name",
+            "project",
+            "project_name",
             "title",
             "shape_type",
             "position_x",

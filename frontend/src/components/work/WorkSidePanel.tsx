@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button, cx } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import type { WorkCompany, WorkInvitation, WorkProject, WorkTeam } from "@/lib/work";
 
 const STORAGE_KEY = "ta_work_panel_open";
@@ -19,6 +20,7 @@ function readOpenState(): boolean {
 
 export default function WorkSidePanel() {
   const pathname = usePathname();
+  const { dir } = useI18n();
   const [open, setOpen] = useState(true);
   const [companies, setCompanies] = useState<WorkCompany[]>([]);
   const [projects, setProjects] = useState<WorkProject[]>([]);
@@ -93,7 +95,7 @@ export default function WorkSidePanel() {
         onClick={toggle}
         className="sticky top-28 z-30 hidden h-[calc(100vh-8rem)] w-10 shrink-0 flex-col items-center gap-3 rounded-xl bg-navy-900 py-4 text-white shadow-md transition hover:bg-navy-800 md:flex"
         title="نمایش پنل ابزارها"
-        dir="rtl"
+        dir={dir}
       >
         <span className="text-sm leading-none">‹</span>
         {badgeCount > 0 && (
@@ -114,7 +116,7 @@ export default function WorkSidePanel() {
   return (
     <aside
       className="sticky top-28 z-30 hidden h-[calc(100vh-8rem)] w-56 shrink-0 flex-col overflow-hidden rounded-xl bg-navy-900 text-white shadow-md md:flex"
-      dir="rtl"
+      dir={dir}
     >
       <div className="flex items-center justify-between border-b border-navy-700 px-3 py-3">
         <div>

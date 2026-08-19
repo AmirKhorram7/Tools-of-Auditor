@@ -139,19 +139,30 @@ export default function StepDetailPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <BackButton fallbackHref={`/explanation/processes/${step.process}`} />
-        <nav className="flex items-center gap-1.5 text-xs text-gray-500">
+        <nav className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
           <Link href="/explanation" className="hover:text-link">
             تشریح سیستم
           </Link>
+          {step.project && (
+            <>
+              <span>/</span>
+              <Link
+                href={`/explanation/projects/${step.project}`}
+                className="hover:text-link"
+              >
+                {step.project_name || "پوشه"}
+              </Link>
+            </>
+          )}
           <span>/</span>
           <Link
             href={`/explanation/processes/${step.process}`}
             className="hover:text-link"
           >
-            فرایند
+            {step.process_name || "فرایند"}
           </Link>
           <span>/</span>
-          <span className="text-ink">{step.title}</span>
+          <span className="font-medium text-ink">{step.title}</span>
         </nav>
       </div>
 

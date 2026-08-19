@@ -6,15 +6,13 @@ import { useEffect, useState } from "react";
 import { Avatar, Badge, Button, Card, Modal, Spinner } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
 import { displayName, useAuth } from "@/lib/auth";
-import {
-  PROJECT_ROLE_LABELS,
-  PROJECT_STATUS_LABELS,
-  type Project,
-} from "@/lib/types";
+import { LanguageSwitch, useI18n } from "@/lib/i18n";
+import { type Project } from "@/lib/types";
 import type { WorkDashboard } from "@/lib/work";
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const { t } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
   const [sharedProjects, setSharedProjects] = useState<Project[]>([]);
   const [work, setWork] = useState<WorkDashboard | null>(null);
@@ -76,30 +74,33 @@ export default function DashboardPage() {
             size={56}
             className="ring-2 ring-brand-500"
           />
-          <div>
+          <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+            <div>
             <h1 className="text-xl font-bold">
-              خوش آمدید، {displayName(profile)}
+              {t("dash.welcome", { name: displayName(profile) })}
             </h1>
             <p className="mt-1 text-sm text-gray-300">
-              {profile?.job_title || "سرویس مورد نظر خود را از نوار بالا انتخاب کنید"}
+              {profile?.job_title || t("dash.pickService")}
             </p>
+            </div>
+            <LanguageSwitch />
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/work">
             <Button variant="secondary" size="sm">
-              ورود به مدیریت کار
+              {t("dash.enterWork")}
             </Button>
           </Link>
           <Link href="/explanation">
             <Button variant="secondary" size="sm">
-              ورود به تشریح سیستم
+              {t("dash.enterExplanation")}
             </Button>
           </Link>
           {profileIncomplete && (
             <Link href="/profile">
               <Button variant="ghost" size="sm" className="text-white hover:bg-white/15">
-                تکمیل پروفایل
+                {t("dash.completeProfile")}
               </Button>
             </Link>
           )}
@@ -108,19 +109,19 @@ export default function DashboardPage() {
 
       <section className="grid gap-4 sm:grid-cols-3">
         <Card>
-          <p className="text-sm text-gray-500">پروژه‌های من</p>
+          <p className="text-sm text-gray-500">{t("dash.myFolders")}</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
             {loading ? <Spinner className="size-5" /> : projects.length}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-500">اشتراک‌شده با من</p>
+          <p className="text-sm text-gray-500">{t("dash.sharedWithMe")}</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
             {loading ? <Spinner className="size-5" /> : sharedProjects.length}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-500">فرایندهای مستندشده</p>
+          <p className="text-sm text-gray-500">{t("dash.documentedProcesses")}</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
             {loading ? <Spinner className="size-5" /> : totalProcesses}
           </p>
@@ -129,29 +130,29 @@ export default function DashboardPage() {
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">مدیریت کار</h2>
+          <h2 className="text-base font-semibold text-gray-900">{t("dash.workManage")}</h2>
           <Link
             href="/work"
             className="text-sm text-link hover:text-link-hover hover:underline"
           >
-            پیشخوان کار
+            {t("dash.workHome")}
           </Link>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Card>
-            <p className="text-sm text-gray-500">کارهای باز من</p>
+            <p className="text-sm text-gray-500">{t("dash.openTasks")}</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">
               {loading ? <Spinner className="size-5" /> : work?.employee.counts.assigned ?? 0}
             </p>
           </Card>
           <Card>
-            <p className="text-sm text-gray-500">سررسید امروز</p>
+            <p className="text-sm text-gray-500">{t("dash.dueToday")}</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">
               {loading ? <Spinner className="size-5" /> : work?.employee.counts.today ?? 0}
             </p>
           </Card>
           <Card>
-            <p className="text-sm text-gray-500">عقب‌افتاده</p>
+            <p className="text-sm text-gray-500">{t("dash.overdue")}</p>
             <p className="mt-1 text-2xl font-bold text-red-600">
               {loading ? <Spinner className="size-5" /> : work?.employee.counts.overdue ?? 0}
             </p>
@@ -162,13 +163,13 @@ export default function DashboardPage() {
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">
-            پروژه‌های اخیر من
+            {t("dash.recentFolders")}
           </h2>
           <Link
             href="/explanation"
             className="text-sm text-link hover:text-link-hover hover:underline"
           >
-            مشاهده همه
+            {t("dash.viewAll")}
           </Link>
         </div>
 
@@ -181,11 +182,11 @@ export default function DashboardPage() {
         ) : projects.length === 0 ? (
           <Card>
             <p className="text-sm text-gray-600">
-              هنوز پروژه‌ای نساخته‌اید. برای شروع به سرویس تشریح سیستم بروید.
+              {t("dash.noFolderYet")}
             </p>
             <div className="mt-3">
               <Link href="/explanation">
-                <Button size="sm">ساخت اولین پروژه</Button>
+                <Button size="sm">{t("dash.createFirstFolder")}</Button>
               </Link>
             </div>
           </Card>
@@ -201,7 +202,7 @@ export default function DashboardPage() {
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">
-            اشتراک‌شده با من
+            {t("dash.sharedWithMe")}
           </h2>
         </div>
         {loading ? (
@@ -213,7 +214,7 @@ export default function DashboardPage() {
         ) : sharedProjects.length === 0 ? (
           <Card>
             <p className="text-sm text-gray-600">
-              هنوز پروژه‌ای با شما اشتراک گذاشته نشده است.
+              {t("dash.noShared")}
             </p>
           </Card>
         ) : (
@@ -227,14 +228,14 @@ export default function DashboardPage() {
 
       <Modal
         open={profileOpen}
-        title="تکمیل پروفایل"
+        title={t("dash.profileTitle")}
         onClose={() => {
           sessionStorage.setItem("ta_profile_nudge", "1");
           setProfileOpen(false);
         }}
       >
         <p className="text-sm text-gray-600">
-          برای همکاری راحت‌تر با دیگران، پروفایل خود را تکمیل کنید.
+          {t("dash.profileHint")}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button
@@ -244,10 +245,10 @@ export default function DashboardPage() {
               setProfileOpen(false);
             }}
           >
-            بعداً
+            {t("common.later")}
           </Button>
           <Link href="/profile" onClick={() => sessionStorage.setItem("ta_profile_nudge", "1")}>
-            <Button>تکمیل پروفایل</Button>
+            <Button>{t("dash.completeProfile")}</Button>
           </Link>
         </div>
       </Modal>
@@ -262,6 +263,7 @@ function ProjectCard({
   project: Project;
   shared?: boolean;
 }) {
+  const { t, n } = useI18n();
   return (
     <Link href={`/explanation/projects/${project.id}`}>
       <Card className="transition hover:border-brand-500 hover:shadow-md">
@@ -269,19 +271,21 @@ function ProjectCard({
           <div>
             <p className="font-medium text-gray-900">{project.name}</p>
             <p className="mt-0.5 text-xs text-gray-500">
-              {project.company_name || "بدون نام شرکت"}
+              {project.company_name || t("dash.noCompany")}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <Badge tone="blue">{PROJECT_STATUS_LABELS[project.status]}</Badge>
+            <Badge tone="blue">{t(`status.${project.status}`)}</Badge>
             {shared && project.my_role && (
-              <Badge tone="amber">{PROJECT_ROLE_LABELS[project.my_role]}</Badge>
+              <Badge tone="amber">{t(`role.${project.my_role}`)}</Badge>
             )}
           </div>
         </div>
         <div className="mt-3 flex gap-4 text-xs text-gray-500">
-          <span>{project.sub_project_count ?? 0} زیرپروژه</span>
-          <span>{project.process_count ?? 0} فرایند</span>
+          {(project.sub_project_count ?? 0) > 0 && (
+            <span>{t("dash.subfolders", { count: n(project.sub_project_count ?? 0) })}</span>
+          )}
+          <span>{t("dash.processes", { count: n(project.process_count ?? 0) })}</span>
         </div>
       </Card>
     </Link>

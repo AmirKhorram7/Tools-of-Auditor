@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.contrib.auth import get_user_model
 from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse
@@ -83,6 +85,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     - List roots: GET /projects/?roots_only=true
     - Shared with me: GET /projects/?roots_only=true&shared=true
+    - Whole tree: GET /projects/tree/ (optionally ?root={id})
     - Members: GET/POST /projects/{id}/members/
     - Export PDF: GET /projects/{id}/export-pdf/
     """
@@ -144,6 +147,79 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not can_delete_project(self.request.user, instance):
             raise PermissionDenied("Only the project owner can delete this project.")
         instance.soft_delete()
+
+    @action(detail=False, methods=["get"], url_path="tree")
+    def tree(self, request):
+        """
+        Full hierarchy for the visual tree view, in a single request:
+        folder -> sub-folder -> process -> step.
+        """
+        visible = projects_for_user(request.user)
+        project_ids = list(visible.values_list("id", flat=True))
+
+        processes = (
+            Process.objects.filter(project_id__in=project_ids)
+            .order_by("order", "id")
+            .values("id", "project_id", "name", "color")
+        )
+        steps = (
+            ProcessStep.objects.filter(
+                process_id__in=[row["id"] for row in processes]
+            )
+            .order_by("order", "id")
+            .values("id", "process_id", "title", "shape_type")
+        )
+
+        steps_by_process = defaultdict(list)
+        for step in steps:
+            steps_by_process[step["process_id"]].append(
+                {
+                    "id": step["id"],
+                    "title": step["title"],
+                    "shape_type": step["shape_type"],
+                }
+            )
+
+        processes_by_project = defaultdict(list)
+        for process in processes:
+            process_steps = steps_by_process.get(process["id"], [])
+            processes_by_project[process["project_id"]].append(
+                {
+                    "id": process["id"],
+                    "name": process["name"],
+                    "color": process["color"] or "default",
+                    "step_count": len(process_steps),
+                    "steps": process_steps,
+                }
+            )
+
+        nodes = {}
+        for project in visible.order_by("name"):
+            nodes[project.id] = {
+                "id": project.id,
+                "parent": project.parent_id,
+                "name": project.name,
+                "company_name": project.company_name,
+                "status": project.status,
+                "color": project.color or "default",
+                "processes": processes_by_project.get(project.id, []),
+                "children": [],
+            }
+
+        roots = []
+        for node in nodes.values():
+            parent = nodes.get(node["parent"]) if node["parent"] else None
+            # A node whose parent is not visible is shown as a root of its own.
+            if parent is None:
+                roots.append(node)
+            else:
+                parent["children"].append(node)
+
+        root_param = request.query_params.get("root")
+        if root_param:
+            roots = [node for node in roots if str(node["id"]) == str(root_param)]
+
+        return Response(roots)
 
     @extend_schema(responses=ProjectMemberSerializer(many=True))
     @action(detail=True, methods=["get", "post"], url_path="members")

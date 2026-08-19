@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import BackButton from "@/components/BackButton";
 import StepCanvas from "@/components/StepCanvas";
+import ColorPicker from "@/components/explanation/ColorPicker";
 import {
   Alert,
   Button,
@@ -19,6 +20,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiDownload, apiFetch, apiList } from "@/lib/api";
+import { cardPalette, faNum, type CardColor } from "@/lib/explanation";
 import {
   SHAPE_LABELS,
   canEditProject,
@@ -62,6 +64,26 @@ export default function ProcessCanvasPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [colorBusy, setColorBusy] = useState(false);
+
+  const changeColor = async (color: CardColor) => {
+    if (!process) return;
+    const previous = process.color;
+    setColorBusy(true);
+    setError(null);
+    setProcess({ ...process, color });
+    try {
+      await apiFetch(`/processes/${process.id}/`, {
+        method: "PATCH",
+        body: { color },
+      });
+    } catch {
+      setProcess({ ...process, color: previous });
+      setError("تغییر رنگ فرایند ناموفق بود.");
+    } finally {
+      setColorBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!Number.isFinite(processId)) return;
@@ -219,7 +241,7 @@ export default function ProcessCanvasPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <BackButton fallbackHref={`/explanation/projects/${process.project}`} />
-        <nav className="flex items-center gap-1.5 text-xs text-gray-500">
+        <nav className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
           <Link href="/explanation" className="hover:text-link">
             تشریح سیستم
           </Link>
@@ -228,70 +250,112 @@ export default function ProcessCanvasPage() {
             href={`/explanation/projects/${process.project}`}
             className="hover:text-link"
           >
-            پروژه
+            {process.project_name || "پوشه"}
           </Link>
           <span>/</span>
-          <span className="text-ink">{process.name}</span>
+          <span className="font-medium text-ink">{process.name}</span>
         </nav>
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-ink">{process.name}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {process.department || "بدون واحد"}
-            {process.process_owner_name &&
-              ` · مالک فرایند: ${process.process_owner_name}`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            disabled={pdfLoading}
-            onClick={async () => {
-              setPdfLoading(true);
-              try {
-                await apiDownload(
-                  `/processes/${processId}/export-pdf/`,
-                  `process-${processId}.pdf`,
-                );
-              } catch (err) {
-                setError(
-                  err instanceof ApiError ? err.message : "دانلود PDF ناموفق بود.",
-                );
-              } finally {
-                setPdfLoading(false);
-              }
-            }}
-          >
-            {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
-          </Button>
+      <div
+        className="relative rounded-2xl border p-5 ps-6"
+        style={{
+          backgroundColor: cardPalette(process.color).bg,
+          borderColor: cardPalette(process.color).border,
+        }}
+      >
+        <span
+          className="absolute inset-y-0 w-1.5 rounded-s-2xl"
+          style={{
+            backgroundColor: cardPalette(process.color).accent,
+            insetInlineStart: 0,
+          }}
+          aria-hidden
+        />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p
+              className="text-[11px] font-semibold tracking-wide opacity-70"
+              style={{ color: cardPalette(process.color).text }}
+            >
+              فرایند
+            </p>
+            <h1
+              className="mt-0.5 text-xl font-bold"
+              style={{ color: cardPalette(process.color).text }}
+            >
+              {process.name}
+            </h1>
+            <p className="mt-1 text-sm" style={{ color: cardPalette(process.color).muted }}>
+              {process.department || "بدون واحد"}
+              {process.process_owner_name &&
+                ` · مالک فرایند: ${process.process_owner_name}`}
+              {` · ${faNum(steps.length)} گام`}
+            </p>
+          </div>
           {editable && (
-            <>
-              <Button variant="secondary" onClick={openEdit}>
-                ویرایش
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setDeleteError(null);
-                  setPending({ kind: "process" });
-                }}
-                className="text-red-600 hover:bg-red-50 hover:border-red-300"
-              >
-                حذف فرایند
-              </Button>
-              <Button
-                onClick={() => {
-                  setFormError(null);
-                  setOpen(true);
-                }}
-              >
-                + افزودن گام
-              </Button>
-            </>
+            <ColorPicker
+              value={process.color}
+              busy={colorBusy}
+              onSelect={changeColor}
+              title="رنگ این فرایند"
+            />
           )}
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {editable && (
+          <Button
+            onClick={() => {
+              setFormError(null);
+              setOpen(true);
+            }}
+          >
+            + افزودن گام
+          </Button>
+        )}
+        <Link href="/explanation/tree">
+          <Button variant="secondary">نمای درختی</Button>
+        </Link>
+        <Button
+          variant="secondary"
+          disabled={pdfLoading}
+          onClick={async () => {
+            setPdfLoading(true);
+            try {
+              await apiDownload(
+                `/processes/${processId}/export-pdf/`,
+                `process-${processId}.pdf`,
+              );
+            } catch (err) {
+              setError(
+                err instanceof ApiError ? err.message : "دانلود PDF ناموفق بود.",
+              );
+            } finally {
+              setPdfLoading(false);
+            }
+          }}
+        >
+          {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
+        </Button>
+        {editable && (
+          <>
+            <Button variant="secondary" onClick={openEdit}>
+              ویرایش
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDeleteError(null);
+                setPending({ kind: "process" });
+              }}
+              className="text-red-600 hover:border-red-300 hover:bg-red-50"
+            >
+              حذف فرایند
+            </Button>
+          </>
+        )}
       </div>
 
       {error && <Alert>{error}</Alert>}

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { cx } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
+import { cardPalette } from "@/lib/explanation";
+import { useI18n } from "@/lib/i18n";
 import type { Process, ProcessStepDetail, Project } from "@/lib/types";
 
 const STORAGE_KEY = "ta_explanation_panel_open";
@@ -30,6 +32,7 @@ function readOpenState(): boolean {
 export default function ExplanationSidePanel() {
   const pathname = usePathname();
   const params = useParams<{ id?: string }>();
+  const { t, dir } = useI18n();
   const routeId = params.id ? Number(params.id) : NaN;
 
   const [open, setOpen] = useState(true);
@@ -37,6 +40,7 @@ export default function ExplanationSidePanel() {
   const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
   const [activeProcessId, setActiveProcessId] = useState<number | null>(null);
   const [activeStepId, setActiveStepId] = useState<number | null>(null);
+  const [activeStepTitle, setActiveStepTitle] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
@@ -56,6 +60,7 @@ export default function ExplanationSidePanel() {
     setActiveProjectId(null);
     setActiveProcessId(null);
     setActiveStepId(null);
+    setActiveStepTitle(null);
 
     if (!Number.isFinite(routeId)) return;
 
@@ -74,9 +79,11 @@ export default function ExplanationSidePanel() {
     if (pathname.includes("/steps/")) {
       const step = await apiFetch<ProcessStepDetail>(`/steps/${routeId}/`);
       setActiveStepId(step.id);
+      setActiveStepTitle(step.title);
       setActiveProcessId(step.process);
-      const process = await apiFetch<Process>(`/processes/${step.process}/`);
-      setActiveProjectId(process.project);
+      setActiveProjectId(
+        step.project ?? (await apiFetch<Process>(`/processes/${step.process}/`)).project,
+      );
     }
   }, [pathname, routeId]);
 
@@ -184,15 +191,15 @@ export default function ExplanationSidePanel() {
         type="button"
         onClick={toggle}
         className="sticky top-28 z-30 flex h-[calc(100vh-8rem)] w-10 shrink-0 flex-col items-center gap-3 rounded-xl bg-navy-900 py-4 text-white shadow-md transition hover:bg-navy-800"
-        title="نمایش پنل ابزارها"
-        dir="rtl"
+        title={t("nav.showTools")}
+        dir={dir}
       >
         <span className="text-sm leading-none">‹</span>
         <span
           className="text-[11px] font-medium tracking-wide"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
         >
-          ابزارها
+          {t("nav.tools")}
         </span>
       </button>
     );
@@ -201,21 +208,21 @@ export default function ExplanationSidePanel() {
   return (
     <aside
       className="sticky top-28 z-30 flex h-[calc(100vh-8rem)] w-56 shrink-0 flex-col overflow-hidden rounded-xl bg-navy-900 text-white shadow-md"
-      dir="rtl"
+      dir={dir}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-navy-700 px-3 py-3">
         <div>
-          <p className="text-sm font-semibold text-white">ابزارها</p>
-          <p className="text-[11px] text-gray-400">تی‌ادیتور</p>
+          <p className="text-sm font-semibold text-white">{t("nav.tools")}</p>
+          <p className="text-[11px] text-gray-400">{t("brand.name")}</p>
         </div>
         <button
           type="button"
           onClick={toggle}
           className="rounded-md px-2 py-1 text-xs text-gray-300 transition hover:bg-navy-700 hover:text-white"
-          title="پنهان کردن پنل"
+          title={t("nav.hideTools")}
         >
-          پنهان ›
+          {t("nav.hideTools")}
         </button>
       </div>
 
@@ -223,7 +230,7 @@ export default function ExplanationSidePanel() {
         {/* Tools list (Stripe-style primary nav) */}
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            سرویس‌ها
+            {t("nav.services")}
           </p>
           <Link
             href="/work"
@@ -237,7 +244,7 @@ export default function ExplanationSidePanel() {
             <span className="flex size-6 items-center justify-center rounded-md bg-navy-700 text-[11px] font-bold">
               ک
             </span>
-            <span className="min-w-0 flex-1">مدیریت کار</span>
+            <span className="min-w-0 flex-1">{t("nav.work")}</span>
           </Link>
           <Link
             href="/explanation"
@@ -251,21 +258,21 @@ export default function ExplanationSidePanel() {
             <span className="flex size-6 items-center justify-center rounded-md bg-brand-500 text-[11px] font-bold text-ink">
               ت
             </span>
-            <span className="min-w-0 flex-1">تشریح سیستم</span>
+            <span className="min-w-0 flex-1">{t("nav.explanation")}</span>
           </Link>
           <span className="mt-1 flex cursor-not-allowed items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-gray-500 opacity-70">
             <span className="flex size-6 items-center justify-center rounded-md bg-navy-700 text-[11px]">
               ب
             </span>
-            برنامه حسابرسی
-            <span className="ms-auto text-[10px]">به‌زودی</span>
+            {t("nav.auditPlan")}
+            <span className="ms-auto text-[10px]">{t("nav.soon")}</span>
           </span>
         </section>
 
-        {/* Tree under the active tool */}
+        {/* Folder tree under the active tool */}
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            درخت پروژه
+            {t("exp.folders")}
           </p>
 
           <Link
@@ -277,13 +284,33 @@ export default function ExplanationSidePanel() {
                 : "text-gray-300 hover:bg-navy-700 hover:text-white",
             )}
           >
-            همه پروژه‌ها
+            {t("exp.allFolders")}
+          </Link>
+
+          <Link
+            href="/explanation/tree"
+            className={cx(
+              "mb-2 flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition",
+              pathname === "/explanation/tree"
+                ? "bg-brand-500 font-medium text-ink"
+                : "text-gray-300 hover:bg-navy-700 hover:text-white",
+            )}
+          >
+            <svg viewBox="0 0 24 24" className="size-3.5" aria-hidden>
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                d="M12 4v4m0 0v4m0 0H6v4m6-4h6v4M4 18h4M16 18h4M10 4h4"
+              />
+            </svg>
+            {t("exp.treeView")}
           </Link>
 
           {loading ? (
-            <p className="px-2 py-3 text-xs text-gray-500">در حال بارگذاری...</p>
+            <p className="px-2 py-3 text-xs text-gray-500">{t("common.loading")}</p>
           ) : roots.length === 0 ? (
-            <p className="px-2 py-3 text-xs text-gray-500">پروژه‌ای نیست.</p>
+            <p className="px-2 py-3 text-xs text-gray-500">{t("exp.noFolders")}</p>
           ) : (
             <div className="space-y-1">
               {roots.map((node) => {
@@ -309,13 +336,19 @@ export default function ExplanationSidePanel() {
                       <Link
                         href={`/explanation/projects/${node.project.id}`}
                         className={cx(
-                          "min-w-0 flex-1 truncate rounded-lg px-2 py-1.5 text-sm transition",
+                          "flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition",
                           isProjectActive(node.project.id)
                             ? "bg-brand-500 font-semibold text-ink"
                             : "text-gray-100 hover:bg-navy-700",
                         )}
                       >
-                        {node.project.name}
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor: cardPalette(node.project.color).accent,
+                          }}
+                        />
+                        <span className="truncate">{node.project.name}</span>
                       </Link>
                     </div>
 
@@ -347,13 +380,23 @@ export default function ExplanationSidePanel() {
                                 <Link
                                   href={`/explanation/projects/${child.project.id}`}
                                   className={cx(
-                                    "min-w-0 flex-1 truncate rounded-md px-2 py-1 text-xs transition",
+                                    "flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition",
                                     isProjectActive(child.project.id)
                                       ? "bg-brand-500 font-medium text-ink"
                                       : "text-gray-300 hover:bg-navy-700 hover:text-white",
                                   )}
                                 >
-                                  {child.project.name}
+                                  <span
+                                    className="size-1.5 shrink-0 rounded-full"
+                                    style={{
+                                      backgroundColor: cardPalette(
+                                        child.project.color,
+                                      ).accent,
+                                    }}
+                                  />
+                                  <span className="truncate">
+                                    {child.project.name}
+                                  </span>
                                 </Link>
                               </div>
                               {childOpen &&
@@ -370,10 +413,13 @@ export default function ExplanationSidePanel() {
             </div>
           )}
 
-          {activeStepId && (
-            <p className="px-2.5 pt-2 text-[11px] text-gray-500">
-              گام فعلی #{activeStepId}
-            </p>
+          {activeStepId && activeStepTitle && (
+            <div className="mt-2 rounded-lg border border-navy-700 bg-navy-800 px-2.5 py-2">
+              <p className="text-[10px] font-semibold text-gray-400">{t("exp.currentStep")}</p>
+              <p className="mt-0.5 truncate text-xs font-medium text-white">
+                {activeStepTitle}
+              </p>
+            </div>
           )}
         </section>
       </div>

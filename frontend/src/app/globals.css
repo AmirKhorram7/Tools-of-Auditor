@@ -4,7 +4,12 @@
 
 @layer base {
   body {
-    @apply bg-surface text-ink font-sans antialiased;
+    @apply bg-surface text-ink antialiased;
+    font-family: var(--font-vazirmatn), Tahoma, "Segoe UI", Arial, sans-serif;
+  }
+
+  html[lang="en"] body {
+    font-family: var(--font-inter), "Segoe UI", Arial, sans-serif;
   }
 }
 
