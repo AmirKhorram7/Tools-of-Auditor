@@ -20,9 +20,9 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiDownload, apiFetch, apiList } from "@/lib/api";
-import { cardPalette, faNum, type CardColor } from "@/lib/explanation";
+import { cardPalette, type CardColor } from "@/lib/explanation";
+import { useI18n } from "@/lib/i18n";
 import {
-  SHAPE_LABELS,
   canEditProject,
   type Process,
   type ProcessStep,
@@ -38,6 +38,7 @@ type Pending =
 export default function ProcessCanvasPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { t, n } = useI18n();
   const processId = Number(params.id);
 
   const [process, setProcess] = useState<Process | null>(null);
@@ -79,7 +80,7 @@ export default function ProcessCanvasPage() {
       });
     } catch {
       setProcess({ ...process, color: previous });
-      setError("تغییر رنگ فرایند ناموفق بود.");
+      setError(t("exp.colorProcessFail"));
     } finally {
       setColorBusy(false);
     }
@@ -99,7 +100,7 @@ export default function ProcessCanvasPage() {
       setSteps(stepList);
       setConnections(connectionList);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "دریافت فرایند ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("exp.loadProcessFail"));
     } finally {
       setLoading(false);
     }
@@ -111,7 +112,7 @@ export default function ProcessCanvasPage() {
 
   const addStep = async () => {
     if (!title.trim()) {
-      setFormError("عنوان گام الزامی است.");
+      setFormError(t("exp.stepTitleRequired"));
       return;
     }
     setSaving(true);
@@ -134,7 +135,7 @@ export default function ProcessCanvasPage() {
       setOpen(false);
       setTitle("");
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "افزودن گام ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("exp.addStepFail"));
     } finally {
       setSaving(false);
     }
@@ -154,7 +155,7 @@ export default function ProcessCanvasPage() {
       });
       setConnections((current) => [...current, created]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ایجاد اتصال ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("exp.connectFail"));
     }
   };
 
@@ -164,7 +165,7 @@ export default function ProcessCanvasPage() {
       await apiFetch(`/connections/${id}/`, { method: "DELETE" });
       setConnections((current) => current.filter((item) => item.id !== id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "حذف اتصال ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("exp.disconnectFail"));
     }
   };
 
@@ -180,7 +181,7 @@ export default function ProcessCanvasPage() {
 
   const saveProcessEdit = async () => {
     if (!editName.trim()) {
-      setEditError("نام فرایند الزامی است.");
+      setEditError(t("exp.processNameRequired"));
       return;
     }
     setEditSaving(true);
@@ -198,7 +199,7 @@ export default function ProcessCanvasPage() {
       setProcess(updated);
       setEditOpen(false);
     } catch (err) {
-      setEditError(err instanceof ApiError ? err.message : "ذخیره ناموفق بود.");
+      setEditError(err instanceof ApiError ? err.message : t("exp.saveFail"));
     } finally {
       setEditSaving(false);
     }
@@ -225,7 +226,7 @@ export default function ProcessCanvasPage() {
         router.replace(`/explanation/projects/${process?.project ?? ""}`);
       }
     } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : "حذف ناموفق بود.");
+      setDeleteError(err instanceof ApiError ? err.message : t("exp.deleteFail"));
     } finally {
       setDeleting(false);
     }
@@ -233,7 +234,7 @@ export default function ProcessCanvasPage() {
 
   if (loading) return <PageLoader />;
   if (error && !process) return <Alert>{error}</Alert>;
-  if (!process) return <Alert>فرایند پیدا نشد.</Alert>;
+  if (!process) return <Alert>{t("exp.processNotFound")}</Alert>;
 
   const editable = canEditProject(process.my_role);
 
@@ -243,14 +244,14 @@ export default function ProcessCanvasPage() {
         <BackButton fallbackHref={`/explanation/projects/${process.project}`} />
         <nav className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
           <Link href="/explanation" className="hover:text-link">
-            تشریح سیستم
+            {t("exp.title")}
           </Link>
           <span>/</span>
           <Link
             href={`/explanation/projects/${process.project}`}
             className="hover:text-link"
           >
-            {process.project_name || "پوشه"}
+            {process.project_name || t("common.folder")}
           </Link>
           <span>/</span>
           <span className="font-medium text-ink">{process.name}</span>
@@ -278,7 +279,7 @@ export default function ProcessCanvasPage() {
               className="text-[11px] font-semibold tracking-wide opacity-70"
               style={{ color: cardPalette(process.color).text }}
             >
-              فرایند
+              {t("common.process")}
             </p>
             <h1
               className="mt-0.5 text-xl font-bold"
@@ -287,10 +288,10 @@ export default function ProcessCanvasPage() {
               {process.name}
             </h1>
             <p className="mt-1 text-sm" style={{ color: cardPalette(process.color).muted }}>
-              {process.department || "بدون واحد"}
+              {process.department || t("exp.noDept")}
               {process.process_owner_name &&
-                ` · مالک فرایند: ${process.process_owner_name}`}
-              {` · ${faNum(steps.length)} گام`}
+                ` · ${t("exp.processOwnerLine", { name: process.process_owner_name })}`}
+              {` · ${t("exp.stepsCount", { count: n(steps.length) })}`}
             </p>
           </div>
           {editable && (
@@ -298,7 +299,7 @@ export default function ProcessCanvasPage() {
               value={process.color}
               busy={colorBusy}
               onSelect={changeColor}
-              title="رنگ این فرایند"
+              title={t("exp.colorThisProcess")}
             />
           )}
         </div>
@@ -312,11 +313,11 @@ export default function ProcessCanvasPage() {
               setOpen(true);
             }}
           >
-            + افزودن گام
+            + {t("exp.addStep")}
           </Button>
         )}
         <Link href="/explanation/tree">
-          <Button variant="secondary">نمای درختی</Button>
+          <Button variant="secondary">{t("exp.treeView")}</Button>
         </Link>
         <Button
           variant="secondary"
@@ -330,19 +331,19 @@ export default function ProcessCanvasPage() {
               );
             } catch (err) {
               setError(
-                err instanceof ApiError ? err.message : "دانلود PDF ناموفق بود.",
+                err instanceof ApiError ? err.message : t("exp.pdfFail"),
               );
             } finally {
               setPdfLoading(false);
             }
           }}
         >
-          {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
+          {pdfLoading ? t("exp.buildingPdf") : t("exp.downloadPdf")}
         </Button>
         {editable && (
           <>
             <Button variant="secondary" onClick={openEdit}>
-              ویرایش
+              {t("common.edit")}
             </Button>
             <Button
               variant="secondary"
@@ -352,7 +353,7 @@ export default function ProcessCanvasPage() {
               }}
               className="text-red-600 hover:border-red-300 hover:bg-red-50"
             >
-              حذف فرایند
+              {t("exp.deleteProcess")}
             </Button>
           </>
         )}
@@ -362,9 +363,7 @@ export default function ProcessCanvasPage() {
 
       <Card className="bg-brand-50">
         <p className="text-xs text-brand-800">
-          {editable
-            ? "شکل‌ها را با کشیدن جابه‌جا کنید و با کلیک روی هر شکل، صفحه مستندسازی آن گام (تشریح، ریسک، کنترل) را باز کنید. برای رسم فلش بین دو گام، دکمه «اتصال گام‌ها» را بزنید و ابتدا گام مبدأ و سپس گام مقصد را انتخاب کنید."
-            : "حالت مشاهده: روی هر شکل کلیک کنید تا تشریح، ریسک، کنترل و پیوست‌های آن گام را ببینید. امکان ویرایش یا بارگذاری فایل وجود ندارد."}
+          {editable ? t("exp.canvasHintEdit") : t("exp.canvasHintView")}
         </p>
       </Card>
 
@@ -383,7 +382,7 @@ export default function ProcessCanvasPage() {
 
       {steps.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-ink">فهرست گام‌ها</h2>
+          <h2 className="mb-2 text-sm font-semibold text-ink">{t("exp.stepList")}</h2>
           <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
             {steps.map((step, index) => (
               <div
@@ -400,7 +399,7 @@ export default function ProcessCanvasPage() {
                   {step.title}
                 </Link>
                 <span className="ms-auto text-xs text-gray-400">
-                  {SHAPE_LABELS[step.shape_type]}
+                  {t(`shape.${step.shape_type}`)}
                 </span>
                 {editable && (
                   <Button
@@ -412,7 +411,7 @@ export default function ProcessCanvasPage() {
                       setPending({ kind: "step", step });
                     }}
                   >
-                    حذف
+                    {t("common.delete")}
                   </Button>
                 )}
               </div>
@@ -421,7 +420,7 @@ export default function ProcessCanvasPage() {
         </section>
       )}
 
-      <Modal open={open} title="افزودن گام" onClose={() => setOpen(false)}>
+      <Modal open={open} title={t("exp.addStep")} onClose={() => setOpen(false)}>
         <form
           className="space-y-3"
           onSubmit={(event) => {
@@ -429,24 +428,26 @@ export default function ProcessCanvasPage() {
             addStep();
           }}
         >
-          <Field label="عنوان گام">
+          <Field label={t("exp.stepTitle")}>
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="مثال: گام ۱ - درخواست خرید"
+              placeholder={t("exp.stepTitlePlaceholder")}
               autoFocus
             />
           </Field>
-          <Field label="شکل روی نمودار">
+          <Field label={t("exp.shapeOnCanvas")}>
             <Select
               value={shape}
               onChange={(event) => setShape(event.target.value as ShapeType)}
             >
-              {Object.entries(SHAPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
+              {(["square", "rectangle", "circle", "diamond", "oval"] as ShapeType[]).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {t(`shape.${value}`)}
+                  </option>
+                ),
+              )}
             </Select>
           </Field>
           {formError && <Alert>{formError}</Alert>}
@@ -456,10 +457,10 @@ export default function ProcessCanvasPage() {
               variant="secondary"
               onClick={() => setOpen(false)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              افزودن
+              {t("common.add")}
             </Button>
           </div>
         </form>
@@ -467,7 +468,7 @@ export default function ProcessCanvasPage() {
 
       <Modal
         open={editOpen}
-        title="ویرایش فرایند"
+        title={t("exp.editProcess")}
         onClose={() => setEditOpen(false)}
       >
         <form
@@ -477,7 +478,7 @@ export default function ProcessCanvasPage() {
             saveProcessEdit();
           }}
         >
-          <Field label="نام فرایند">
+          <Field label={t("exp.processName")}>
             <Input
               value={editName}
               onChange={(event) => setEditName(event.target.value)}
@@ -485,20 +486,20 @@ export default function ProcessCanvasPage() {
             />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="واحد سازمانی">
+            <Field label={t("exp.department")}>
               <Input
                 value={editDepartment}
                 onChange={(event) => setEditDepartment(event.target.value)}
               />
             </Field>
-            <Field label="مالک فرایند">
+            <Field label={t("exp.processOwner")}>
               <Input
                 value={editOwnerName}
                 onChange={(event) => setEditOwnerName(event.target.value)}
               />
             </Field>
           </div>
-          <Field label="توضیحات">
+          <Field label={t("exp.description")}>
             <Textarea
               rows={3}
               value={editDescription}
@@ -512,10 +513,10 @@ export default function ProcessCanvasPage() {
               variant="secondary"
               onClick={() => setEditOpen(false)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={editSaving}>
-              ذخیره
+              {t("common.save")}
             </Button>
           </div>
         </form>
@@ -523,11 +524,13 @@ export default function ProcessCanvasPage() {
 
       <ConfirmDialog
         open={pending !== null}
-        title={pending?.kind === "process" ? "حذف فرایند" : "حذف گام"}
+        title={pending?.kind === "process" ? t("exp.deleteProcess") : t("exp.deleteStep")}
         description={
           pending?.kind === "process"
-            ? `فرایند «${process.name}» به همراه همه گام‌ها، ریسک‌ها و کنترل‌های آن حذف می‌شود. ادامه می‌دهید؟`
-            : `گام «${pending?.kind === "step" ? pending.step.title : ""}» و مستندات و اتصال‌های آن حذف می‌شود. ادامه می‌دهید؟`
+            ? t("exp.deleteProcessDeepConfirm", { name: process.name })
+            : t("exp.deleteStepConfirm", {
+                name: pending?.kind === "step" ? pending.step.title : "",
+              })
         }
         loading={deleting}
         error={deleteError}

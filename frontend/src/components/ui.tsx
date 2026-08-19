@@ -3,6 +3,7 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 import { mediaUrl } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 export function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -177,6 +178,7 @@ export function Modal({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -192,7 +194,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             className="rounded-md p-1 text-gray-400 transition hover:bg-surface hover:text-navy-800"
-            aria-label="بستن"
+            aria-label={t("common.close")}
           >
             ✕
           </button>
@@ -208,7 +210,7 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "حذف",
+  confirmLabel,
   loading = false,
   error,
   onConfirm,
@@ -223,6 +225,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <Modal open={open} title={title} onClose={onCancel}>
       <div className="space-y-4">
@@ -230,7 +233,7 @@ export function ConfirmDialog({
         {error && <Alert>{error}</Alert>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onCancel}>
-            انصراف
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -238,7 +241,7 @@ export function ConfirmDialog({
             loading={loading}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("common.delete")}
           </Button>
         </div>
       </div>

@@ -4,13 +4,8 @@ import { useState } from "react";
 
 import { Alert, Button, Input, Select, cx } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import type { MediaKind, MediaSection, StepMedia } from "@/lib/types";
-
-const KIND_LABELS: Record<MediaKind, string> = {
-  image: "تصویر",
-  file: "فایل",
-  link: "لینک",
-};
 
 type Props = {
   stepId: number;
@@ -32,6 +27,7 @@ export default function MediaPanel({
   onChanged,
   readOnly = false,
 }: Props) {
+  const { t } = useI18n();
   const [kind, setKind] = useState<MediaKind>("image");
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
@@ -51,11 +47,11 @@ export default function MediaPanel({
     setError(null);
 
     if (kind === "link" && !url.trim()) {
-      setError("برای نوع لینک، آدرس الزامی است.");
+      setError(t("media.linkRequired"));
       return;
     }
     if (kind !== "link" && !file && !url.trim()) {
-      setError("یک فایل انتخاب کنید یا آدرس وارد کنید.");
+      setError(t("media.fileOrUrl"));
       return;
     }
 
@@ -90,19 +86,19 @@ export default function MediaPanel({
       setOpen(false);
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "افزودن پیوست ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("media.addFail"));
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (id: number) => {
-    if (!window.confirm("این پیوست حذف شود؟")) return;
+    if (!window.confirm(t("media.deleteConfirm"))) return;
     try {
       await apiFetch(`/media/${id}/`, { method: "DELETE" });
       onChanged();
     } catch {
-      setError("حذف پیوست ناموفق بود.");
+      setError(t("media.deleteFail"));
     }
   };
 
@@ -110,7 +106,7 @@ export default function MediaPanel({
     <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-semibold text-gray-700">
-          پیوست‌ها (لینک، تصویر، فایل)
+          {t("media.attachments")}
         </p>
         {!readOnly && (
           <Button
@@ -121,7 +117,7 @@ export default function MediaPanel({
               setError(null);
             }}
           >
-            {open ? "بستن" : "+ افزودن"}
+            {open ? t("common.close") : `+ ${t("common.add")}`}
           </Button>
         )}
       </div>
@@ -143,7 +139,7 @@ export default function MediaPanel({
                     item.kind === "file" && "bg-amber-100 text-amber-700",
                   )}
                 >
-                  {KIND_LABELS[item.kind]}
+                  {t(`media.${item.kind}`)}
                 </span>
                 {href ? (
                   <a
@@ -162,7 +158,7 @@ export default function MediaPanel({
                     type="button"
                     onClick={() => remove(item.id)}
                     className="ms-auto text-red-500 transition hover:text-red-700"
-                    title="حذف"
+                    title={t("common.delete")}
                   >
                     ✕
                   </button>
@@ -174,7 +170,7 @@ export default function MediaPanel({
       )}
 
       {items.length === 0 && !open && (
-        <p className="text-xs text-gray-500">پیوستی ثبت نشده است.</p>
+        <p className="text-xs text-gray-500">{t("media.empty")}</p>
       )}
 
       {!readOnly && open && (
@@ -188,14 +184,14 @@ export default function MediaPanel({
               }}
               className="py-2 text-xs"
             >
-              <option value="image">تصویر</option>
-              <option value="file">فایل</option>
-              <option value="link">لینک</option>
+              <option value="image">{t("media.image")}</option>
+              <option value="file">{t("media.file")}</option>
+              <option value="link">{t("media.link")}</option>
             </Select>
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="عنوان (اختیاری)"
+              placeholder={t("media.titleOptional")}
               className="py-2 text-xs sm:col-span-2"
             />
           </div>
@@ -221,10 +217,10 @@ export default function MediaPanel({
 
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="secondary" onClick={() => setOpen(false)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button size="sm" loading={busy} onClick={submit}>
-              افزودن
+              {t("common.add")}
             </Button>
           </div>
         </div>

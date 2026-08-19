@@ -6,17 +6,33 @@ import { useCallback, useEffect, useState } from "react";
 
 import { cx } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
-import { cardPalette } from "@/lib/explanation";
+import { cardPalette, type TreeFolder } from "@/lib/explanation";
 import { useI18n } from "@/lib/i18n";
-import type { Process, ProcessStepDetail, Project } from "@/lib/types";
+import type { Process, ProcessStepDetail } from "@/lib/types";
 
 const STORAGE_KEY = "ta_explanation_panel_open";
 
+type PanelProcess = { id: number; name: string };
 type TreeNode = {
-  project: Project;
-  processes: Process[];
+  id: number;
+  name: string;
+  color?: string;
+  processes: PanelProcess[];
   children: TreeNode[];
 };
+
+function toNode(folder: TreeFolder): TreeNode {
+  return {
+    id: folder.id,
+    name: folder.name,
+    color: folder.color,
+    processes: folder.processes.map((item) => ({
+      id: item.id,
+      name: item.name,
+    })),
+    children: folder.children.map(toNode),
+  };
+}
 
 function readOpenState(): boolean {
   if (typeof window === "undefined") return true;
@@ -90,44 +106,22 @@ export default function ExplanationSidePanel() {
   const loadTree = useCallback(async () => {
     setLoading(true);
     try {
-      await resolveContext();
-      const rootProjects = await apiList<Project>("/projects/?roots_only=true");
-      const nodes = await Promise.all(
-        rootProjects.map(async (project) => {
-          const [children, processes] = await Promise.all([
-            apiList<Project>(`/projects/?parent=${project.id}`),
-            apiList<Process>(`/processes/?project=${project.id}`),
-          ]);
-          const childNodes = await Promise.all(
-            children.map(async (child) => {
-              const childProcesses = await apiList<Process>(
-                `/processes/?project=${child.id}`,
-              );
-              return {
-                project: child,
-                processes: childProcesses,
-                children: [] as TreeNode[],
-              };
-            }),
-          );
-          return {
-            project,
-            processes,
-            children: childNodes,
-          };
-        }),
-      );
-      setRoots(nodes);
+      const folders = await apiList<TreeFolder>("/projects/tree/");
+      setRoots(folders.map(toNode));
     } catch {
       setRoots([]);
     } finally {
       setLoading(false);
     }
-  }, [resolveContext]);
+  }, []);
 
   useEffect(() => {
     loadTree();
   }, [loadTree]);
+
+  useEffect(() => {
+    resolveContext().catch(() => undefined);
+  }, [resolveContext]);
 
   // Auto-expand the branch that contains the current page.
   useEffect(() => {
@@ -136,21 +130,21 @@ export default function ExplanationSidePanel() {
       const next = { ...current };
       for (const node of roots) {
         const hitRoot =
-          node.project.id === activeProjectId ||
+          node.id === activeProjectId ||
           node.processes.some((p) => p.id === activeProcessId) ||
           node.children.some(
             (child) =>
-              child.project.id === activeProjectId ||
+              child.id === activeProjectId ||
               child.processes.some((p) => p.id === activeProcessId),
           );
-        if (hitRoot) next[node.project.id] = true;
+        if (hitRoot) next[node.id] = true;
         for (const child of node.children) {
           if (
-            child.project.id === activeProjectId ||
+            child.id === activeProjectId ||
             child.processes.some((p) => p.id === activeProcessId)
           ) {
-            next[child.project.id] = true;
-            next[node.project.id] = true;
+            next[child.id] = true;
+            next[node.id] = true;
           }
         }
       }
@@ -165,7 +159,7 @@ export default function ExplanationSidePanel() {
     setExpanded((current) => ({ ...current, [id]: !current[id] }));
   };
 
-  const renderProcesses = (processes: Process[]) => (
+  const renderProcesses = (processes: PanelProcess[]) => (
     <ul className="ms-2 space-y-0.5 border-s border-navy-700/60 ps-2">
       {processes.map((process) => (
         <li key={process.id}>
@@ -314,17 +308,17 @@ export default function ExplanationSidePanel() {
           ) : (
             <div className="space-y-1">
               {roots.map((node) => {
-                const isOpen = Boolean(expanded[node.project.id]);
+                const isOpen = Boolean(expanded[node.id]);
                 const hasKids =
                   node.processes.length > 0 || node.children.length > 0;
 
                 return (
-                  <div key={node.project.id} className="space-y-0.5">
+                  <div key={node.id} className="space-y-0.5">
                     <div className="flex items-center gap-0.5">
                       {hasKids ? (
                         <button
                           type="button"
-                          onClick={() => toggleExpand(node.project.id)}
+                          onClick={() => toggleExpand(node.id)}
                           className="flex size-6 shrink-0 items-center justify-center rounded text-xs text-gray-400 hover:bg-navy-700 hover:text-white"
                           aria-label={isOpen ? "بستن" : "باز کردن"}
                         >
@@ -334,10 +328,10 @@ export default function ExplanationSidePanel() {
                         <span className="size-6 shrink-0" />
                       )}
                       <Link
-                        href={`/explanation/projects/${node.project.id}`}
+                        href={`/explanation/projects/${node.id}`}
                         className={cx(
                           "flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition",
-                          isProjectActive(node.project.id)
+                          isProjectActive(node.id)
                             ? "bg-brand-500 font-semibold text-ink"
                             : "text-gray-100 hover:bg-navy-700",
                         )}
@@ -345,10 +339,10 @@ export default function ExplanationSidePanel() {
                         <span
                           className="size-2 shrink-0 rounded-full"
                           style={{
-                            backgroundColor: cardPalette(node.project.color).accent,
+                            backgroundColor: cardPalette(node.color).accent,
                           }}
                         />
-                        <span className="truncate">{node.project.name}</span>
+                        <span className="truncate">{node.name}</span>
                       </Link>
                     </div>
 
@@ -357,18 +351,18 @@ export default function ExplanationSidePanel() {
                         {node.processes.length > 0 &&
                           renderProcesses(node.processes)}
                         {node.children.map((child) => {
-                          const childOpen = Boolean(expanded[child.project.id]);
+                          const childOpen = Boolean(expanded[child.id]);
                           const childHas =
                             child.processes.length > 0 ||
                             child.children.length > 0;
                           return (
-                            <div key={child.project.id} className="space-y-0.5">
+                            <div key={child.id} className="space-y-0.5">
                               <div className="flex items-center gap-0.5">
                                 {childHas ? (
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      toggleExpand(child.project.id)
+                                      toggleExpand(child.id)
                                     }
                                     className="flex size-5 shrink-0 items-center justify-center rounded text-[10px] text-gray-400 hover:bg-navy-700"
                                   >
@@ -378,10 +372,10 @@ export default function ExplanationSidePanel() {
                                   <span className="size-5 shrink-0" />
                                 )}
                                 <Link
-                                  href={`/explanation/projects/${child.project.id}`}
+                                  href={`/explanation/projects/${child.id}`}
                                   className={cx(
                                     "flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition",
-                                    isProjectActive(child.project.id)
+                                    isProjectActive(child.id)
                                       ? "bg-brand-500 font-medium text-ink"
                                       : "text-gray-300 hover:bg-navy-700 hover:text-white",
                                   )}
@@ -390,12 +384,12 @@ export default function ExplanationSidePanel() {
                                     className="size-1.5 shrink-0 rounded-full"
                                     style={{
                                       backgroundColor: cardPalette(
-                                        child.project.color,
+                                        child.color,
                                       ).accent,
                                     }}
                                   />
                                   <span className="truncate">
-                                    {child.project.name}
+                                    {child.name}
                                   </span>
                                 </Link>
                               </div>

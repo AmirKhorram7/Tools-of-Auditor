@@ -7,9 +7,9 @@ import { Alert, Avatar, Badge, Button, Card, EmptyState, Field, Input, Textarea 
 import JalaliDateField from "@/components/work/JalaliDateField";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import type { Profile } from "@/lib/types";
 import {
-  INVITE_STATUS_LABELS,
   notificationHref,
   type WorkInvitation,
   type WorkTimeline,
@@ -38,6 +38,7 @@ const emptyForm: FormState = {
 
 export default function ProfilePage() {
   const { profile, setProfile, refreshProfile } = useAuth();
+  const { t } = useI18n();
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -61,7 +62,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!profile) {
-      refreshProfile().catch(() => setError("دریافت پروفایل ناموفق بود."));
+      refreshProfile().catch(() => setError(t("profile.loadFail")));
       return;
     }
     setForm({
@@ -129,9 +130,9 @@ export default function ProfilePage() {
       setProfile(updated);
       setImageFile(null);
       await refreshProfile().catch(() => undefined);
-      setSuccess("پروفایل با موفقیت ذخیره شد.");
+      setSuccess(t("profile.saveOk"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ذخیره پروفایل ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("profile.saveFail"));
     } finally {
       setSaving(false);
     }
@@ -142,11 +143,11 @@ export default function ProfilePage() {
     setPasswordSuccess(null);
 
     if (password.length < 8) {
-      setPasswordError("رمز عبور باید حداقل ۸ کاراکتر باشد.");
+      setPasswordError(t("profile.passwordMin"));
       return;
     }
     if (password !== confirmPassword) {
-      setPasswordError("تکرار رمز عبور با رمز جدید یکسان نیست.");
+      setPasswordError(t("profile.passwordMismatch"));
       return;
     }
 
@@ -159,7 +160,7 @@ export default function ProfilePage() {
       setProfile(latest);
 
       if (needsCurrent && !currentPassword) {
-        setPasswordError("رمز عبور فعلی را وارد کنید.");
+        setPasswordError(t("profile.currentRequired"));
         return;
       }
 
@@ -179,14 +180,12 @@ export default function ProfilePage() {
       setConfirmPassword("");
       setHasPassword(true);
       setPasswordSuccess(
-        needsCurrent
-          ? "رمز عبور با موفقیت تغییر کرد."
-          : "رمز عبور ذخیره شد. از این پس می‌توانید با رمز عبور وارد شوید.",
+        needsCurrent ? t("profile.passwordChanged") : t("profile.passwordSet"),
       );
       await refreshProfile().catch(() => undefined);
     } catch (err) {
       setPasswordError(
-        err instanceof ApiError ? err.message : "ذخیره رمز عبور ناموفق بود.",
+        err instanceof ApiError ? err.message : t("profile.passwordFail"),
       );
     } finally {
       setSavingPassword(false);
@@ -202,7 +201,7 @@ export default function ProfilePage() {
       });
       setInvites(await apiList<WorkInvitation>("/work/invitations/"));
     } catch (err) {
-      setSideError(err instanceof ApiError ? err.message : "پاسخ به دعوت ناموفق بود.");
+      setSideError(err instanceof ApiError ? err.message : t("profile.inviteFail"));
     } finally {
       setBusyId(null);
     }
@@ -213,22 +212,26 @@ export default function ProfilePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-bold text-ink">پروفایل من</h1>
+        <h1 className="text-lg font-bold text-ink">{t("profile.title")}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          مشخصات، دعوت‌ها و فعالیت کار در یک جا.
+          {t("profile.subtitle")}
         </p>
       </div>
 
       <div className="flex gap-2 overflow-x-auto">
-        <TabBtn active={tab === "info"} label="مشخصات" onClick={() => setTab("info")} />
+        <TabBtn active={tab === "info"} label={t("profile.tabInfo")} onClick={() => setTab("info")} />
         <TabBtn
           active={tab === "invites"}
-          label={pendingInvites.length > 0 ? `دعوت‌ها (${pendingInvites.length})` : "دعوت‌ها"}
+          label={
+            pendingInvites.length > 0
+              ? `${t("profile.tabInvites")} (${pendingInvites.length})`
+              : t("profile.tabInvites")
+          }
           onClick={() => setTab("invites")}
         />
         <TabBtn
           active={tab === "activity"}
-          label="فعالیت"
+          label={t("profile.tabActivity")}
           onClick={() => setTab("activity")}
         />
       </div>
@@ -238,8 +241,8 @@ export default function ProfilePage() {
           {sideError && <Alert>{sideError}</Alert>}
           {pendingInvites.length === 0 ? (
             <EmptyState
-              title="دعوت بازی ندارید"
-              description="دعوت به تیم اینجا دیده می‌شود."
+              title={t("profile.noInvitesTitle")}
+              description={t("profile.noInvitesDesc")}
             />
           ) : (
             pendingInvites.map((invite) => (
@@ -248,7 +251,7 @@ export default function ProfilePage() {
                   <div>
                     <p className="font-bold text-ink">{invite.team_name}</p>
                     <p className="mt-1 text-xs text-gray-500">
-                      از طرف {invite.invited_by_name}
+                      {t("profile.from", { name: invite.invited_by_name })}
                       {invite.position_title ? ` · ${invite.position_title}` : ""}
                     </p>
                   </div>
@@ -259,14 +262,14 @@ export default function ProfilePage() {
                       loading={busyId === invite.id}
                       onClick={() => respond(invite.id, false)}
                     >
-                      رد
+                      {t("profile.reject")}
                     </Button>
                     <Button
                       size="sm"
                       loading={busyId === invite.id}
                       onClick={() => respond(invite.id, true)}
                     >
-                      پذیرش
+                      {t("profile.accept")}
                     </Button>
                   </div>
                 </div>
@@ -275,13 +278,13 @@ export default function ProfilePage() {
           )}
           {invites.some((row) => row.status !== "pending") && (
             <p className="text-xs text-gray-400">
-              قبلی:{" "}
+              {t("profile.previous")}{" "}
               {invites
                 .filter((row) => row.status !== "pending")
                 .slice(0, 6)
                 .map(
                   (row) =>
-                    `${row.team_name} (${INVITE_STATUS_LABELS[row.status] || row.status})`,
+                    `${row.team_name} (${t(`invite.${row.status}`)})`,
                 )
                 .join(" · ")}
             </p>
@@ -292,7 +295,7 @@ export default function ProfilePage() {
       {tab === "activity" && (
         <section>
           {activity.length === 0 ? (
-            <EmptyState title="هنوز فعالیتی نیست" description="کار و پروژه اینجا ثبت می‌شود." />
+            <EmptyState title={t("profile.noActivityTitle")} description={t("profile.noActivityDesc")} />
           ) : (
             <ul className="space-y-2">
               {activity.map((item) => (
@@ -318,13 +321,13 @@ export default function ProfilePage() {
         <div className="flex flex-wrap items-center gap-4">
           <Avatar
             src={previewUrl ?? profile?.profile_image}
-            name={`${form.first_name} ${form.last_name}`.trim() || "کاربر"}
+            name={`${form.first_name} ${form.last_name}`.trim() || t("common.user")}
             size={64}
           />
           <div>
-            <p className="text-sm font-medium text-ink">تصویر پروفایل</p>
+            <p className="text-sm font-medium text-ink">{t("profile.photo")}</p>
             <p className="mb-2 text-xs text-gray-500">
-              فرمت‌های JPG یا PNG، حداکثر چند مگابایت
+              {t("profile.photoHint")}
             </p>
             <input
               type="file"
@@ -334,14 +337,14 @@ export default function ProfilePage() {
             />
           </div>
           <div className="ms-auto space-y-1 text-end">
-            <p className="text-xs text-gray-500">شماره موبایل (ورود)</p>
+            <p className="text-xs text-gray-500">{t("profile.phoneLogin")}</p>
             <p dir="ltr" className="text-sm font-medium text-ink">
               {profile?.phone_number ?? "—"}
             </p>
             {hasPassword ? (
-              <Badge tone="green">رمز عبور فعال است</Badge>
+              <Badge tone="green">{t("profile.passwordOn")}</Badge>
             ) : (
-              <Badge tone="amber">رمز عبور تنظیم نشده</Badge>
+              <Badge tone="amber">{t("profile.passwordOff")}</Badge>
             )}
           </div>
         </div>
@@ -356,35 +359,35 @@ export default function ProfilePage() {
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="نام">
+            <Field label={t("profile.firstName")}>
               <Input
                 value={form.first_name}
                 onChange={(event) => update("first_name", event.target.value)}
-                placeholder="نام"
+                placeholder={t("profile.firstName")}
               />
             </Field>
-            <Field label="نام خانوادگی">
+            <Field label={t("profile.lastName")}>
               <Input
                 value={form.last_name}
                 onChange={(event) => update("last_name", event.target.value)}
-                placeholder="نام خانوادگی"
+                placeholder={t("profile.lastName")}
               />
             </Field>
-            <Field label="نام شرکت / سازمان">
+            <Field label={t("profile.company")}>
               <Input
                 value={form.company_name}
                 onChange={(event) => update("company_name", event.target.value)}
-                placeholder="مثال: شرکت دوشه"
+                placeholder={t("profile.companyPlaceholder")}
               />
             </Field>
-            <Field label="عنوان شغلی">
+            <Field label={t("profile.job")}>
               <Input
                 value={form.job_title}
                 onChange={(event) => update("job_title", event.target.value)}
-                placeholder="مثال: حسابرس داخلی ارشد"
+                placeholder={t("profile.jobPlaceholder")}
               />
             </Field>
-            <Field label="تاریخ تولد">
+            <Field label={t("profile.birth")}>
               <JalaliDateField
                 value={form.birth_date}
                 onChange={(iso) => update("birth_date", iso)}
@@ -392,12 +395,12 @@ export default function ProfilePage() {
             </Field>
           </div>
 
-          <Field label="درباره من">
+          <Field label={t("profile.bio")}>
             <Textarea
               rows={4}
               value={form.bio}
               onChange={(event) => update("bio", event.target.value)}
-              placeholder="سابقه کاری و حوزه تخصصی شما"
+              placeholder={t("profile.bioPlaceholder")}
             />
           </Field>
 
@@ -406,7 +409,7 @@ export default function ProfilePage() {
 
           <div className="flex justify-end">
             <Button type="submit" loading={saving}>
-              ذخیره تغییرات
+              {t("profile.saveChanges")}
             </Button>
           </div>
         </form>
@@ -415,12 +418,12 @@ export default function ProfilePage() {
       <Card>
         <div className="mb-4">
           <h2 className="text-base font-semibold text-ink">
-            {hasPassword ? "تغییر رمز عبور" : "تعیین رمز عبور"}
+            {hasPassword ? t("profile.changePassword") : t("profile.setPassword")}
           </h2>
           <p className="mt-1 text-sm text-gray-500">
             {hasPassword
-              ? "رمز عبور فعلی را وارد کنید و رمز جدید بسازید."
-              : "با ساخت رمز عبور می‌توانید بدون پیامک و فقط با شماره موبایل وارد شوید."}
+              ? t("profile.changePasswordHint")
+              : t("profile.setPasswordHint")}
           </p>
         </div>
 
@@ -432,7 +435,7 @@ export default function ProfilePage() {
           }}
         >
           {hasPassword && (
-            <Field label="رمز عبور فعلی">
+            <Field label={t("profile.currentPassword")}>
               <Input
                 type="password"
                 value={currentPassword}
@@ -444,7 +447,7 @@ export default function ProfilePage() {
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="رمز عبور جدید" hint="حداقل ۸ کاراکتر">
+            <Field label={t("profile.newPassword")} hint={t("profile.passwordHint")}>
               <Input
                 type="password"
                 value={password}
@@ -453,7 +456,7 @@ export default function ProfilePage() {
                 autoComplete="new-password"
               />
             </Field>
-            <Field label="تکرار رمز عبور جدید">
+            <Field label={t("profile.confirmPassword")}>
               <Input
                 type="password"
                 value={confirmPassword}
@@ -469,7 +472,7 @@ export default function ProfilePage() {
 
           <div className="flex justify-end">
             <Button type="submit" loading={savingPassword}>
-              {hasPassword ? "تغییر رمز عبور" : "ذخیره رمز عبور"}
+              {hasPassword ? t("profile.changePassword") : t("profile.savePassword")}
             </Button>
           </div>
         </form>

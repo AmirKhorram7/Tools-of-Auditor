@@ -19,6 +19,7 @@ import {
   cx,
 } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
   canEditProject,
   type ProcessStepDetail,
@@ -27,14 +28,9 @@ import {
 
 type Tab = "explanation" | "risk" | "control";
 
-const TABS: Array<{ key: Tab; label: string }> = [
-  { key: "explanation", label: "تشریح سیستم" },
-  { key: "risk", label: "ریسک‌ها" },
-  { key: "control", label: "کنترل‌ها" },
-];
-
 export default function StepDetailPage() {
   const params = useParams<{ id: string }>();
+  const { t } = useI18n();
   const stepId = Number(params.id);
 
   const [step, setStep] = useState<ProcessStepDetail | null>(null);
@@ -59,7 +55,7 @@ export default function StepDetailPage() {
       setStep(data);
       setExplanation(data.explanation ?? "");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "دریافت گام ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("exp.loadStepFail"));
     } finally {
       setLoading(false);
     }
@@ -82,9 +78,9 @@ export default function StepDetailPage() {
           ? { ...current, explanation: updated.explanation ?? explanation }
           : current,
       );
-      setSavedNote("تشریح ذخیره شد.");
+      setSavedNote(t("exp.explanationSaved"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ذخیره تشریح ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("exp.saveExplanationFail"));
     } finally {
       setSavingExplanation(false);
     }
@@ -92,7 +88,7 @@ export default function StepDetailPage() {
 
   const createItem = async () => {
     if (!itemModal || !itemTitle.trim()) {
-      setFormError("عنوان الزامی است.");
+      setFormError(t("exp.titleRequired"));
       return;
     }
     setSavingItem(true);
@@ -122,7 +118,7 @@ export default function StepDetailPage() {
       setItemModal(null);
       setItemTitle("");
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ثبت ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("exp.createItemFail"));
     } finally {
       setSavingItem(false);
     }
@@ -130,7 +126,7 @@ export default function StepDetailPage() {
 
   if (loading) return <PageLoader />;
   if (error && !step) return <Alert>{error}</Alert>;
-  if (!step) return <Alert>گام پیدا نشد.</Alert>;
+  if (!step) return <Alert>{t("exp.stepNotFound")}</Alert>;
 
   // Missing my_role (older API) keeps the editor open; API still enforces writes.
   const editable = step.my_role == null || canEditProject(step.my_role);
@@ -141,7 +137,7 @@ export default function StepDetailPage() {
         <BackButton fallbackHref={`/explanation/processes/${step.process}`} />
         <nav className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
           <Link href="/explanation" className="hover:text-link">
-            تشریح سیستم
+            {t("exp.title")}
           </Link>
           {step.project && (
             <>
@@ -150,7 +146,7 @@ export default function StepDetailPage() {
                 href={`/explanation/projects/${step.project}`}
                 className="hover:text-link"
               >
-                {step.project_name || "پوشه"}
+                {step.project_name || t("common.folder")}
               </Link>
             </>
           )}
@@ -159,7 +155,7 @@ export default function StepDetailPage() {
             href={`/explanation/processes/${step.process}`}
             className="hover:text-link"
           >
-            {step.process_name || "فرایند"}
+            {step.process_name || t("common.process")}
           </Link>
           <span>/</span>
           <span className="font-medium text-ink">{step.title}</span>
@@ -169,16 +165,20 @@ export default function StepDetailPage() {
       <div>
         <h1 className="text-lg font-bold text-ink">{step.title}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          {editable
-            ? "این گام را در سه بخش تشریح، ریسک و کنترل مستند کنید."
-            : "حالت مشاهده: می‌توانید محتوا و پیوست‌ها را ببینید، اما ویرایش غیرفعال است."}
+          {editable ? t("exp.stepHintEdit") : t("exp.stepHintView")}
         </p>
       </div>
 
       {error && <Alert>{error}</Alert>}
 
       <div className="flex gap-1 rounded-xl border border-gray-200 bg-white p-1">
-        {TABS.map((item) => (
+        {(
+          [
+            { key: "explanation" as const, label: t("exp.tabExplanation") },
+            { key: "risk" as const, label: t("exp.tabRisks") },
+            { key: "control" as const, label: t("exp.tabControls") },
+          ]
+        ).map((item) => (
           <button
             key={item.key}
             type="button"
@@ -202,7 +202,7 @@ export default function StepDetailPage() {
           <RichTextEditor
             value={explanation}
             onChange={setExplanation}
-            placeholder="شرح کامل این گام از فرایند را بنویسید..."
+            placeholder={t("exp.explanationPlaceholder")}
             minHeight={240}
             readOnly={!editable}
           />
@@ -220,7 +220,7 @@ export default function StepDetailPage() {
           {editable && (
             <div className="flex justify-end">
               <Button loading={savingExplanation} onClick={saveExplanation}>
-                ذخیره تشریح
+                {t("exp.saveExplanation")}
               </Button>
             </div>
           )}
@@ -298,7 +298,7 @@ export default function StepDetailPage() {
 
       <Modal
         open={itemModal !== null}
-        title={itemModal === "risk" ? "ریسک جدید" : "کنترل جدید"}
+        title={itemModal === "risk" ? t("exp.newRisk") : t("exp.newControl")}
         onClose={() => setItemModal(null)}
       >
         <form
@@ -308,14 +308,14 @@ export default function StepDetailPage() {
             createItem();
           }}
         >
-          <Field label="عنوان">
+          <Field label={t("exp.itemTitle")}>
             <Input
               value={itemTitle}
               onChange={(event) => setItemTitle(event.target.value)}
               placeholder={
                 itemModal === "risk"
-                  ? "مثال: خرید بدون تاییدیه مدیر"
-                  : "مثال: تایید دو مرحله‌ای درخواست خرید"
+                  ? t("exp.riskTitlePlaceholder")
+                  : t("exp.controlTitlePlaceholder")
               }
               autoFocus
             />
@@ -327,10 +327,10 @@ export default function StepDetailPage() {
               variant="secondary"
               onClick={() => setItemModal(null)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={savingItem}>
-              افزودن
+              {t("common.add")}
             </Button>
           </div>
         </form>
@@ -358,10 +358,11 @@ function ItemSection({
   onItemUpdated: (item: StepItem) => void;
   onItemRemoved: (id: number) => void;
 }) {
+  const { t } = useI18n();
   const labels =
     kind === "risk"
-      ? { title: "ریسک‌ها", add: "+ افزودن ریسک", empty: "ریسکی ثبت نشده است" }
-      : { title: "کنترل‌ها", add: "+ افزودن کنترل", empty: "کنترلی ثبت نشده است" };
+      ? { title: t("exp.tabRisks"), add: t("exp.addRisk"), empty: t("exp.noRisks") }
+      : { title: t("exp.tabControls"), add: t("exp.addControl"), empty: t("exp.noControls") };
 
   return (
     <div className="space-y-3">
@@ -379,8 +380,8 @@ function ItemSection({
           title={labels.empty}
           description={
             editable
-              ? "برای این گام موارد شناسایی‌شده را ثبت کنید."
-              : "برای این گام موردی ثبت نشده است."
+              ? t("exp.itemsHintEdit")
+              : t("exp.itemsHintView")
           }
           action={
             editable ? (
@@ -425,6 +426,7 @@ function ItemEditor({
   onUpdated: (item: StepItem) => void;
   onRemoved: (id: number) => void;
 }) {
+  const { t } = useI18n();
   const [content, setContent] = useState(item.content ?? "");
   const [title, setTitle] = useState(item.title);
   const [saving, setSaving] = useState(false);
@@ -455,21 +457,21 @@ function ItemEditor({
         content,
         media_items: updated.media_items ?? item.media_items,
       });
-      setNote("ذخیره شد.");
+      setNote(t("exp.saved"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ذخیره ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("exp.saveFail"));
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async () => {
-    if (!window.confirm("این مورد حذف شود؟")) return;
+    if (!window.confirm(t("exp.confirmDeleteItem"))) return;
     try {
       await apiFetch(`${basePath}/${item.id}/`, { method: "DELETE" });
       onRemoved(item.id);
     } catch {
-      setError("حذف ناموفق بود.");
+      setError(t("exp.deleteFail"));
     }
   };
 
@@ -487,7 +489,7 @@ function ItemEditor({
         )}
         {editable && (
           <Button variant="ghost" size="sm" onClick={remove} className="text-red-600">
-            حذف
+            {t("common.delete")}
           </Button>
         )}
       </div>
@@ -497,8 +499,8 @@ function ItemEditor({
         onChange={setContent}
         placeholder={
           kind === "risk"
-            ? "توضیح ریسک، اثر و احتمال وقوع..."
-            : "توضیح کنترل، نوع و دوره اجرا..."
+            ? t("exp.riskContentPlaceholder")
+            : t("exp.controlContentPlaceholder")
         }
         minHeight={150}
         readOnly={!editable}
@@ -520,7 +522,7 @@ function ItemEditor({
       {editable && (
         <div className="flex justify-end">
           <Button size="sm" loading={saving} onClick={save}>
-            ذخیره
+            {t("common.save")}
           </Button>
         </div>
       )}

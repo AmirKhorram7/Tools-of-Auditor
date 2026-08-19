@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Inter, Vazirmatn } from "next/font/google";
 
 import { AuthProvider } from "@/lib/auth";
@@ -94,24 +95,29 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get("ta_locale")?.value;
+  const initialLocale = raw === "en" ? "en" : "fa";
+
   return (
     <html
-      lang="fa"
-      dir="rtl"
+      lang={initialLocale}
+      dir={initialLocale === "fa" ? "rtl" : "ltr"}
       className={`${vazirmatn.variable} ${inter.variable}`}
+      suppressHydrationWarning
     >
       <body className="min-h-screen antialiased">
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var l=localStorage.getItem("ta_locale");if(l==="en"){document.documentElement.lang="en";document.documentElement.dir="ltr";}}catch(e){}`,
+            __html: `try{var l=localStorage.getItem("ta_locale");if(l==="en"||l==="fa"){document.documentElement.lang=l==="en"?"en":"fa";document.documentElement.dir=l==="en"?"ltr":"rtl";document.cookie="ta_locale="+l+";path=/;max-age=31536000;SameSite=Lax";}}catch(e){}`,
           }}
         />
-        <LocaleProvider>
+        <LocaleProvider initialLocale={initialLocale}>
           <AuthProvider>{children}</AuthProvider>
         </LocaleProvider>
       </body>

@@ -22,11 +22,10 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiDownload, apiFetch, apiList, mediaUrl } from "@/lib/api";
-import { cardPalette, faNum, type CardColor } from "@/lib/explanation";
+import { cardPalette, type CardColor } from "@/lib/explanation";
 import { useI18n } from "@/lib/i18n";
 import {
   PROJECT_MEMBER_ROLE_OPTIONS,
-  PROJECT_ROLE_LABELS,
   PROJECT_STATUS_OPTIONS,
   canEditProject,
   canManageMembers,
@@ -47,7 +46,7 @@ type Pending =
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, n } = useI18n();
   const projectId = Number(params.id);
 
   const [project, setProject] = useState<Project | null>(null);
@@ -125,7 +124,7 @@ export default function ProjectDetailPage() {
 
   const createSubProject = async () => {
     if (!subName.trim()) {
-      setFormError("نام زیرپوشه الزامی است.");
+      setFormError(t("exp.subfolderNameRequired"));
       return;
     }
     setSaving(true);
@@ -139,7 +138,7 @@ export default function ProjectDetailPage() {
       setSubName("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت زیرپوشه ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("exp.createSubfolderFail"));
     } finally {
       setSaving(false);
     }
@@ -147,7 +146,7 @@ export default function ProjectDetailPage() {
 
   const createProcess = async () => {
     if (!processName.trim()) {
-      setFormError("نام فرایند الزامی است.");
+      setFormError(t("exp.processNameRequired"));
       return;
     }
     setSaving(true);
@@ -171,7 +170,7 @@ export default function ProjectDetailPage() {
       setProcessDescription("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت فرایند ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("exp.createProcessFail"));
     } finally {
       setSaving(false);
     }
@@ -305,7 +304,7 @@ export default function ProjectDetailPage() {
         body: { status: nextStatus },
       });
       setProject(updated);
-      setStatusSuccess("وضعیت پوشه ذخیره شد.");
+      setStatusSuccess(t("exp.statusSaved"));
     } catch (err) {
       setStatusError(
         err instanceof ApiError ? err.message : "تغییر وضعیت ناموفق بود.",
@@ -479,7 +478,7 @@ export default function ProjectDetailPage() {
 
   if (loading) return <PageLoader />;
   if (error) return <Alert>{error}</Alert>;
-  if (!project) return <Alert>پوشه پیدا نشد.</Alert>;
+  if (!project) return <Alert>{t("exp.notFound")}</Alert>;
 
   const editable = canEditProject(project.my_role);
   const manageMembers = canManageMembers(project.my_role);
@@ -491,17 +490,19 @@ export default function ProjectDetailPage() {
   const confirmCopy =
     pending?.kind === "self"
       ? {
-          title: project.is_root ? "حذف پوشه" : "حذف زیرپوشه",
-          description: `«${project.name}» به همراه همه زیرپوشه‌ها و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟`,
+          title: project.is_root ? t("exp.deleteFolder") : t("exp.deleteSubfolder"),
+          description: t("exp.deleteSelfConfirm", { name: project.name }),
         }
       : pending?.kind === "sub-project"
         ? {
-            title: "حذف زیرپوشه",
-            description: `زیرپوشه «${pending.name}» و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟`,
+            title: t("exp.deleteSubfolder"),
+            description: t("exp.deleteSubfolderConfirm", { name: pending.name }),
           }
         : {
-            title: "حذف فرایند",
-            description: `فرایند «${pending?.kind === "process" ? pending.name : ""}» و همه گام‌های آن حذف می‌شود. ادامه می‌دهید؟`,
+            title: t("exp.deleteProcess"),
+            description: t("exp.deleteProcessConfirm", {
+              name: pending?.kind === "process" ? pending.name : "",
+            }),
           };
 
   return (
@@ -516,7 +517,7 @@ export default function ProjectDetailPage() {
         />
         <nav className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
           <Link href="/explanation" className="hover:text-link">
-            تشریح سیستم
+            {t("exp.title")}
           </Link>
           {project.parent && (
             <>
@@ -525,7 +526,7 @@ export default function ProjectDetailPage() {
                 href={`/explanation/projects/${project.parent}`}
                 className="hover:text-link"
               >
-                {project.parent_name || "پوشه اصلی"}
+                {project.parent_name || t("exp.rootFolder")}
               </Link>
             </>
           )}
@@ -579,7 +580,7 @@ export default function ProjectDetailPage() {
                   className="text-xs opacity-80"
                   style={{ color: palette.text }}
                 >
-                  {faNum(processes.length)} فرایند
+                  {t("dash.processes", { count: n(processes.length) })}
                 </span>
               </div>
               {project.description && (
@@ -594,20 +595,20 @@ export default function ProjectDetailPage() {
               value={project.color}
               busy={colorBusy === "self"}
               onSelect={changeSelfColor}
-              title="رنگ این پوشه"
+              title={t("exp.colorThisFolder")}
             />
           )}
         </div>
 
         {!project.is_root && (
           <p className="mt-4 rounded-lg bg-white/70 px-3 py-2 text-xs text-gray-600">
-            دسترسی اعضا در پوشه اصلی تنظیم می‌شود.{" "}
+            {t("exp.accessHint")}{" "}
             {project.parent && (
               <Link
                 href={`/explanation/projects/${project.parent}`}
                 className="font-medium text-link hover:text-link-hover"
               >
-                رفتن به پوشه اصلی
+                {t("exp.goRoot")}
               </Link>
             )}
           </p>
@@ -622,7 +623,7 @@ export default function ProjectDetailPage() {
               setProcessOpen(true);
             }}
           >
-            + فرایند
+            + {t("exp.addProcess")}
           </Button>
         )}
         {editable && project.is_root && (
@@ -633,26 +634,26 @@ export default function ProjectDetailPage() {
               setSubOpen(true);
             }}
           >
-            + زیرپوشه
+            + {t("exp.addSubfolder")}
           </Button>
         )}
         <Link href={`/explanation/tree?root=${rootId}`}>
-          <Button variant="secondary">نمای درختی</Button>
+          <Button variant="secondary">{t("exp.treeView")}</Button>
         </Link>
         {editable && (
           <Button
             variant="secondary"
             onClick={() => openEdit({ kind: "project", item: project })}
           >
-            ویرایش
+            {t("common.edit")}
           </Button>
         )}
         <Button variant="secondary" disabled={pdfLoading} onClick={downloadPdf}>
-          {pdfLoading ? "در حال ساخت PDF..." : "دانلود PDF"}
+          {pdfLoading ? t("exp.buildingPdf") : t("exp.downloadPdf")}
         </Button>
         {manageMembers && (
           <Button variant="secondary" onClick={openShare}>
-            اشتراک‌گذاری
+            {t("exp.share")}
           </Button>
         )}
         {(canDeleteRoot || (editable && !project.is_root)) && (
@@ -661,7 +662,7 @@ export default function ProjectDetailPage() {
             className="text-red-600 hover:border-red-300 hover:bg-red-50"
             onClick={() => askDelete({ kind: "self" })}
           >
-            {project.is_root ? "حذف پوشه" : "حذف زیرپوشه"}
+            {project.is_root ? t("exp.deleteFolder") : t("exp.deleteSubfolder")}
           </Button>
         )}
 
@@ -687,7 +688,7 @@ export default function ProjectDetailPage() {
             ))}
           </select>
           {statusSaving && (
-            <span className="text-[11px] text-gray-500">ذخیره...</span>
+            <span className="text-[11px] text-gray-500">{t("common.saving")}</span>
           )}
         </div>
       </div>
@@ -699,7 +700,7 @@ export default function ProjectDetailPage() {
       {/* Sub-folders are optional, so the section only appears once one exists. */}
       {project.is_root && subProjects.length > 0 && (
         <section>
-          <h2 className="mb-3 text-base font-semibold text-ink">زیرپوشه‌ها</h2>
+          <h2 className="mb-3 text-base font-semibold text-ink">{t("exp.subfolders")}</h2>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {subProjects.map((sub) => (
               <FolderCard
@@ -719,7 +720,7 @@ export default function ProjectDetailPage() {
                     name: sub.name,
                   })
                 }
-                meta={<span>{faNum(sub.process_count ?? 0)} فرایند</span>}
+                meta={<span>{t("dash.processes", { count: n(sub.process_count ?? 0) })}</span>}
               />
             ))}
           </div>
@@ -727,14 +728,14 @@ export default function ProjectDetailPage() {
       )}
 
       <section>
-        <h2 className="mb-3 text-base font-semibold text-ink">فرایندها</h2>
+        <h2 className="mb-3 text-base font-semibold text-ink">{t("exp.processes")}</h2>
         {processes.length === 0 ? (
           <EmptyState
-            title="فرایندی ثبت نشده است"
-            description="مثال: فرایند تدارکات، فرایند فروش، فرایند درآمد"
+            title={t("exp.noProcess")}
+            description={t("exp.noProcessDesc")}
             action={
               editable ? (
-                <Button onClick={() => setProcessOpen(true)}>ساخت فرایند</Button>
+                <Button onClick={() => setProcessOpen(true)}>{t("exp.createProcess")}</Button>
               ) : undefined
             }
           />
@@ -765,7 +766,7 @@ export default function ProjectDetailPage() {
         )}
       </section>
 
-      <Modal open={subOpen} title="زیرپوشه جدید" onClose={() => setSubOpen(false)}>
+      <Modal open={subOpen} title={t("exp.newSubfolder")} onClose={() => setSubOpen(false)}>
         <form
           className="space-y-3"
           onSubmit={(event) => {
@@ -773,11 +774,11 @@ export default function ProjectDetailPage() {
             createSubProject();
           }}
         >
-          <Field label="نام زیرپوشه">
+          <Field label={t("exp.subfolderName")}>
             <Input
               value={subName}
               onChange={(event) => setSubName(event.target.value)}
-              placeholder="مثال: حوزه مالی"
+              placeholder={t("exp.subfolderPlaceholder")}
               autoFocus
             />
           </Field>
@@ -788,10 +789,10 @@ export default function ProjectDetailPage() {
               variant="secondary"
               onClick={() => setSubOpen(false)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              ساخت
+              {t("common.create")}
             </Button>
           </div>
         </form>
@@ -799,7 +800,7 @@ export default function ProjectDetailPage() {
 
       <Modal
         open={processOpen}
-        title="فرایند جدید"
+        title={t("exp.newProcess")}
         onClose={() => setProcessOpen(false)}
       >
         <form
@@ -809,31 +810,31 @@ export default function ProjectDetailPage() {
             createProcess();
           }}
         >
-          <Field label="نام فرایند">
+          <Field label={t("exp.processName")}>
             <Input
               value={processName}
               onChange={(event) => setProcessName(event.target.value)}
-              placeholder="مثال: فرایند تدارکات"
+              placeholder={t("exp.processPlaceholder")}
               autoFocus
             />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="واحد سازمانی">
+            <Field label={t("exp.department")}>
               <Input
                 value={processDepartment}
                 onChange={(event) => setProcessDepartment(event.target.value)}
-                placeholder="مثال: بازرگانی"
+                placeholder={t("exp.departmentPlaceholder")}
               />
             </Field>
-            <Field label="مالک فرایند">
+            <Field label={t("exp.processOwner")}>
               <Input
                 value={processOwnerName}
                 onChange={(event) => setProcessOwnerName(event.target.value)}
-                placeholder="نام مسئول فرایند"
+                placeholder={t("exp.processOwnerPlaceholder")}
               />
             </Field>
           </div>
-          <Field label="توضیحات">
+          <Field label={t("exp.description")}>
             <Textarea
               rows={3}
               value={processDescription}
@@ -847,10 +848,10 @@ export default function ProjectDetailPage() {
               variant="secondary"
               onClick={() => setProcessOpen(false)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              ساخت
+              {t("common.create")}
             </Button>
           </div>
         </form>
@@ -858,18 +859,17 @@ export default function ProjectDetailPage() {
 
       <Modal
         open={shareOpen}
-        title="اشتراک‌گذاری پوشه"
+        title={t("exp.shareTitle")}
         onClose={() => setShareOpen(false)}
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            با دعوت از طریق شماره موبایل، کل این پوشه (و زیرپوشه‌ها و فرایندها)
-            برای همکار یا مدیر شما قابل مشاهده می‌شود.
+            {t("exp.shareHint")}
           </p>
           <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
             <Field
-              label="شماره موبایل"
-              hint="با تایپ شماره، کاربران ثبت‌شده پیشنهاد می‌شوند."
+              label={t("login.phone")}
+              hint={t("exp.phoneLookupHint")}
             >
               <div className="relative">
                 <Input
@@ -882,11 +882,11 @@ export default function ProjectDetailPage() {
                 {(lookupLoading || lookupHits.length > 0) && (
                   <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md">
                     {lookupLoading && lookupHits.length === 0 && (
-                      <p className="px-3 py-2 text-xs text-gray-500">در حال جستجو...</p>
+                      <p className="px-3 py-2 text-xs text-gray-500">{t("exp.searching")}</p>
                     )}
                     {lookupHits.map((user) => {
                       const name =
-                        `${user.first_name} ${user.last_name}`.trim() || "کاربر تی‌ادیتور";
+                        `${user.first_name} ${user.last_name}`.trim() || t("common.user");
                       const avatar = mediaUrl(user.profile_image);
                       return (
                         <button
@@ -922,7 +922,7 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </Field>
-            <Field label="نقش">
+            <Field label={t("exp.role")}>
               <Select
                 value={inviteRole}
                 onChange={(event) =>
@@ -931,22 +931,22 @@ export default function ProjectDetailPage() {
               >
                 {PROJECT_MEMBER_ROLE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(`role.${option.value}`)}
                   </option>
                 ))}
               </Select>
             </Field>
             <div className="flex items-end">
               <Button loading={shareSaving} onClick={inviteMember}>
-                دعوت
+                {t("common.invite")}
               </Button>
             </div>
           </div>
           {shareError && <Alert>{shareError}</Alert>}
           <div className="space-y-2 border-t border-gray-100 pt-3">
-            <p className="text-sm font-medium text-ink">اعضای فعلی</p>
+            <p className="text-sm font-medium text-ink">{t("exp.members")}</p>
             {members.length === 0 ? (
-              <p className="text-sm text-gray-500">هنوز عضوی دعوت نشده است.</p>
+              <p className="text-sm text-gray-500">{t("exp.noMembers")}</p>
             ) : (
               members.map((member) => {
                 const name =
@@ -974,7 +974,7 @@ export default function ProjectDetailPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium text-ink">{name}</p>
                         <p className="text-xs text-gray-500" dir="ltr">
-                          {member.phone_number} · {PROJECT_ROLE_LABELS[member.role]}
+                          {member.phone_number} · {t(`role.${member.role}`)}
                         </p>
                       </div>
                     </div>
@@ -986,7 +986,7 @@ export default function ProjectDetailPage() {
                         disabled={shareSaving}
                         onClick={() => removeMember(member.id)}
                       >
-                        حذف
+                        {t("common.delete")}
                       </Button>
                     )}
                   </div>
@@ -1001,10 +1001,10 @@ export default function ProjectDetailPage() {
         open={editTarget !== null}
         title={
           editTarget?.kind === "process"
-            ? "ویرایش فرایند"
+            ? t("exp.editProcess")
             : editTarget?.kind === "sub-project"
-              ? "ویرایش زیرپوشه"
-              : "ویرایش پوشه"
+              ? t("exp.editSubfolder")
+              : t("exp.editFolder")
         }
         onClose={() => setEditTarget(null)}
       >
@@ -1018,10 +1018,10 @@ export default function ProjectDetailPage() {
           <Field
             label={
               editTarget?.kind === "process"
-                ? "نام فرایند"
+                ? t("exp.processName")
                 : editTarget?.kind === "sub-project"
-                  ? "نام زیرپوشه"
-                  : "نام پوشه"
+                  ? t("exp.subfolderName")
+                  : t("exp.folderName")
             }
           >
             <Input
@@ -1033,13 +1033,13 @@ export default function ProjectDetailPage() {
 
           {editTarget?.kind === "project" && (
             <>
-              <Field label="نام شرکت">
+              <Field label={t("exp.companyOptional")}>
                 <Input
                   value={editCompany}
                   onChange={(event) => setEditCompany(event.target.value)}
                 />
               </Field>
-              <Field label="توضیحات">
+              <Field label={t("exp.description")}>
                 <Textarea
                   rows={3}
                   value={editDescription}
@@ -1052,20 +1052,20 @@ export default function ProjectDetailPage() {
           {editTarget?.kind === "process" && (
             <>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="واحد سازمانی">
+                <Field label={t("exp.department")}>
                   <Input
                     value={editDepartment}
                     onChange={(event) => setEditDepartment(event.target.value)}
                   />
                 </Field>
-                <Field label="مالک فرایند">
+                <Field label={t("exp.processOwner")}>
                   <Input
                     value={editOwnerName}
                     onChange={(event) => setEditOwnerName(event.target.value)}
                   />
                 </Field>
               </div>
-              <Field label="توضیحات">
+              <Field label={t("exp.description")}>
                 <Textarea
                   rows={3}
                   value={editDescription}
@@ -1082,10 +1082,10 @@ export default function ProjectDetailPage() {
               variant="secondary"
               onClick={() => setEditTarget(null)}
             >
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button type="submit" loading={saving}>
-              ذخیره
+              {t("common.save")}
             </Button>
           </div>
         </form>

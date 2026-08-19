@@ -3,28 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 
 import { cx } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
 
 type ToolbarAction = {
-  label: string;
-  title: string;
+  label?: string;
+  labelKey?: string;
+  titleKey: string;
   command: string;
   value?: string;
 };
 
 const ACTIONS: ToolbarAction[] = [
-  { label: "B", title: "درشت", command: "bold" },
-  { label: "I", title: "کج", command: "italic" },
-  { label: "U", title: "زیرخط", command: "underline" },
-  { label: "H1", title: "تیتر ۱", command: "formatBlock", value: "h1" },
-  { label: "H2", title: "تیتر ۲", command: "formatBlock", value: "h2" },
-  { label: "متن", title: "متن ساده", command: "formatBlock", value: "p" },
-  { label: "• لیست", title: "لیست نقطه‌ای", command: "insertUnorderedList" },
-  { label: "۱. لیست", title: "لیست عددی", command: "insertOrderedList" },
-  { label: "نقل‌قول", title: "نقل‌قول", command: "formatBlock", value: "blockquote" },
-  { label: "راست‌چین", title: "راست‌چین", command: "justifyRight" },
-  { label: "وسط", title: "وسط‌چین", command: "justifyCenter" },
-  { label: "چپ‌چین", title: "چپ‌چین", command: "justifyLeft" },
-  { label: "پاک‌کردن", title: "حذف قالب‌بندی", command: "removeFormat" },
+  { label: "B", titleKey: "editor.bold", command: "bold" },
+  { label: "I", titleKey: "editor.italic", command: "italic" },
+  { label: "U", titleKey: "editor.underline", command: "underline" },
+  { label: "H1", titleKey: "editor.h1", command: "formatBlock", value: "h1" },
+  { label: "H2", titleKey: "editor.h2", command: "formatBlock", value: "h2" },
+  { labelKey: "editor.paragraph", titleKey: "editor.paragraphTitle", command: "formatBlock", value: "p" },
+  { labelKey: "editor.bullet", titleKey: "editor.bulletTitle", command: "insertUnorderedList" },
+  { labelKey: "editor.number", titleKey: "editor.numberTitle", command: "insertOrderedList" },
+  { labelKey: "editor.quote", titleKey: "editor.quote", command: "formatBlock", value: "blockquote" },
+  { labelKey: "editor.alignRight", titleKey: "editor.alignRight", command: "justifyRight" },
+  { labelKey: "editor.alignCenter", titleKey: "editor.alignCenterTitle", command: "justifyCenter" },
+  { labelKey: "editor.alignLeft", titleKey: "editor.alignLeft", command: "justifyLeft" },
+  { labelKey: "editor.clear", titleKey: "editor.clearTitle", command: "removeFormat" },
 ];
 
 type FontOption = {
@@ -35,9 +37,9 @@ type FontOption = {
   match: string;
 };
 
-const FONT_GROUPS: Array<{ label: string; fonts: FontOption[] }> = [
+const FONT_GROUPS: Array<{ labelKey: string; fonts: FontOption[] }> = [
   {
-    label: "فارسی",
+    labelKey: "editor.fontsFa",
     fonts: [
       {
         label: "B Nazanin",
@@ -73,7 +75,7 @@ const FONT_GROUPS: Array<{ label: string; fonts: FontOption[] }> = [
     ],
   },
   {
-    label: "English",
+    labelKey: "editor.fontsEn",
     fonts: [
       { label: "Arial", value: "Arial, Helvetica, sans-serif", match: "arial" },
       { label: "Georgia", value: "Georgia, serif", match: "georgia" },
@@ -101,11 +103,11 @@ const FONT_GROUPS: Array<{ label: string; fonts: FontOption[] }> = [
 const ALL_FONTS = FONT_GROUPS.flatMap((group) => group.fonts);
 
 const FONT_SIZES = [
-  { label: "کوچک", value: "12px" },
-  { label: "عادی", value: "14px" },
-  { label: "متوسط", value: "16px" },
-  { label: "بزرگ", value: "18px" },
-  { label: "خیلی بزرگ", value: "22px" },
+  { labelKey: "editor.sizeSmall", value: "12px" },
+  { labelKey: "editor.sizeNormal", value: "14px" },
+  { labelKey: "editor.sizeMedium", value: "16px" },
+  { labelKey: "editor.sizeLarge", value: "18px" },
+  { labelKey: "editor.sizeXLarge", value: "22px" },
 ];
 
 const DEFAULT_FONT = "Tahoma, sans-serif";
@@ -174,10 +176,12 @@ function clearStyle(node: Node, property: "fontSize" | "fontFamily") {
 export default function RichTextEditor({
   value,
   onChange,
-  placeholder = "متن خود را وارد کنید...",
+  placeholder,
   minHeight = 180,
   readOnly = false,
 }: Props) {
+  const { t, dir } = useI18n();
+  const resolvedPlaceholder = placeholder ?? t("editor.placeholder");
   const editorRef = useRef<HTMLDivElement>(null);
   const savedRange = useRef<Range | null>(null);
   const [currentFont, setCurrentFont] = useState(DEFAULT_FONT);
@@ -304,13 +308,13 @@ export default function RichTextEditor({
     if (!editor) return;
 
     const selected = selectedText();
-    const urlRaw = window.prompt("آدرس لینک را وارد کنید:", "https://");
+    const urlRaw = window.prompt(t("editor.linkUrl"), "https://");
     if (urlRaw === null) return;
     const href = normalizeUrl(urlRaw);
     if (!href) return;
 
-    const defaultLabel = selected || "لینک";
-    const labelRaw = window.prompt("نام نمایشی لینک (متن کوتاه):", defaultLabel);
+    const defaultLabel = selected || t("editor.linkDefault");
+    const labelRaw = window.prompt(t("editor.linkLabel"), defaultLabel);
     if (labelRaw === null) return;
     const label = labelRaw.trim() || defaultLabel;
 
@@ -359,12 +363,12 @@ export default function RichTextEditor({
           <select
             className="h-7 max-w-[168px] rounded border border-gray-300 bg-white px-1.5 text-xs text-navy-800"
             value={currentFont}
-            title="قلم"
+            title={t("editor.font")}
             onMouseDown={saveSelection}
             onChange={(event) => applyInlineStyle("fontFamily", event.target.value)}
           >
             {FONT_GROUPS.map((group) => (
-              <optgroup key={group.label} label={group.label}>
+              <optgroup key={group.labelKey} label={t(group.labelKey)}>
                 {group.fonts.map((font) => (
                   <option key={font.value} value={font.value}>
                     {font.label}
@@ -377,13 +381,13 @@ export default function RichTextEditor({
           <select
             className="h-7 max-w-[110px] rounded border border-gray-300 bg-white px-1.5 text-xs text-navy-800"
             value={currentSize}
-            title="اندازه قلم"
+            title={t("editor.fontSize")}
             onMouseDown={saveSelection}
             onChange={(event) => applyInlineStyle("fontSize", event.target.value)}
           >
             {FONT_SIZES.map((size) => (
               <option key={size.value} value={size.value}>
-                {size.label}
+                {t(size.labelKey)}
               </option>
             ))}
           </select>
@@ -392,9 +396,9 @@ export default function RichTextEditor({
 
           {ACTIONS.map((action) => (
             <button
-              key={action.label}
+              key={action.titleKey}
               type="button"
-              title={action.title}
+              title={t(action.titleKey)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => run(action)}
               className={cx(
@@ -404,27 +408,27 @@ export default function RichTextEditor({
                 action.command === "underline" && "underline",
               )}
             >
-              {action.label}
+              {action.label ?? t(action.labelKey ?? action.titleKey)}
             </button>
           ))}
 
           <button
             type="button"
-            title="افزودن لینک با نام نمایشی"
+            title={t("editor.addLinkTitle")}
             onMouseDown={(event) => event.preventDefault()}
             onClick={addLink}
             className="rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700"
           >
-            🔗 لینک
+            {t("editor.addLink")}
           </button>
           <button
             type="button"
-            title="حذف لینک"
+            title={t("editor.removeLinkTitle")}
             onMouseDown={(event) => event.preventDefault()}
             onClick={removeLink}
             className="rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700"
           >
-            برداشتن لینک
+            {t("editor.removeLink")}
           </button>
         </div>
       )}
@@ -432,9 +436,9 @@ export default function RichTextEditor({
       <div
         ref={editorRef}
         contentEditable={!readOnly}
-        dir="rtl"
+        dir={dir}
         suppressContentEditableWarning
-        data-placeholder={placeholder}
+        data-placeholder={resolvedPlaceholder}
         style={{ minHeight }}
         onInput={() => {
           if (!readOnly) emit();
@@ -453,7 +457,7 @@ export default function RichTextEditor({
 
       {!readOnly && (
         <p className="border-t border-gray-100 bg-gray-50 px-3 py-1 text-[11px] text-gray-500">
-          متن را انتخاب کنید، سپس قلم یا اندازه را عوض کنید. برای باز کردن لینک هنگام ویرایش: Ctrl+کلیک.
+          {t("editor.hint")}
         </p>
       )}
     </div>

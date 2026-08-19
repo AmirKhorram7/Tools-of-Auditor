@@ -70,7 +70,7 @@ export default function WorkSidePanel() {
 
   useEffect(() => {
     load();
-  }, [load, pathname]);
+  }, [load]);
 
   const respond = async (id: number, accept: boolean) => {
     setBusyId(id);

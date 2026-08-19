@@ -13,6 +13,8 @@ import {
 export type Locale = "fa" | "en";
 
 const STORAGE_KEY = "ta_locale";
+const COOKIE_KEY = "ta_locale";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 type Dict = Record<string, string>;
 
@@ -30,6 +32,7 @@ const FA: Dict = {
   "nav.auditPlan": "برنامه حسابرسی",
   "nav.workingPapers": "کاربرگ‌ها",
   "nav.myProfile": "پروفایل من",
+  "nav.hideTools": "پنهان",
   "nav.tools": "ابزارها",
   "nav.showTools": "نمایش پنل ابزارها",
   "nav.inbox": "اعلان‌ها",
@@ -37,6 +40,9 @@ const FA: Dict = {
   "lang.fa": "فارسی",
   "lang.en": "English",
 
+  "common.create": "ساخت",
+  "common.add": "افزودن",
+  "common.close": "بستن",
   "common.save": "ذخیره",
   "common.cancel": "انصراف",
   "common.delete": "حذف",
@@ -52,6 +58,8 @@ const FA: Dict = {
   "common.process": "فرایند",
   "common.step": "گام",
   "common.service": "سرویس",
+  "common.user": "کاربر",
+  "common.invite": "دعوت",
 
   "status.draft": "پیش‌نویس",
   "status.active": "فعال",
@@ -133,7 +141,7 @@ const FA: Dict = {
   "exp.createFail": "ساخت پوشه ناموفق بود.",
   "exp.saveFail": "ذخیره پوشه ناموفق بود.",
   "exp.colorFail": "تغییر رنگ پوشه ناموفق بود.",
-  "exp.deleteFail": "حذف پوشه ناموفق بود.",
+  "exp.deleteFail": "حذف ناموفق بود.",
   "exp.subfolders": "زیرپوشه‌ها",
   "exp.processes": "فرایندها",
   "exp.addProcess": "فرایند",
@@ -177,6 +185,188 @@ const FA: Dict = {
   "exp.layers": "ترتیب لایه‌ها:",
   "exp.treeHint": "روی هر کارت بزنید تا همان صفحه باز شود. با دکمه گِرد پایین هر کارت، زیرمجموعه‌های آن باز و بسته می‌شود.",
   "exp.folders": "پوشه‌ها",
+  "exp.colorThisFolder": "رنگ این پوشه",
+  "exp.deleteSubfolder": "حذف زیرپوشه",
+  "exp.deleteProcess": "حذف فرایند",
+  "exp.editProcess": "ویرایش فرایند",
+  "exp.editSubfolder": "ویرایش زیرپوشه",
+  "exp.subfolderNameRequired": "نام زیرپوشه الزامی است.",
+  "exp.processNameRequired": "نام فرایند الزامی است.",
+  "exp.createSubfolderFail": "ساخت زیرپوشه ناموفق بود.",
+  "exp.createProcessFail": "ساخت فرایند ناموفق بود.",
+  "exp.role": "نقش",
+  "exp.members": "اعضای فعلی",
+  "exp.noMembers": "هنوز عضوی دعوت نشده است.",
+  "exp.statusSaved": "وضعیت پوشه ذخیره شد.",
+  "exp.phoneLookupHint": "با تایپ شماره، کاربران ثبت‌شده پیشنهاد می‌شوند.",
+  "exp.searching": "در حال جستجو...",
+  "exp.deleteSubfolderConfirm": "زیرپوشه «{name}» و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟",
+  "exp.deleteProcessConfirm": "فرایند «{name}» و همه گام‌های آن حذف می‌شود. ادامه می‌دهید؟",
+  "exp.deleteSelfConfirm": "«{name}» به همراه همه زیرپوشه‌ها و فرایندهای آن حذف می‌شود. ادامه می‌دهید؟",
+  "exp.colorThisProcess": "رنگ این فرایند",
+  "exp.processNotFound": "فرایند پیدا نشد.",
+  "exp.loadProcessFail": "دریافت فرایند ناموفق بود.",
+  "exp.colorProcessFail": "تغییر رنگ فرایند ناموفق بود.",
+  "exp.stepTitleRequired": "عنوان گام الزامی است.",
+  "exp.addStepFail": "افزودن گام ناموفق بود.",
+  "exp.connectFail": "ایجاد اتصال ناموفق بود.",
+  "exp.disconnectFail": "حذف اتصال ناموفق بود.",
+  "exp.pdfFail": "دانلود PDF ناموفق بود.",
+  "exp.processOwnerLine": "مالک فرایند: {name}",
+  "exp.addStep": "افزودن گام",
+  "exp.canvasHintEdit": "شکل‌ها را با کشیدن جابه‌جا کنید و با کلیک روی هر شکل، صفحه مستندسازی آن گام (تشریح، ریسک، کنترل) را باز کنید. برای رسم فلش بین دو گام، دکمه «اتصال گام‌ها» را بزنید و ابتدا گام مبدأ و سپس گام مقصد را انتخاب کنید.",
+  "exp.canvasHintView": "حالت مشاهده: روی هر شکل کلیک کنید تا تشریح، ریسک، کنترل و پیوست‌های آن گام را ببینید. امکان ویرایش یا بارگذاری فایل وجود ندارد.",
+  "exp.stepList": "فهرست گام‌ها",
+  "exp.stepTitle": "عنوان گام",
+  "exp.stepTitlePlaceholder": "مثال: گام ۱ - درخواست خرید",
+  "exp.shapeOnCanvas": "شکل روی نمودار",
+  "exp.deleteStep": "حذف گام",
+  "exp.deleteProcessDeepConfirm": "فرایند «{name}» به همراه همه گام‌ها، ریسک‌ها و کنترل‌های آن حذف می‌شود. ادامه می‌دهید؟",
+  "exp.deleteStepConfirm": "گام «{name}» و مستندات و اتصال‌های آن حذف می‌شود. ادامه می‌دهید؟",
+  "exp.stepNotFound": "گام پیدا نشد.",
+  "exp.loadStepFail": "دریافت گام ناموفق بود.",
+  "exp.stepHintEdit": "این گام را در سه بخش تشریح، ریسک و کنترل مستند کنید.",
+  "exp.stepHintView": "حالت مشاهده: می‌توانید محتوا و پیوست‌ها را ببینید، اما ویرایش غیرفعال است.",
+  "exp.tabExplanation": "تشریح سیستم",
+  "exp.tabRisks": "ریسک‌ها",
+  "exp.tabControls": "کنترل‌ها",
+  "exp.explanationPlaceholder": "شرح کامل این گام از فرایند را بنویسید...",
+  "exp.explanationSaved": "تشریح ذخیره شد.",
+  "exp.saveExplanationFail": "ذخیره تشریح ناموفق بود.",
+  "exp.saveExplanation": "ذخیره تشریح",
+  "exp.titleRequired": "عنوان الزامی است.",
+  "exp.createItemFail": "ثبت ناموفق بود.",
+  "exp.newRisk": "ریسک جدید",
+  "exp.newControl": "کنترل جدید",
+  "exp.itemTitle": "عنوان",
+  "exp.riskTitlePlaceholder": "مثال: خرید بدون تاییدیه مدیر",
+  "exp.controlTitlePlaceholder": "مثال: تایید دو مرحله‌ای درخواست خرید",
+  "exp.addRisk": "+ افزودن ریسک",
+  "exp.addControl": "+ افزودن کنترل",
+  "exp.noRisks": "ریسکی ثبت نشده است",
+  "exp.noControls": "کنترلی ثبت نشده است",
+  "exp.itemsHintEdit": "برای این گام موارد شناسایی‌شده را ثبت کنید.",
+  "exp.itemsHintView": "برای این گام موردی ثبت نشده است.",
+  "exp.saved": "ذخیره شد.",
+  "exp.confirmDeleteItem": "این مورد حذف شود؟",
+  "exp.riskContentPlaceholder": "توضیح ریسک، اثر و احتمال وقوع...",
+  "exp.controlContentPlaceholder": "توضیح کنترل، نوع و دوره اجرا...",
+  "exp.connectSteps": "اتصال گام‌ها",
+  "exp.endConnect": "پایان اتصال",
+  "exp.pickSource": "گام مبدأ را انتخاب کنید.",
+  "exp.pickTarget": "حالا گام مقصد را انتخاب کنید.",
+  "exp.dragHint": "شکل‌ها را بکشید تا جابه‌جا شوند، یا کلیک کنید تا مستندسازی باز شود.",
+  "exp.viewClickHint": "حالت مشاهده: برای دیدن مستندات هر گام روی شکل کلیک کنید.",
+  "exp.deleteConnection": "حذف این اتصال",
+  "exp.clickToConnect": "برای اتصال کلیک کنید",
+  "exp.clickToView": "برای دیدن مستندات کلیک کنید",
+  "exp.dragOrClick": "برای جابه‌جایی بکشید، برای باز کردن کلیک کنید",
+  "exp.noStepsOnCanvas": "هنوز گامی اضافه نشده است. با دکمه «افزودن گام» شروع کنید.",
+  "shape.square": "مربع",
+  "shape.rectangle": "مستطیل",
+  "shape.circle": "دایره",
+  "shape.diamond": "لوزی",
+  "shape.oval": "بیضی",
+  "media.attachments": "پیوست‌ها (لینک، تصویر، فایل)",
+  "media.empty": "پیوستی ثبت نشده است.",
+  "media.image": "تصویر",
+  "media.file": "فایل",
+  "media.link": "لینک",
+  "media.titleOptional": "عنوان (اختیاری)",
+  "media.linkRequired": "برای نوع لینک، آدرس الزامی است.",
+  "media.fileOrUrl": "یک فایل انتخاب کنید یا آدرس وارد کنید.",
+  "media.addFail": "افزودن پیوست ناموفق بود.",
+  "media.deleteConfirm": "این پیوست حذف شود؟",
+  "media.deleteFail": "حذف پیوست ناموفق بود.",
+  "editor.bold": "درشت",
+  "editor.italic": "کج",
+  "editor.underline": "زیرخط",
+  "editor.h1": "تیتر ۱",
+  "editor.h2": "تیتر ۲",
+  "editor.paragraph": "متن",
+  "editor.paragraphTitle": "متن ساده",
+  "editor.bullet": "• لیست",
+  "editor.bulletTitle": "لیست نقطه‌ای",
+  "editor.number": "۱. لیست",
+  "editor.numberTitle": "لیست عددی",
+  "editor.quote": "نقل‌قول",
+  "editor.alignRight": "راست‌چین",
+  "editor.alignCenter": "وسط",
+  "editor.alignCenterTitle": "وسط‌چین",
+  "editor.alignLeft": "چپ‌چین",
+  "editor.clear": "پاک‌کردن",
+  "editor.clearTitle": "حذف قالب‌بندی",
+  "editor.font": "قلم",
+  "editor.fontSize": "اندازه قلم",
+  "editor.fontsFa": "فارسی",
+  "editor.fontsEn": "English",
+  "editor.sizeSmall": "کوچک",
+  "editor.sizeNormal": "عادی",
+  "editor.sizeMedium": "متوسط",
+  "editor.sizeLarge": "بزرگ",
+  "editor.sizeXLarge": "خیلی بزرگ",
+  "editor.addLink": "🔗 لینک",
+  "editor.addLinkTitle": "افزودن لینک با نام نمایشی",
+  "editor.removeLink": "برداشتن لینک",
+  "editor.removeLinkTitle": "حذف لینک",
+  "editor.hint": "متن را انتخاب کنید، سپس قلم یا اندازه را عوض کنید. برای باز کردن لینک هنگام ویرایش: Ctrl+کلیک.",
+  "editor.linkUrl": "آدرس لینک را وارد کنید:",
+  "editor.linkLabel": "نام نمایشی لینک (متن کوتاه):",
+  "editor.linkDefault": "لینک",
+  "editor.placeholder": "متن خود را وارد کنید...",
+
+  "profile.title": "پروفایل من",
+  "profile.subtitle": "مشخصات، دعوت‌ها و فعالیت کار در یک جا.",
+  "profile.tabInfo": "مشخصات",
+  "profile.tabInvites": "دعوت‌ها",
+  "profile.tabActivity": "فعالیت",
+  "profile.noInvitesTitle": "دعوت بازی ندارید",
+  "profile.noInvitesDesc": "دعوت به تیم اینجا دیده می‌شود.",
+  "profile.from": "از طرف {name}",
+  "profile.reject": "رد",
+  "profile.accept": "پذیرش",
+  "profile.previous": "قبلی:",
+  "profile.noActivityTitle": "هنوز فعالیتی نیست",
+  "profile.noActivityDesc": "کار و پروژه اینجا ثبت می‌شود.",
+  "profile.photo": "تصویر پروفایل",
+  "profile.photoHint": "فرمت‌های JPG یا PNG، حداکثر چند مگابایت",
+  "profile.phoneLogin": "شماره موبایل (ورود)",
+  "profile.passwordOn": "رمز عبور فعال است",
+  "profile.passwordOff": "رمز عبور تنظیم نشده",
+  "profile.firstName": "نام",
+  "profile.lastName": "نام خانوادگی",
+  "profile.company": "نام شرکت / سازمان",
+  "profile.companyPlaceholder": "مثال: شرکت دوشه",
+  "profile.job": "عنوان شغلی",
+  "profile.jobPlaceholder": "مثال: حسابرس داخلی ارشد",
+  "profile.birth": "تاریخ تولد",
+  "profile.bio": "درباره من",
+  "profile.bioPlaceholder": "سابقه کاری و حوزه تخصصی شما",
+  "profile.saveChanges": "ذخیره تغییرات",
+  "profile.changePassword": "تغییر رمز عبور",
+  "profile.setPassword": "تعیین رمز عبور",
+  "profile.changePasswordHint": "رمز عبور فعلی را وارد کنید و رمز جدید بسازید.",
+  "profile.setPasswordHint": "با ساخت رمز عبور می‌توانید بدون پیامک و فقط با شماره موبایل وارد شوید.",
+  "profile.currentPassword": "رمز عبور فعلی",
+  "profile.newPassword": "رمز عبور جدید",
+  "profile.passwordHint": "حداقل ۸ کاراکتر",
+  "profile.confirmPassword": "تکرار رمز عبور جدید",
+  "profile.savePassword": "ذخیره رمز عبور",
+  "profile.loadFail": "دریافت پروفایل ناموفق بود.",
+  "profile.saveOk": "پروفایل با موفقیت ذخیره شد.",
+  "profile.saveFail": "ذخیره پروفایل ناموفق بود.",
+  "profile.passwordMin": "رمز عبور باید حداقل ۸ کاراکتر باشد.",
+  "profile.passwordMismatch": "تکرار رمز عبور با رمز جدید یکسان نیست.",
+  "profile.currentRequired": "رمز عبور فعلی را وارد کنید.",
+  "profile.passwordChanged": "رمز عبور با موفقیت تغییر کرد.",
+  "profile.passwordSet": "رمز عبور ذخیره شد. از این پس می‌توانید با رمز عبور وارد شوید.",
+  "profile.passwordFail": "ذخیره رمز عبور ناموفق بود.",
+  "profile.inviteFail": "پاسخ به دعوت ناموفق بود.",
+  "invite.pending": "در انتظار",
+  "invite.accepted": "پذیرفته",
+  "invite.rejected": "رد شده",
+  "invite.expired": "منقضی",
+  "invite.cancelled": "لغو",
 };
 
 const EN: Dict = {
@@ -193,6 +383,7 @@ const EN: Dict = {
   "nav.auditPlan": "Audit plan",
   "nav.workingPapers": "Working papers",
   "nav.myProfile": "My profile",
+  "nav.hideTools": "Hide",
   "nav.tools": "Tools",
   "nav.showTools": "Show tools panel",
   "nav.inbox": "Inbox",
@@ -200,6 +391,9 @@ const EN: Dict = {
   "lang.fa": "فارسی",
   "lang.en": "English",
 
+  "common.create": "Create",
+  "common.add": "Add",
+  "common.close": "Close",
   "common.save": "Save",
   "common.cancel": "Cancel",
   "common.delete": "Delete",
@@ -215,6 +409,8 @@ const EN: Dict = {
   "common.process": "Process",
   "common.step": "Step",
   "common.service": "Service",
+  "common.user": "User",
+  "common.invite": "Invite",
 
   "status.draft": "Draft",
   "status.active": "Active",
@@ -296,7 +492,7 @@ const EN: Dict = {
   "exp.createFail": "Could not create the folder.",
   "exp.saveFail": "Could not save the folder.",
   "exp.colorFail": "Could not change the folder color.",
-  "exp.deleteFail": "Could not delete the folder.",
+  "exp.deleteFail": "Could not delete.",
   "exp.subfolders": "Subfolders",
   "exp.processes": "Processes",
   "exp.addProcess": "Process",
@@ -340,15 +536,224 @@ const EN: Dict = {
   "exp.layers": "Layers:",
   "exp.treeHint": "Click a card to open it. Use the round button under a card to expand or collapse it.",
   "exp.folders": "Folders",
+  "exp.colorThisFolder": "Color of this folder",
+  "exp.deleteSubfolder": "Delete subfolder",
+  "exp.deleteProcess": "Delete process",
+  "exp.editProcess": "Edit process",
+  "exp.editSubfolder": "Edit subfolder",
+  "exp.subfolderNameRequired": "Subfolder name is required.",
+  "exp.processNameRequired": "Process name is required.",
+  "exp.createSubfolderFail": "Could not create the subfolder.",
+  "exp.createProcessFail": "Could not create the process.",
+  "exp.role": "Role",
+  "exp.members": "Current members",
+  "exp.noMembers": "No members invited yet.",
+  "exp.statusSaved": "Folder status saved.",
+  "exp.phoneLookupHint": "Type a phone number to see registered users.",
+  "exp.searching": "Searching...",
+  "exp.deleteSubfolderConfirm": "Subfolder “{name}” and its processes will be deleted. Continue?",
+  "exp.deleteProcessConfirm": "Process “{name}” and all of its steps will be deleted. Continue?",
+  "exp.deleteSelfConfirm": "“{name}” and all of its subfolders and processes will be deleted. Continue?",
+  "exp.colorThisProcess": "Color of this process",
+  "exp.processNotFound": "Process not found.",
+  "exp.loadProcessFail": "Could not load the process.",
+  "exp.colorProcessFail": "Could not change the process color.",
+  "exp.stepTitleRequired": "Step title is required.",
+  "exp.addStepFail": "Could not add the step.",
+  "exp.connectFail": "Could not create the connection.",
+  "exp.disconnectFail": "Could not delete the connection.",
+  "exp.pdfFail": "Could not download the PDF.",
+  "exp.processOwnerLine": "Process owner: {name}",
+  "exp.addStep": "Add step",
+  "exp.canvasHintEdit": "Drag shapes to move them. Click a shape to open its documentation (explanation, risk, control). To draw an arrow, tap Connect steps, then pick the start step and the end step.",
+  "exp.canvasHintView": "View only: click a shape to see that step’s explanation, risks, controls and attachments. Editing and uploads are disabled.",
+  "exp.stepList": "Steps",
+  "exp.stepTitle": "Step title",
+  "exp.stepTitlePlaceholder": "Example: Step 1 — purchase request",
+  "exp.shapeOnCanvas": "Shape on the diagram",
+  "exp.deleteStep": "Delete step",
+  "exp.deleteProcessDeepConfirm": "Process “{name}” and all of its steps, risks and controls will be deleted. Continue?",
+  "exp.deleteStepConfirm": "Step “{name}” and its documents and connections will be deleted. Continue?",
+  "exp.stepNotFound": "Step not found.",
+  "exp.loadStepFail": "Could not load the step.",
+  "exp.stepHintEdit": "Document this step in three parts: explanation, risk and control.",
+  "exp.stepHintView": "View only: you can read content and attachments, but editing is off.",
+  "exp.tabExplanation": "Explanation",
+  "exp.tabRisks": "Risks",
+  "exp.tabControls": "Controls",
+  "exp.explanationPlaceholder": "Write the full explanation of this process step...",
+  "exp.explanationSaved": "Explanation saved.",
+  "exp.saveExplanationFail": "Could not save the explanation.",
+  "exp.saveExplanation": "Save explanation",
+  "exp.titleRequired": "Title is required.",
+  "exp.createItemFail": "Could not save this item.",
+  "exp.newRisk": "New risk",
+  "exp.newControl": "New control",
+  "exp.itemTitle": "Title",
+  "exp.riskTitlePlaceholder": "Example: Purchase without manager approval",
+  "exp.controlTitlePlaceholder": "Example: Two-step approval of the purchase request",
+  "exp.addRisk": "+ Add risk",
+  "exp.addControl": "+ Add control",
+  "exp.noRisks": "No risks yet",
+  "exp.noControls": "No controls yet",
+  "exp.itemsHintEdit": "Record the items identified for this step.",
+  "exp.itemsHintView": "Nothing is recorded for this step.",
+  "exp.saved": "Saved.",
+  "exp.confirmDeleteItem": "Delete this item?",
+  "exp.riskContentPlaceholder": "Describe the risk, impact and likelihood...",
+  "exp.controlContentPlaceholder": "Describe the control, type and how often it runs...",
+  "exp.connectSteps": "Connect steps",
+  "exp.endConnect": "Stop connecting",
+  "exp.pickSource": "Select the start step.",
+  "exp.pickTarget": "Now select the end step.",
+  "exp.dragHint": "Drag shapes to move them, or click to open documentation.",
+  "exp.viewClickHint": "View only: click a shape to open that step’s documents.",
+  "exp.deleteConnection": "Delete this connection",
+  "exp.clickToConnect": "Click to connect",
+  "exp.clickToView": "Click to view documents",
+  "exp.dragOrClick": "Drag to move, click to open",
+  "exp.noStepsOnCanvas": "No steps yet. Start with Add step.",
+  "shape.square": "Square",
+  "shape.rectangle": "Rectangle",
+  "shape.circle": "Circle",
+  "shape.diamond": "Diamond",
+  "shape.oval": "Oval",
+  "media.attachments": "Attachments (link, image, file)",
+  "media.empty": "No attachments yet.",
+  "media.image": "Image",
+  "media.file": "File",
+  "media.link": "Link",
+  "media.titleOptional": "Title (optional)",
+  "media.linkRequired": "A URL is required for a link.",
+  "media.fileOrUrl": "Choose a file or enter a URL.",
+  "media.addFail": "Could not add the attachment.",
+  "media.deleteConfirm": "Delete this attachment?",
+  "media.deleteFail": "Could not delete the attachment.",
+  "editor.bold": "Bold",
+  "editor.italic": "Italic",
+  "editor.underline": "Underline",
+  "editor.h1": "Heading 1",
+  "editor.h2": "Heading 2",
+  "editor.paragraph": "Text",
+  "editor.paragraphTitle": "Normal text",
+  "editor.bullet": "• List",
+  "editor.bulletTitle": "Bullet list",
+  "editor.number": "1. List",
+  "editor.numberTitle": "Numbered list",
+  "editor.quote": "Quote",
+  "editor.alignRight": "Align right",
+  "editor.alignCenter": "Center",
+  "editor.alignCenterTitle": "Align center",
+  "editor.alignLeft": "Align left",
+  "editor.clear": "Clear",
+  "editor.clearTitle": "Clear formatting",
+  "editor.font": "Font",
+  "editor.fontSize": "Font size",
+  "editor.fontsFa": "Persian",
+  "editor.fontsEn": "English",
+  "editor.sizeSmall": "Small",
+  "editor.sizeNormal": "Normal",
+  "editor.sizeMedium": "Medium",
+  "editor.sizeLarge": "Large",
+  "editor.sizeXLarge": "Extra large",
+  "editor.addLink": "🔗 Link",
+  "editor.addLinkTitle": "Add a link with a display name",
+  "editor.removeLink": "Remove link",
+  "editor.removeLinkTitle": "Remove link",
+  "editor.hint": "Select text, then change the font or size. To open a link while editing: Ctrl+click.",
+  "editor.linkUrl": "Enter the link URL:",
+  "editor.linkLabel": "Display name for the link (short text):",
+  "editor.linkDefault": "Link",
+  "editor.placeholder": "Enter your text...",
+
+  "profile.title": "My profile",
+  "profile.subtitle": "Your details, invitations and work activity in one place.",
+  "profile.tabInfo": "Details",
+  "profile.tabInvites": "Invitations",
+  "profile.tabActivity": "Activity",
+  "profile.noInvitesTitle": "No open invitations",
+  "profile.noInvitesDesc": "Team invitations appear here.",
+  "profile.from": "From {name}",
+  "profile.reject": "Decline",
+  "profile.accept": "Accept",
+  "profile.previous": "Previous:",
+  "profile.noActivityTitle": "No activity yet",
+  "profile.noActivityDesc": "Work and projects will show up here.",
+  "profile.photo": "Profile photo",
+  "profile.photoHint": "JPG or PNG, a few megabytes max",
+  "profile.phoneLogin": "Phone number (sign-in)",
+  "profile.passwordOn": "Password is set",
+  "profile.passwordOff": "No password set",
+  "profile.firstName": "First name",
+  "profile.lastName": "Last name",
+  "profile.company": "Company / organization",
+  "profile.companyPlaceholder": "Example: Dooshe",
+  "profile.job": "Job title",
+  "profile.jobPlaceholder": "Example: Senior internal auditor",
+  "profile.birth": "Date of birth",
+  "profile.bio": "About me",
+  "profile.bioPlaceholder": "Your experience and specialist area",
+  "profile.saveChanges": "Save changes",
+  "profile.changePassword": "Change password",
+  "profile.setPassword": "Set a password",
+  "profile.changePasswordHint": "Enter your current password and choose a new one.",
+  "profile.setPasswordHint": "With a password you can sign in with your phone number, without SMS.",
+  "profile.currentPassword": "Current password",
+  "profile.newPassword": "New password",
+  "profile.passwordHint": "At least 8 characters",
+  "profile.confirmPassword": "Confirm new password",
+  "profile.savePassword": "Save password",
+  "profile.loadFail": "Could not load profile.",
+  "profile.saveOk": "Profile saved.",
+  "profile.saveFail": "Could not save profile.",
+  "profile.passwordMin": "Password must be at least 8 characters.",
+  "profile.passwordMismatch": "Passwords do not match.",
+  "profile.currentRequired": "Enter your current password.",
+  "profile.passwordChanged": "Password changed.",
+  "profile.passwordSet": "Password saved. You can now sign in with your password.",
+  "profile.passwordFail": "Could not save password.",
+  "profile.inviteFail": "Could not respond to the invitation.",
+  "invite.pending": "Pending",
+  "invite.accepted": "Accepted",
+  "invite.rejected": "Declined",
+  "invite.expired": "Expired",
+  "invite.cancelled": "Cancelled",
 };
 
 const MESSAGES: Record<Locale, Dict> = { fa: FA, en: EN };
+
+function isLocale(value: string | null | undefined): value is Locale {
+  return value === "fa" || value === "en";
+}
+
+function persistLocale(next: Locale) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, next);
+    document.cookie = `${COOKIE_KEY}=${next};path=/;max-age=${COOKIE_MAX_AGE};SameSite=Lax`;
+  } catch {
+    /* ignore */
+  }
+}
 
 function interpolate(template: string, vars?: Record<string, string | number>) {
   if (!vars) return template;
   return template.replace(/\{(\w+)\}/g, (_, key: string) =>
     vars[key] === undefined ? `{${key}}` : String(vars[key]),
   );
+}
+
+function lookup(locale: Locale, key: string): string | undefined {
+  const own = MESSAGES[locale][key];
+  if (own !== undefined) return own;
+  // Never show Farsi while English is selected.
+  return undefined;
+}
+
+if (process.env.NODE_ENV !== "production") {
+  const missingInEn = Object.keys(FA).filter((key) => EN[key] === undefined);
+  if (missingInEn.length > 0) {
+    console.warn("[i18n] English is missing keys:", missingInEn);
+  }
 }
 
 type I18nState = {
@@ -367,19 +772,33 @@ function applyDocumentLocale(locale: Locale) {
   root.dir = locale === "fa" ? "rtl" : "ltr";
 }
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("fa");
+export function LocaleProvider({
+  children,
+  initialLocale = "fa",
+}: {
+  children: ReactNode;
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(
+    isLocale(initialLocale) ? initialLocale : "fa",
+  );
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved === "en" || saved === "fa") {
+      if (isLocale(saved) && saved !== locale) {
         setLocaleState(saved);
         applyDocumentLocale(saved);
+        persistLocale(saved);
+        return;
       }
+      persistLocale(locale);
     } catch {
       /* ignore */
     }
+    applyDocumentLocale(locale);
+    // First paint only: later locale changes are handled by setLocale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -388,17 +807,20 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      /* ignore */
-    }
+    persistLocale(next);
+    applyDocumentLocale(next);
   }, []);
 
   const t = useCallback(
     (key: string, vars?: Record<string, string | number>) => {
-      const table = MESSAGES[locale];
-      return interpolate(table[key] ?? MESSAGES.fa[key] ?? key, vars);
+      const template = lookup(locale, key);
+      if (template === undefined) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(`[i18n] missing "${key}" for locale "${locale}"`);
+        }
+        return interpolate(key, vars);
+      }
+      return interpolate(template, vars);
     },
     [locale],
   );

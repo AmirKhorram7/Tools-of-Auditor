@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { cx } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import { SHAPE_SIZES, type ProcessStep, type StepConnection } from "@/lib/types";
 
 /** Border-radius / rotation per shape. Dimensions come from SHAPE_SIZES. */
@@ -68,6 +69,7 @@ export default function StepCanvas({
   readOnly = false,
 }: Props) {
   const router = useRouter();
+  const { t, dir } = useI18n();
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
     id: number;
@@ -255,23 +257,23 @@ export default function StepCanvas({
                 : "border-gray-300 bg-white text-navy-800 hover:border-navy-700",
             )}
           >
-            {connectMode ? "پایان اتصال" : "اتصال گام‌ها"}
+            {connectMode ? t("exp.endConnect") : t("exp.connectSteps")}
           </button>
 
           <p className="text-xs text-gray-500">
             {connectMode
               ? linkSource === null
-                ? "گام مبدأ را انتخاب کنید."
-                : "حالا گام مقصد را انتخاب کنید."
-              : "شکل‌ها را بکشید تا جابه‌جا شوند، یا کلیک کنید تا مستندسازی باز شود."}
+                ? t("exp.pickSource")
+                : t("exp.pickTarget")
+              : t("exp.dragHint")}
           </p>
 
-          {busy && <span className="text-xs text-gray-400">در حال ذخیره…</span>}
+          {busy && <span className="text-xs text-gray-400">{t("common.saving")}</span>}
         </div>
       )}
       {readOnly && (
         <p className="text-xs text-gray-500">
-          حالت مشاهده: برای دیدن مستندات هر گام روی شکل کلیک کنید.
+          {t("exp.viewClickHint")}
         </p>
       )}
 
@@ -343,7 +345,7 @@ export default function StepCanvas({
                 onClick={() => removeConnection(connection.id)}
                 style={{ left: mid.x - 10, top: mid.y - 10 }}
                 className="absolute z-20 flex size-5 items-center justify-center rounded-full border border-red-300 bg-white text-[11px] leading-none text-red-600 shadow-sm transition hover:bg-red-600 hover:text-white"
-                title="حذف این اتصال"
+                title={t("exp.deleteConnection")}
               >
                 ✕
               </button>
@@ -380,14 +382,14 @@ export default function StepCanvas({
                   )}
                   title={
                     connectMode
-                      ? "برای اتصال کلیک کنید"
+                      ? t("exp.clickToConnect")
                       : readOnly
-                        ? "برای دیدن مستندات کلیک کنید"
-                        : "برای جابه‌جایی بکشید، برای باز کردن کلیک کنید"
+                        ? t("exp.clickToView")
+                        : t("exp.dragOrClick")
                   }
                 >
                   <span
-                    dir="rtl"
+                    dir={dir}
                     className={cx(
                       "pointer-events-none text-xs font-medium text-ink",
                       step.shape_type === "diamond" && "-rotate-45",
@@ -403,7 +405,7 @@ export default function StepCanvas({
                     onClick={() => onDeleteStep(step)}
                     style={{ left: x + size.width - 10, top: y - 10 }}
                     className="absolute z-20 flex size-6 items-center justify-center rounded-full border border-red-300 bg-white text-xs leading-none text-red-600 opacity-0 shadow-sm transition hover:bg-red-600 hover:text-white group-hover:opacity-100"
-                    title="حذف گام"
+                    title={t("exp.deleteStep")}
                   >
                     ✕
                   </button>
@@ -414,10 +416,10 @@ export default function StepCanvas({
 
           {steps.length === 0 && (
             <div
-              dir="rtl"
+              dir={dir}
               className="absolute inset-0 flex items-center justify-center text-sm text-gray-400"
             >
-              هنوز گامی اضافه نشده است. با دکمه «افزودن گام» شروع کنید.
+              {t("exp.noStepsOnCanvas")}
             </div>
           )}
         </div>
