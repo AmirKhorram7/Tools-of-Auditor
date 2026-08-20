@@ -1,0 +1,347 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ display_name }} — activity{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+  .ta-report {
+    max-width: 1180px;
+    color: var(--body-fg);
+  }
+  .ta-hero,
+  .ta-stat,
+  .ta-card {
+    background: var(--darkened-bg, var(--body-bg));
+    border: 1px solid var(--hairline-color);
+    color: var(--body-fg);
+  }
+  .ta-hero {
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 18px;
+  }
+  .ta-hero h1 {
+    margin: 0 0 4px; font-size: 1.45rem; color: var(--body-loud-color, var(--body-fg));
+  }
+  .ta-muted { color: var(--body-quiet-color); font-size: 13px; }
+  .ta-chip {
+    display: inline-block; margin-inline-end: 6px; margin-top: 6px;
+    padding: 2px 8px; border-radius: 999px; font-size: 12px;
+    background: var(--selected-bg, var(--body-bg));
+    color: var(--body-fg);
+    border: 1px solid var(--hairline-color);
+  }
+  .ta-chip.ok {
+    background: color-mix(in srgb, #22c55e 22%, var(--body-bg));
+    color: var(--body-loud-color, var(--body-fg));
+    border-color: color-mix(in srgb, #22c55e 40%, var(--hairline-color));
+  }
+  .ta-chip.warn {
+    background: color-mix(in srgb, #eab308 22%, var(--body-bg));
+    color: var(--body-loud-color, var(--body-fg));
+    border-color: color-mix(in srgb, #eab308 40%, var(--hairline-color));
+  }
+  .ta-stats {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px; margin-bottom: 20px;
+  }
+  .ta-stat { border-radius: 10px; padding: 12px 14px; }
+  .ta-stat .n {
+    font-size: 1.6rem; font-weight: 700; line-height: 1.2;
+    color: var(--body-loud-color, var(--body-fg));
+  }
+  .ta-stat .l { font-size: 12px; font-weight: 600; margin-top: 2px; }
+  .ta-bar {
+    display: block; width: 100%; height: 6px; margin-top: 10px;
+    border: 0; border-radius: 99px; overflow: hidden;
+    background: var(--hairline-color);
+    accent-color: var(--link-fg, var(--primary));
+  }
+  .ta-bar::-webkit-progress-bar {
+    background: var(--hairline-color); border-radius: 99px;
+  }
+  .ta-bar::-webkit-progress-value,
+  .ta-bar::-moz-progress-bar {
+    background: var(--link-fg, var(--primary)); border-radius: 99px;
+  }
+  .ta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .ta-grid { grid-template-columns: 1fr; } }
+  .ta-card { border-radius: 10px; overflow: hidden; }
+  .ta-card h2 {
+    margin: 0; padding: 10px 14px; font-size: 14px;
+    background: var(--selected-bg, var(--body-bg));
+    color: var(--body-loud-color, var(--body-fg));
+    border-bottom: 1px solid var(--hairline-color);
+  }
+  .ta-card table { width: 100%; border-collapse: collapse; }
+  .ta-card th, .ta-card td {
+    text-align: start; padding: 8px 12px; font-size: 13px;
+    border-bottom: 1px solid var(--hairline-color);
+    vertical-align: top;
+    color: var(--body-fg);
+  }
+  .ta-card th { color: var(--body-quiet-color); font-weight: 600; }
+  .ta-card a { color: var(--link-fg); }
+  .ta-empty { padding: 14px; color: var(--body-quiet-color); font-size: 13px; }
+  .ta-wide { grid-column: 1 / -1; }
+  .ta-profile-card { margin-bottom: 20px; }
+  .ta-profile {
+    display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+    padding: 16px 14px;
+  }
+  .ta-avatar {
+    width: 96px; height: 96px; border-radius: 12px; object-fit: cover;
+    border: 1px solid var(--hairline-color); background: var(--selected-bg, var(--body-bg));
+    flex-shrink: 0;
+  }
+  .ta-avatar-fallback {
+    width: 96px; height: 96px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 700;
+    background: var(--selected-bg, var(--body-bg));
+    color: var(--body-quiet-color);
+    border: 1px solid var(--hairline-color);
+  }
+  .ta-profile-body { flex: 1; min-width: 240px; }
+  .ta-dl {
+    display: grid; grid-template-columns: minmax(110px, 150px) 1fr;
+    gap: 8px 18px; margin: 0;
+  }
+  .ta-dl dt {
+    margin: 0; color: var(--body-quiet-color); font-weight: 600; font-size: 12px;
+  }
+  .ta-dl dd { margin: 0; font-size: 13px; color: var(--body-fg); }
+  .ta-bio { white-space: pre-wrap; }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Home" %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='user_management' %}">User management</a>
+  &rsaquo; <a href="{% url 'admin:user_management_customuser_changelist' %}">{% trans "Users" %}</a>
+  &rsaquo; <a href="{% url 'admin:user_management_customuser_change' user.pk %}">{{ display_name }}</a>
+  &rsaquo; Activity
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="ta-report">
+  <div class="ta-hero">
+    <div style="flex:1; min-width: 240px;">
+      <p class="ta-muted">User activity report</p>
+      <h1>{{ display_name }}</h1>
+      <p class="ta-muted" dir="ltr">{{ user.phone_number }}</p>
+      {% if profile %}
+        {% if profile.company_name %}<span class="ta-chip">{{ profile.company_name }}</span>{% endif %}
+        {% if profile.job_title %}<span class="ta-chip">{{ profile.job_title }}</span>{% endif %}
+      {% endif %}
+      {% if user.is_phone_verified %}<span class="ta-chip ok">Phone verified</span>{% endif %}
+      {% if user.is_active %}<span class="ta-chip ok">Active</span>{% else %}<span class="ta-chip warn">Inactive</span>{% endif %}
+      {% if user.is_staff %}<span class="ta-chip">Staff</span>{% endif %}
+    </div>
+    <div class="ta-muted" style="min-width: 200px;">
+      <div>Joined: {{ user.date_joined|date:"Y-m-d H:i" }}</div>
+      <div>Last login: {% if user.last_login %}{{ user.last_login|date:"Y-m-d H:i" }}{% else %}Never{% endif %}</div>
+      <p style="margin-top: 12px;">
+        <a class="button" href="{% url 'admin:user_management_customuser_change' user.pk %}">Edit user</a>
+      </p>
+    </div>
+  </div>
+
+  <section class="ta-card ta-profile-card">
+    <h2>Profile they completed</h2>
+    <div class="ta-profile">
+      {% if profile and profile.profile_image %}
+        <img class="ta-avatar" src="{{ profile.profile_image.url }}" alt="">
+      {% else %}
+        <div class="ta-avatar-fallback" aria-hidden="true">{{ display_name|slice:":1"|upper }}</div>
+      {% endif %}
+      <div class="ta-profile-body">
+        <dl class="ta-dl">
+          <dt>First name</dt>
+          <dd>{% if user.first_name %}{{ user.first_name }}{% else %}<span class="ta-muted">Not filled</span>{% endif %}</dd>
+          <dt>Last name</dt>
+          <dd>{% if user.last_name %}{{ user.last_name }}{% else %}<span class="ta-muted">Not filled</span>{% endif %}</dd>
+          <dt>Phone</dt>
+          <dd dir="ltr">{{ user.phone_number }}</dd>
+          <dt>Company</dt>
+          <dd>{% if profile.company_name %}{{ profile.company_name }}{% else %}<span class="ta-muted">Not filled</span>{% endif %}</dd>
+          <dt>Job title</dt>
+          <dd>{% if profile.job_title %}{{ profile.job_title }}{% else %}<span class="ta-muted">Not filled</span>{% endif %}</dd>
+          <dt>Birth date</dt>
+          <dd>{% if profile.birth_date %}{{ profile.birth_date|date:"Y-m-d" }}{% else %}<span class="ta-muted">Not filled</span>{% endif %}</dd>
+          <dt>Password</dt>
+          <dd>{% if has_password %}Set{% else %}<span class="ta-muted">Not set — OTP only</span>{% endif %}</dd>
+          <dt>Bio</dt>
+          <dd>{% if profile.bio %}<span class="ta-bio">{{ profile.bio }}</span>{% else %}<span class="ta-muted">Not filled</span>{% endif %}</dd>
+        </dl>
+        {% if profile %}
+          <p class="ta-muted" style="margin: 12px 0 0;">
+            Profile updated {{ profile.updated_at|date:"Y-m-d H:i" }}
+            · <a href="{% url 'admin:user_management_profile_change' profile.pk %}">Open profile</a>
+          </p>
+        {% else %}
+          <p class="ta-muted" style="margin: 12px 0 0;">This user has not created a profile yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <div class="ta-stats">
+    {% for s in stats %}
+      <div class="ta-stat">
+        <div class="n">{{ s.value }}</div>
+        <div class="l">{{ s.label }}</div>
+        <div class="ta-muted">{{ s.hint }}</div>
+        <progress class="ta-bar" value="{{ s.pct }}" max="100"></progress>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="ta-grid">
+    <section class="ta-card">
+      <h2>Folders they created</h2>
+      {% if folders %}
+      <table>
+        <tr><th>Folder</th><th>Status</th><th>Subfolders</th><th>Processes</th><th>Created</th></tr>
+        {% for row in folders %}
+        <tr>
+          <td><a href="{{ row.admin_href }}">{{ row.name }}</a></td>
+          <td>{{ row.get_status_display }}</td>
+          <td>{{ row.subfolder_total }}</td>
+          <td>{{ row.process_total }}</td>
+          <td>{{ row.created_at|date:"Y-m-d" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">No folders yet.</p>{% endif %}
+    </section>
+
+    <section class="ta-card">
+      <h2>Processes they designed</h2>
+      {% if processes %}
+      <table>
+        <tr><th>Process</th><th>Folder</th><th>Steps</th><th>Created</th></tr>
+        {% for row in processes %}
+        <tr>
+          <td><a href="{{ row.admin_href }}">{{ row.name }}</a></td>
+          <td>{{ row.project }}</td>
+          <td>{{ row.step_total }}</td>
+          <td>{{ row.created_at|date:"Y-m-d" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">No processes yet.</p>{% endif %}
+    </section>
+
+    <section class="ta-card">
+      <h2>Subfolders</h2>
+      {% if subfolders %}
+      <table>
+        <tr><th>Subfolder</th><th>Parent folder</th><th>Status</th><th>Created</th></tr>
+        {% for row in subfolders %}
+        <tr>
+          <td><a href="{{ row.admin_href }}">{{ row.name }}</a></td>
+          <td>{{ row.parent }}</td>
+          <td>{{ row.get_status_display }}</td>
+          <td>{{ row.created_at|date:"Y-m-d" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">No subfolders.</p>{% endif %}
+    </section>
+
+    <section class="ta-card">
+      <h2>Folders shared with them</h2>
+      {% if shared %}
+      <table>
+        <tr><th>Folder</th><th>Role</th><th>Since</th></tr>
+        {% for row in shared %}
+        <tr>
+          <td><a href="{{ row.admin_href }}">{{ row.project }}</a></td>
+          <td>{{ row.get_role_display }}</td>
+          <td>{{ row.created_at|date:"Y-m-d" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">Nothing shared with this user.</p>{% endif %}
+    </section>
+
+    <section class="ta-card">
+      <h2>Work — companies &amp; teams</h2>
+      {% if companies or teams or company_seats or team_seats %}
+      <table>
+        <tr><th>Type</th><th>Name</th><th>Role / status</th></tr>
+        {% for row in companies %}
+        <tr><td>Owns company</td><td><a href="{{ row.admin_href }}">{{ row.name }}</a></td><td>{{ row.get_status_display }}</td></tr>
+        {% endfor %}
+        {% for row in company_seats %}
+        <tr><td>Company member</td><td><a href="{{ row.admin_href }}">{{ row.company }}</a></td><td>{{ row.get_role_display }}</td></tr>
+        {% endfor %}
+        {% for row in teams %}
+        <tr><td>Owns team</td><td><a href="{{ row.admin_href }}">{{ row.name }}</a></td><td>{{ row.company }}</td></tr>
+        {% endfor %}
+        {% for row in team_seats %}
+        <tr><td>Team member</td><td><a href="{{ row.admin_href }}">{{ row.team }}</a></td><td>{{ row.position_title|default:"—" }}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">No work companies or teams.</p>{% endif %}
+    </section>
+
+    <section class="ta-card">
+      <h2>Work — projects &amp; tasks</h2>
+      {% if work_projects or tasks_created or tasks_assigned %}
+      <table>
+        <tr><th>Kind</th><th>Title</th><th>Status</th></tr>
+        {% for row in work_projects %}
+        <tr><td>Owns project</td><td><a href="{{ row.admin_href }}">{{ row.name }}</a></td><td>{{ row.get_status_display }}</td></tr>
+        {% endfor %}
+        {% for row in tasks_created %}
+        <tr><td>Created task</td><td><a href="{{ row.admin_href }}">{{ row.title }}</a></td><td>{{ row.get_status_display }}</td></tr>
+        {% endfor %}
+        {% for row in tasks_assigned %}
+        <tr><td>Assigned task</td><td><a href="{{ row.admin_href }}">{{ row.title }}</a></td><td>{{ row.get_status_display }}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">No work projects or tasks.</p>{% endif %}
+    </section>
+
+    <section class="ta-card">
+      <h2>Support tickets</h2>
+      {% if tickets %}
+      <table>
+        <tr><th>Subject</th><th>Status</th><th>Priority</th><th>Opened</th></tr>
+        {% for row in tickets %}
+        <tr>
+          <td><a href="{{ row.admin_href }}">{{ row.subject }}</a></td>
+          <td>{{ row.get_status_display }}</td>
+          <td>{{ row.get_priority_display }}</td>
+          <td>{{ row.created_at|date:"Y-m-d" }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">No tickets.</p>{% endif %}
+    </section>
+
+    <section class="ta-card ta-wide">
+      <h2>Recent work activity</h2>
+      {% if activity %}
+      <table>
+        <tr><th>When</th><th>Action</th><th>What</th><th>Project / company</th><th>Note</th></tr>
+        {% for row in activity %}
+        <tr>
+          <td>{{ row.created_at|date:"Y-m-d H:i" }}</td>
+          <td>{{ row.get_action_display }}</td>
+          <td>{{ row.entity_type }} #{{ row.entity_id }}</td>
+          <td>{{ row.project|default:row.company|default:"—" }}</td>
+          <td>{{ row.description|truncatechars:80 }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">No activity log yet.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

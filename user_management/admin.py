@@ -1,5 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.db.models import Count, Q
+from django.shortcuts import get_object_or_404, render
+from django.urls import path, reverse
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from user_management.models import (
@@ -9,6 +13,7 @@ from user_management.models import (
     TicketMessage,
     TicketStatus,
 )
+from user_management.reports import build_user_activity
 
 
 class ProfileInline(admin.StackedInline):
@@ -22,18 +27,22 @@ class ProfileInline(admin.StackedInline):
 @admin.register(CustomUser)
 class CustomUserAdmin(BaseUserAdmin):
     model = CustomUser
+    change_form_template = "admin/user_management/customuser/change_form.html"
     list_display = (
         "id",
         "first_name",
         "last_name",
         "phone_number",
         "is_phone_verified",
-        "is_staff",
         "is_active",
+        "last_login",
+        "folder_count",
+        "process_count",
+        "activity_link",
     )
-    list_filter = ("is_phone_verified", "is_staff", "is_active")
+    list_filter = ("is_phone_verified", "is_staff", "is_active", "last_login", "date_joined")
     search_fields = ("phone_number", "first_name", "last_name")
-    ordering = ("id",)
+    ordering = ("-date_joined",)
     fieldsets = (
         (None, {"fields": ("phone_number", "password")}),
         (_("Personal info"), {"fields": ("first_name", "last_name")}),
@@ -67,6 +76,68 @@ class CustomUserAdmin(BaseUserAdmin):
         ),
     )
     inlines = [ProfileInline]
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                folder_count=Count(
+                    "owned_projects",
+                    filter=Q(
+                        owned_projects__parent__isnull=True,
+                        owned_projects__is_deleted=False,
+                    ),
+                    distinct=True,
+                ),
+                process_count=Count(
+                    "owned_processes",
+                    filter=Q(owned_processes__is_deleted=False),
+                    distinct=True,
+                ),
+            )
+        )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        extra = [
+            path(
+                "<int:user_id>/activity/",
+                self.admin_site.admin_view(self.activity_report_view),
+                name="user_activity_report",
+            ),
+        ]
+        return extra + urls
+
+    def activity_report_view(self, request, user_id):
+        user = get_object_or_404(
+            CustomUser.objects.select_related("profile"),
+            pk=user_id,
+        )
+        context = {
+            **self.admin_site.each_context(request),
+            **build_user_activity(user),
+            "opts": self.model._meta,
+            "has_view_permission": self.has_view_permission(request, user),
+        }
+        return render(
+            request,
+            "admin/user_management/customuser/activity_report.html",
+            context,
+        )
+
+    @admin.display(description=_("Folders"), ordering="folder_count")
+    def folder_count(self, obj):
+        return obj.folder_count
+
+    @admin.display(description=_("Processes"), ordering="process_count")
+    def process_count(self, obj):
+        return obj.process_count
+
+    @admin.display(description=_("Activity"))
+    def activity_link(self, obj):
+        url = reverse("admin:user_activity_report", args=[obj.pk])
+        return format_html('<a class="button" href="{}">{}</a>', url, _("Open report"))
 
 
 @admin.register(Profile)
