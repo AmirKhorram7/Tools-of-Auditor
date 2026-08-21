@@ -3,7 +3,6 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import BackButton from "@/components/BackButton";
 import {
   Alert,
   Avatar,
@@ -18,6 +17,7 @@ import {
   Select,
 } from "@/components/ui";
 import PhoneSuggest from "@/components/work/PhoneSuggest";
+import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch } from "@/lib/api";
 import type { WorkTeam, WorkTeamMember } from "@/lib/work";
@@ -132,22 +132,44 @@ export default function WorkTeamPage() {
     }
   };
 
+  const removeMember = async (member: WorkTeamMember) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch(`/work/teams/${teamId}/members/${member.id}/`, {
+        method: "PATCH",
+        body: { status: "inactive" },
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "حذف عضو ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <PageLoader />;
   if (!team) return <Alert>{error || "تیم پیدا نشد."}</Alert>;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      <WorkBreadcrumb
+        fallbackHref={`/work/companies/${team.company}`}
+        items={[
+          { href: "/work", label: "کار" },
+          {
+            href: `/work/companies/${team.company}`,
+            label: team.company_name || "شرکت",
+          },
+          { label: team.name },
+        ]}
+      />
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <BackButton fallbackHref={`/work/companies/${team.company}`} />
-          <div className="mt-3 rounded-2xl bg-navy-900 p-5 text-white">
-            <p className="text-[11px] font-semibold tracking-wide text-brand-400">تیم</p>
-            <h1 className="mt-1 text-2xl font-bold">{team.name}</h1>
-            <p className="mt-2 text-sm text-gray-300">
-              {team.company_name || "شرکت"} ·{" "}
-              {canManage ? "می‌توانید اعضا و نام تیم را ویرایش کنید." : "فقط مشاهده"}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-lg font-bold text-ink">{team.name}</h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {canManage ? "عضو اضافه یا حذف کنید." : "فقط مشاهده"}
+          </p>
         </div>
         {canManage && (
           <Button size="sm" onClick={() => { setFormError(null); setInviteOpen(true); }}>
@@ -227,18 +249,29 @@ export default function WorkTeamPage() {
                 </WorkTd>
                 {canManage && (
                   <WorkTd>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        setEditMember(member);
-                        setMemberTitle(member.position_title || "");
-                        setMemberStatus(member.status);
-                        setFormError(null);
-                      }}
-                    >
-                      ویرایش
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setEditMember(member);
+                          setMemberTitle(member.position_title || "");
+                          setMemberStatus(member.status);
+                          setFormError(null);
+                        }}
+                      >
+                        ویرایش
+                      </Button>
+                      {member.status === "active" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void removeMember(member)}
+                        >
+                          حذف
+                        </Button>
+                      )}
+                    </div>
                   </WorkTd>
                 )}
               </tr>

@@ -242,10 +242,10 @@ export default function WorkSidePanel() {
                   <Link
                     href={`/work/companies/${company.id}`}
                     className={cx(
-                      "block rounded-lg px-2.5 py-2 text-sm font-bold transition",
+                      "block truncate rounded-md px-2 py-1.5 text-xs font-medium transition",
                       pathname === `/work/companies/${company.id}`
-                        ? "bg-brand-500 text-ink"
-                        : "bg-navy-800 text-white hover:bg-navy-700",
+                        ? "bg-brand-500 font-bold text-ink"
+                        : "text-gray-200 hover:bg-navy-700 hover:text-white",
                     )}
                   >
                     {company.name}

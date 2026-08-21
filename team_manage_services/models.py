@@ -122,6 +122,35 @@ class CompanyMember(BaseModel):
         return f"{self.company} - {self.user}"
 
 
+class WorkLabel(BaseModel):
+    """Company-wide colored tag, same idea as a GitLab label."""
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="work_labels",
+    )
+    name = models.CharField(max_length=80)
+    color = models.CharField(
+        max_length=7,
+        default="#428BCA",
+        help_text=_("Hex color, e.g. #428BCA"),
+    )
+    description = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "name"],
+                name="tm_unique_label_name_in_company",
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class Team(BaseModel):
     class Status(models.TextChoices):
         ACTIVE = "active", _("Active")
@@ -392,6 +421,40 @@ class ProjectMember(BaseModel):
         return f"{self.project} - {self.user}"
 
 
+class BoardColumn(BaseModel):
+    """One list on a project board (To Do, Testing, Need Merge, …)."""
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="board_columns",
+    )
+    name = models.CharField(max_length=80)
+    color = models.CharField(max_length=7, default="#1F75CB")
+    position = models.PositiveIntegerField(default=0)
+    status_key = models.CharField(
+        max_length=20,
+        default="in_progress",
+        help_text=_("Kept in sync with Task.status so list view and progress still work."),
+    )
+    is_closed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "name"],
+                name="tm_unique_column_name_in_project",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["project", "position"], name="tm_col_project_pos"),
+        ]
+
+    def __str__(self):
+        return f"{self.project} / {self.name}"
+
+
 class Task(BaseModel):
     class Status(models.TextChoices):
         TODO = "todo", _("To Do")
@@ -448,6 +511,18 @@ class Task(BaseModel):
     start_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    column = models.ForeignKey(
+        BoardColumn,
+        on_delete=models.SET_NULL,
+        related_name="tasks",
+        null=True,
+        blank=True,
+    )
+    labels = models.ManyToManyField(
+        WorkLabel,
+        related_name="tasks",
+        blank=True,
+    )
 
     class Meta:
         ordering = ["due_date", "-created_at"]

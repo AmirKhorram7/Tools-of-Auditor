@@ -42,6 +42,7 @@ export type WorkInvitation = {
 export type WorkProject = {
   id: number;
   company: number;
+  company_name?: string;
   name: string;
   description: string;
   owner: number;
@@ -70,6 +71,30 @@ export type WorkTaskStatus =
   | "done"
   | "cancelled";
 
+export type WorkLabel = {
+  id: number;
+  company: number;
+  name: string;
+  color: string;
+  description?: string;
+};
+
+export type WorkBoardColumn = {
+  id: number;
+  project: number;
+  name: string;
+  color: string;
+  position: number;
+  status_key: WorkTaskStatus;
+  is_closed: boolean;
+  task_count?: number;
+  tasks?: WorkTask[];
+};
+
+export type WorkBoard = {
+  columns: WorkBoardColumn[];
+};
+
 export type WorkTask = {
   id: number;
   project: number;
@@ -79,11 +104,19 @@ export type WorkTask = {
   assigned_to: number | null;
   assignee_user_id: number | null;
   assignee_name: string | null;
+  assignee_avatar?: string | null;
   status: WorkTaskStatus;
+  column: number | null;
+  column_name?: string | null;
+  column_color?: string | null;
+  labels?: WorkLabel[];
   priority: number;
   difficulty: number;
+  start_date: string | null;
   due_date: string | null;
   progress_percent: number;
+  can_move?: boolean;
+  created_at?: string;
 };
 
 export type WorkTaskStep = {
@@ -317,4 +350,56 @@ export function notificationHref(item: {
   if (type === "invitation" && id) return "/work/inbox";
   if (item.project_id) return `/work/projects/${item.project_id}`;
   return "/work";
+}
+
+function parseHex(hex: string): [number, number, number] | null {
+  const raw = (hex || "").replace("#", "");
+  if (raw.length < 6) return null;
+  return [
+    parseInt(raw.slice(0, 2), 16),
+    parseInt(raw.slice(2, 4), 16),
+    parseInt(raw.slice(4, 6), 16),
+  ];
+}
+
+export function labelTextColor(hex: string): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return "#fff";
+  const luma = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+  return luma > 165 ? "#1f1f1f" : "#ffffff";
+}
+
+/** Soft wash of a hue — for column headers and label pills. */
+export function colorAlpha(hex: string, alpha: number): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return `rgba(31, 31, 31, ${alpha})`;
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+}
+
+export const LABEL_COLORS = [
+  "#7A3B55",
+  "#355F7A",
+  "#8A6E32",
+  "#7A3D3D",
+  "#3A6B52",
+  "#554A78",
+  "#3D5F7A",
+  "#A06540",
+];
+
+export function teamColor(id: number): string {
+  return LABEL_COLORS[Math.abs(id) % LABEL_COLORS.length];
+}
+
+export function shortFaDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const day = value.slice(0, 10);
+  try {
+    return new Date(`${day}T00:00:00`).toLocaleDateString("fa-IR", {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return day;
+  }
 }

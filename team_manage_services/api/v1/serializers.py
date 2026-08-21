@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from team_manage_services.models import (
     Attachment,
+    BoardColumn,
     Company,
     CompanyMember,
     Invitation,
@@ -13,8 +14,13 @@ from team_manage_services.models import (
     TaskStep,
     Team,
     TeamMember,
+    WorkLabel,
 )
-from team_manage_services.services.access import is_company_manager, is_project_manager
+from team_manage_services.services.access import (
+    can_move_task,
+    is_company_manager,
+    is_project_manager,
+)
 from team_manage_services.services.progress import (
     project_progress_percent,
     task_progress_percent,
@@ -189,15 +195,53 @@ class AddProjectTeamSerializer(serializers.Serializer):
     team_id = serializers.IntegerField()
 
 
+class WorkLabelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkLabel
+        fields = ["id", "company", "name", "color", "description", "created_at"]
+        read_only_fields = ["company", "created_at"]
+
+
+class BoardColumnSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BoardColumn
+        fields = [
+            "id",
+            "project",
+            "name",
+            "color",
+            "position",
+            "status_key",
+            "is_closed",
+        ]
+        read_only_fields = ["project", "position"]
+
+
+class BoardColumnWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=80, required=False)
+    color = serializers.CharField(max_length=7, required=False)
+    status_key = serializers.ChoiceField(
+        choices=Task.Status.choices,
+        required=False,
+    )
+    is_closed = serializers.BooleanField(required=False)
+
+
+class BoardColumnReorderSerializer(serializers.Serializer):
+    column_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+
+
 class ProjectSerializer(serializers.ModelSerializer):
     progress_percent = serializers.SerializerMethodField()
     can_manage = serializers.SerializerMethodField()
+    company_name = serializers.CharField(source="company.name", read_only=True)
 
     class Meta:
         model = Project
         fields = [
             "id",
             "company",
+            "company_name",
             "name",
             "description",
             "owner",
@@ -280,7 +324,19 @@ class TaskSerializer(serializers.ModelSerializer):
         source="assigned_to.user_id", read_only=True, allow_null=True
     )
     assignee_name = serializers.SerializerMethodField()
+    assignee_avatar = serializers.SerializerMethodField()
     project_name = serializers.CharField(source="project.name", read_only=True)
+    column_name = serializers.CharField(source="column.name", read_only=True, allow_null=True)
+    column_color = serializers.CharField(source="column.color", read_only=True, allow_null=True)
+    labels = WorkLabelSerializer(many=True, read_only=True)
+    label_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=WorkLabel.objects.all(),
+        required=False,
+        write_only=True,
+        source="labels",
+    )
+    can_move = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
@@ -293,14 +349,21 @@ class TaskSerializer(serializers.ModelSerializer):
             "assigned_to",
             "assignee_user_id",
             "assignee_name",
+            "assignee_avatar",
             "created_by",
             "status",
+            "column",
+            "column_name",
+            "column_color",
+            "labels",
+            "label_ids",
             "priority",
             "difficulty",
             "start_date",
             "due_date",
             "completed_at",
             "progress_percent",
+            "can_move",
             "created_at",
             "updated_at",
         ]
@@ -314,6 +377,24 @@ class TaskSerializer(serializers.ModelSerializer):
             return None
         user = obj.assigned_to.user
         return user.get_full_name().strip() or user.phone_number
+
+    def get_assignee_avatar(self, obj):
+        if not obj.assigned_to_id:
+            return None
+        profile = getattr(obj.assigned_to.user, "profile", None)
+        image = getattr(profile, "profile_image", None) if profile else None
+        if not image:
+            return None
+        try:
+            return image.url
+        except (AttributeError, ValueError):
+            return None
+
+    def get_can_move(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return can_move_task(request.user, obj)
 
 
 class TaskDetailSerializer(TaskSerializer):

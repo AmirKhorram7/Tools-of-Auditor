@@ -172,11 +172,13 @@ export function Modal({
   title,
   onClose,
   children,
+  className,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   const { t } = useI18n();
   if (!open) return null;
@@ -187,7 +189,12 @@ export function Modal({
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative z-10 w-full max-w-lg overflow-visible rounded-xl bg-white p-5 shadow-xl">
+      <div
+        className={cx(
+          "relative z-10 w-full overflow-visible rounded-xl bg-white p-5 shadow-xl",
+          className ?? "max-w-lg",
+        )}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
           <button

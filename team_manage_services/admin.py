@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from team_manage_services.models import (
     ActivityLog,
     Attachment,
+    BoardColumn,
     Company,
     CompanyMember,
     Invitation,
@@ -17,6 +18,7 @@ from team_manage_services.models import (
     TaskStep,
     Team,
     TeamMember,
+    WorkLabel,
 )
 
 
@@ -34,6 +36,12 @@ class CompanyMemberInline(admin.TabularInline):
     fields = ("user", "role", "status", "joined_at")
     readonly_fields = ("joined_at",)
     show_change_link = True
+
+
+class WorkLabelInline(admin.TabularInline):
+    model = WorkLabel
+    extra = 0
+    fields = ("name", "color", "description")
 
 
 class TeamInline(admin.TabularInline):
@@ -67,7 +75,7 @@ class CompanyAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ("parent", "owner")
     readonly_fields = ("created_at", "updated_at")
-    inlines = [TeamInline, CompanyMemberInline]
+    inlines = [TeamInline, CompanyMemberInline, WorkLabelInline]
     date_hierarchy = "created_at"
     list_select_related = ("parent", "owner")
 
@@ -297,6 +305,13 @@ class ProjectMemberInline(admin.TabularInline):
     show_change_link = True
 
 
+class BoardColumnInline(admin.TabularInline):
+    model = BoardColumn
+    extra = 0
+    fields = ("name", "color", "position", "status_key", "is_closed")
+    ordering = ("position",)
+
+
 class TaskInline(admin.TabularInline):
     model = Task
     extra = 0
@@ -332,7 +347,7 @@ class ProjectAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ("company", "owner")
     readonly_fields = ("created_at", "updated_at")
-    inlines = [ProjectTeamInline, ProjectMemberInline, TaskInline]
+    inlines = [BoardColumnInline, ProjectTeamInline, ProjectMemberInline, TaskInline]
     date_hierarchy = "created_at"
     list_select_related = ("company", "owner")
 
@@ -429,6 +444,7 @@ class TaskAdmin(admin.ModelAdmin):
         "project",
         "assignee_name",
         "status",
+        "column",
         "priority",
         "difficulty",
         "due_date",
@@ -452,7 +468,9 @@ class TaskAdmin(admin.ModelAdmin):
         "assigned_to",
         "created_by",
         "difficulty_set_by",
+        "column",
     )
+    filter_horizontal = ("labels",)
     readonly_fields = ("created_at", "updated_at", "completed_at")
     inlines = [TaskStepInline, TaskCommentInline]
     date_hierarchy = "due_date"
@@ -648,3 +666,20 @@ class ActivityLogAdmin(admin.ModelAdmin):
     def short_description(self, obj):
         text = (obj.description or "").strip().replace("\n", " ")
         return text[:80] + ("…" if len(text) > 80 else "")
+
+
+@admin.register(WorkLabel)
+class WorkLabelAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "color", "company", "created_at")
+    search_fields = ("name", "company__name")
+    list_filter = ("company",)
+    autocomplete_fields = ("company",)
+
+
+@admin.register(BoardColumn)
+class BoardColumnAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "project", "status_key", "position", "is_closed")
+    search_fields = ("name", "project__name")
+    list_filter = ("status_key", "is_closed")
+    autocomplete_fields = ("project",)
+    ordering = ("project", "position")

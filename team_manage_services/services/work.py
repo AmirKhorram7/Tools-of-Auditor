@@ -17,9 +17,16 @@ from team_manage_services.models import (
     TeamMember,
 )
 from team_manage_services.services.access import (
+    can_move_task,
     can_work_on_task,
     is_company_manager,
     is_project_manager,
+)
+from team_manage_services.services.board import (
+    apply_column_to_task,
+    column_for_status,
+    ensure_project_columns,
+    seed_project_columns,
 )
 from team_manage_services.services.notify import log_activity, notify_user
 
@@ -45,6 +52,7 @@ def create_project(*, user, company, **fields) -> Project:
     project.full_clean()
     project.save()
     _ensure_project_owner_member(project)
+    seed_project_columns(project)
     log_activity(
         actor=user,
         action=ActivityLog.Action.CREATED,
@@ -121,20 +129,33 @@ def add_project_member(*, user, project: Project, member_user, role=None) -> Pro
 
 
 @transaction.atomic
-def create_task(*, user, project: Project, **fields) -> Task:
+def create_task(*, user, project: Project, labels=None, **fields) -> Task:
     if not is_project_manager(user, project):
         raise PermissionDenied("Only a project manager can create a task.")
     assigned = fields.get("assigned_to")
     if assigned and assigned.project_id != project.id:
         raise ValidationError({"assigned_to": "Assignee must be a member of this project."})
+    column = fields.pop("column", None)
+    ensure_project_columns(project)
+    if column is None:
+        columns = list(project.board_columns.order_by("position", "id"))
+        column = column_for_status(project, fields.get("status") or Task.Status.TODO)
+        if column is None and columns:
+            column = columns[0]
+    elif column.project_id != project.id:
+        raise ValidationError({"column": "Column must belong to this project."})
     task = Task(
         project=project,
         created_by=user,
         difficulty_set_by=user,
+        column=column,
         **fields,
     )
+    apply_column_to_task(task, column)
     task.full_clean()
     task.save()
+    if labels:
+        _set_task_labels(task, labels)
     log_activity(
         actor=user,
         action=ActivityLog.Action.CREATED,
@@ -146,6 +167,14 @@ def create_task(*, user, project: Project, **fields) -> Task:
     )
     _notify_assignment(user, task)
     return task
+
+
+def _set_task_labels(task: Task, labels) -> None:
+    label_list = list(labels)
+    for label in label_list:
+        if label.company_id != task.project.company_id:
+            raise ValidationError({"labels": "Labels must belong to the same company."})
+    task.labels.set(label_list)
 
 
 def _notify_assignment(actor, task: Task):
@@ -183,17 +212,32 @@ def update_task(*, user, task: Task, **fields) -> Task:
     if not can_work_on_task(user, task):
         raise PermissionDenied("You cannot update this task.")
     fields.pop("project", None)
+    labels = fields.pop("labels", None)
+    moving = "status" in fields or "column" in fields
+    if moving and not can_move_task(user, task):
+        raise PermissionDenied("Only the assignee or a manager can move this task.")
     if not is_project_manager(user, task.project):
         if "difficulty" in fields and fields["difficulty"] != task.difficulty:
             raise PermissionDenied("Employees cannot change task difficulty.")
         fields.pop("difficulty", None)
         fields.pop("assigned_to", None)
         fields.pop("priority", None)
+        if labels is not None:
+            raise PermissionDenied("Only a manager can change labels.")
 
     old_assignee_id = task.assigned_to_id
     old_status = task.status
+    column = fields.pop("column", None)
     for key, value in fields.items():
         setattr(task, key, value)
+    if column is not None:
+        if column.project_id != task.project_id:
+            raise ValidationError({"column": "Column must belong to this project."})
+        apply_column_to_task(task, column)
+    elif "status" in fields:
+        matched = column_for_status(task.project, task.status)
+        if matched is not None:
+            apply_column_to_task(task, matched)
     if task.status == Task.Status.DONE and not task.completed_at:
         task.completed_at = timezone.now()
     if task.status != Task.Status.DONE:
@@ -202,6 +246,8 @@ def update_task(*, user, task: Task, **fields) -> Task:
         task.difficulty_set_by = user
     task.full_clean()
     task.save()
+    if labels is not None:
+        _set_task_labels(task, labels)
 
     if fields.get("assigned_to") and task.assigned_to_id != old_assignee_id:
         _notify_assignment(user, task)

@@ -14,6 +14,9 @@ from team_manage_services.api.v1.serializers import (
     AddProjectMemberSerializer,
     AddProjectTeamSerializer,
     AttachmentSerializer,
+    BoardColumnReorderSerializer,
+    BoardColumnSerializer,
+    BoardColumnWriteSerializer,
     CommentWriteSerializer,
     CompanyMemberSerializer,
     CompanySerializer,
@@ -30,8 +33,10 @@ from team_manage_services.api.v1.serializers import (
     TeamMemberSerializer,
     TeamMemberUpdateSerializer,
     TeamSerializer,
+    WorkLabelSerializer,
 )
 from team_manage_services.models import (
+    BoardColumn,
     Invitation,
     Notification,
     Task,
@@ -39,6 +44,7 @@ from team_manage_services.models import (
     TaskStep,
     Team,
     TeamMember,
+    WorkLabel,
 )
 from team_manage_services.repositories.employee_dashboard import employee_dashboard
 from team_manage_services.repositories.manager_dashboard import manager_dashboard
@@ -50,6 +56,15 @@ from team_manage_services.services.access import (
     is_company_manager,
     is_project_manager,
     projects_for_user,
+)
+from team_manage_services.services.board import (
+    create_column,
+    create_label,
+    delete_column,
+    ensure_project_columns,
+    reorder_columns,
+    update_column,
+    update_label,
 )
 from team_manage_services.services.errors import call_service
 from team_manage_services.services.org import (
@@ -148,6 +163,58 @@ class CompanyViewSet(viewsets.ModelViewSet):
         company = self.get_object()
         qs = company.members.select_related("user").order_by("role", "id")
         return Response(CompanyMemberSerializer(qs, many=True).data)
+
+    @extend_schema(
+        methods=["GET"],
+        operation_id="work_companies_labels_list",
+        summary="List company labels",
+        responses={200: WorkLabelSerializer(many=True)},
+    )
+    @extend_schema(
+        methods=["POST"],
+        operation_id="work_companies_labels_create",
+        summary="Create a colored label",
+        description="Company manager only. `{name, color, description?}`. Color is hex, e.g. `#C91C1C`.",
+        request=WorkLabelSerializer,
+        responses={201: WorkLabelSerializer},
+    )
+    @action(detail=True, methods=["get", "post"])
+    def labels(self, request, pk=None):
+        company = self.get_object()
+        if request.method == "GET":
+            qs = company.work_labels.order_by("name")
+            return Response(WorkLabelSerializer(qs, many=True).data)
+        serializer = WorkLabelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        label = call_service(
+            create_label,
+            user=request.user,
+            company=company,
+            name=serializer.validated_data["name"],
+            color=serializer.validated_data.get("color", "#428BCA"),
+            description=serializer.validated_data.get("description", ""),
+        )
+        return Response(WorkLabelSerializer(label).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="Update a company label",
+        request=WorkLabelSerializer,
+        responses={200: WorkLabelSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"labels/(?P<label_id>[^/.]+)",
+    )
+    def update_label_action(self, request, pk=None, label_id=None):
+        company = self.get_object()
+        label = WorkLabel.objects.filter(pk=label_id, company=company).first()
+        if label is None:
+            raise ValidationError({"label_id": "Label not found."})
+        serializer = WorkLabelSerializer(label, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        label = call_service(update_label, user=request.user, label=label, **serializer.validated_data)
+        return Response(WorkLabelSerializer(label).data)
 
 
 @extend_schema(tags=["Work Teams"])
@@ -424,6 +491,137 @@ class ProjectViewSet(viewsets.ModelViewSet):
         qs = project.members.select_related("user")
         return Response(ProjectMemberSerializer(qs, many=True).data)
 
+    @extend_schema(
+        summary="List teams linked to this project",
+        responses={200: TeamSerializer(many=True)},
+    )
+    @action(detail=True, methods=["get"], url_path="teams")
+    def linked_teams(self, request, pk=None):
+        project = self.get_object()
+        qs = (
+            Team.objects.filter(project_links__project=project)
+            .select_related("company", "owner")
+            .distinct()
+        )
+        return Response(TeamSerializer(qs, many=True, context={"request": request}).data)
+
+    @extend_schema(
+        summary="Project board (columns + cards)",
+        description="GitLab-style lists for this project. Existing projects get default columns on first open.",
+    )
+    @action(detail=True, methods=["get"])
+    def board(self, request, pk=None):
+        project = self.get_object()
+        columns = ensure_project_columns(project)
+        tasks = (
+            Task.objects.filter(project=project)
+            .exclude(status=Task.Status.CANCELLED)
+            .select_related(
+                "project",
+                "assigned_to",
+                "assigned_to__user",
+                "assigned_to__user__profile",
+                "column",
+                "created_by",
+            )
+            .prefetch_related("labels", "steps")
+            .order_by("due_date", "-created_at")
+        )
+        serialized = TaskSerializer(tasks, many=True, context={"request": request}).data
+        grouped = {}
+        for row, task in zip(serialized, tasks):
+            grouped.setdefault(task.column_id, []).append(row)
+        payload = []
+        for column in columns:
+            cards = grouped.get(column.id, [])
+            payload.append(
+                {
+                    **BoardColumnSerializer(column).data,
+                    "task_count": len(cards),
+                    "tasks": cards,
+                }
+            )
+        return Response({"columns": payload})
+
+    @extend_schema(
+        methods=["GET"],
+        operation_id="work_projects_columns_list",
+        summary="List board columns",
+        responses={200: BoardColumnSerializer(many=True)},
+    )
+    @extend_schema(
+        methods=["POST"],
+        operation_id="work_projects_columns_create",
+        summary="Add a board column",
+        request=BoardColumnWriteSerializer,
+        responses={201: BoardColumnSerializer},
+    )
+    @action(detail=True, methods=["get", "post"])
+    def columns(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "GET":
+            columns = ensure_project_columns(project)
+            return Response(BoardColumnSerializer(columns, many=True).data)
+        serializer = BoardColumnWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        column = call_service(
+            create_column,
+            user=request.user,
+            project=project,
+            **serializer.validated_data,
+        )
+        return Response(BoardColumnSerializer(column).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        methods=["PATCH"],
+        operation_id="work_projects_columns_update",
+        summary="Rename / recolor a board column",
+        request=BoardColumnWriteSerializer,
+        responses={200: BoardColumnSerializer},
+    )
+    @extend_schema(
+        methods=["DELETE"],
+        operation_id="work_projects_columns_delete",
+        summary="Delete a board column (tasks move to the first remaining list)",
+    )
+    @action(
+        detail=True,
+        methods=["patch", "delete"],
+        url_path=r"columns/(?P<column_id>[^/.]+)",
+    )
+    def update_column_action(self, request, pk=None, column_id=None):
+        project = self.get_object()
+        column = BoardColumn.objects.filter(pk=column_id, project=project).first()
+        if column is None:
+            raise ValidationError({"column_id": "Column not found."})
+        if request.method == "DELETE":
+            call_service(delete_column, user=request.user, column=column)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        serializer = BoardColumnWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        column = call_service(
+            update_column, user=request.user, column=column, **serializer.validated_data
+        )
+        return Response(BoardColumnSerializer(column).data)
+
+    @extend_schema(
+        summary="Reorder board columns",
+        request=BoardColumnReorderSerializer,
+        responses={200: BoardColumnSerializer(many=True)},
+    )
+    @action(detail=True, methods=["post"], url_path="reorder-columns")
+    def reorder_columns_action(self, request, pk=None):
+        project = self.get_object()
+        serializer = BoardColumnReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        columns = call_service(
+            reorder_columns,
+            user=request.user,
+            project=project,
+            column_ids=serializer.validated_data["column_ids"],
+        )
+        return Response(BoardColumnSerializer(columns, many=True).data)
+
 
 @extend_schema(tags=["Work Tasks"])
 @extend_schema_view(
@@ -475,9 +673,11 @@ class TaskViewSet(viewsets.ModelViewSet):
                 "project",
                 "assigned_to",
                 "assigned_to__user",
+                "assigned_to__user__profile",
+                "column",
                 "created_by",
             )
-            .prefetch_related("steps")
+            .prefetch_related("steps", "labels")
         )
         if self.action == "retrieve":
             qs = qs.prefetch_related("comments__author", "comments__attachments")

@@ -4,12 +4,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import BackButton from "@/components/BackButton";
 import {
   Alert,
   Badge,
   Button,
-  Card,
   EmptyState,
   Field,
   Input,
@@ -20,12 +18,15 @@ import {
 } from "@/components/ui";
 import JalaliDateField from "@/components/work/JalaliDateField";
 import ProgressBar from "@/components/work/ProgressBar";
+import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
   PRIORITY_LABELS,
   PROJECT_STATUS_LABELS,
   formatFaDate,
+  labelTextColor,
+  teamColor,
   type WorkCompany,
   type WorkProject,
   type WorkTeam,
@@ -133,17 +134,17 @@ export default function WorkCompanyPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <BackButton fallbackHref="/work" />
-          <div className="mt-3 rounded-2xl bg-navy-900 p-5 text-white">
-            <p className="text-[11px] font-semibold tracking-wide text-brand-400">شرکت</p>
-            <h1 className="mt-1 text-2xl font-bold">{company.name}</h1>
-            <p className="mt-2 text-sm text-gray-300">
-              ۱) تیم بسازید ۲) همکار دعوت کنید ۳) پروژه و کار تعریف کنید.
-            </p>
-          </div>
+          <WorkBreadcrumb
+            fallbackHref="/work"
+            items={[
+              { href: "/work", label: "کار" },
+              { label: company.name },
+            ]}
+          />
+          <h1 className="mt-2 text-xl font-bold text-ink">{company.name}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => { setFormError(null); setTeamOpen(true); }}>
@@ -157,8 +158,8 @@ export default function WorkCompanyPage() {
 
       {error && <Alert>{error}</Alert>}
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink">تیم‌ها</h2>
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-ink">تیم‌ها</h2>
         {teams.length === 0 ? (
           <EmptyState
             title="هنوز تیمی نیست"
@@ -170,18 +171,18 @@ export default function WorkCompanyPage() {
             }
           />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-wrap gap-2">
             {teams.map((team) => (
-              <Link key={team.id} href={`/work/teams/${team.id}`}>
-                <Card className="transition hover:border-brand-500 hover:shadow-md">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-lg font-bold text-navy-900">{team.name}</p>
-                    <Badge>{team.status === "active" ? "فعال" : "بایگانی"}</Badge>
-                  </div>
-                  <p className="mt-3 text-xs text-gray-500">
-                    {team.can_manage ? "مشاهده و ویرایش تیم ←" : "مشاهده اعضای تیم ←"}
-                  </p>
-                </Card>
+              <Link
+                key={team.id}
+                href={`/work/teams/${team.id}`}
+                className="rounded-lg px-3 py-1.5 text-sm font-bold shadow-sm"
+                style={{
+                  backgroundColor: teamColor(team.id),
+                  color: labelTextColor(teamColor(team.id)),
+                }}
+              >
+                {team.name}
               </Link>
             ))}
           </div>
@@ -209,7 +210,7 @@ export default function WorkCompanyPage() {
                     href={`/work/projects/${project.id}`}
                     className="font-bold text-navy-900 hover:text-link"
                   >
-                    {project.name}
+                    {project.name} — بورد
                   </Link>
                 </WorkTd>
                 <WorkTd>

@@ -120,6 +120,9 @@ class WorkAPISmokeTests(APITestCase):
             format="json",
         )
         self.assertEqual(add_team.status_code, status.HTTP_200_OK, add_team.data)
+        linked_teams = self.manager_client.get(f"{WORK}/projects/{project_id}/teams/")
+        self.assertEqual(linked_teams.status_code, status.HTTP_200_OK, linked_teams.data)
+        self.assertTrue(any(row["id"] == team_id for row in linked_teams.data))
         member_rows = add_team.data
         employee_pm = next(
             row for row in member_rows if row["user"] == self.employee.id
@@ -179,6 +182,46 @@ class WorkAPISmokeTests(APITestCase):
         self.assertEqual(patch_status.status_code, status.HTTP_200_OK, patch_status.data)
         self.assertEqual(patch_status.data["status"], "in_progress")
         self.assertEqual(patch_status.data["difficulty"], 3)
+        self.assertTrue(patch_status.data.get("can_move"))
+        self.assertIsNotNone(patch_status.data.get("column"))
+
+        board = self.manager_client.get(f"{WORK}/projects/{project_id}/board/")
+        self.assertEqual(board.status_code, status.HTTP_200_OK, board.data)
+        self.assertGreaterEqual(len(board.data["columns"]), 4)
+
+        outsider = User.objects.create_user(
+            phone_number="09120000003",
+            password="pass-other",
+            first_name="دیگر",
+            last_name="کاربر",
+            is_phone_verified=True,
+        )
+        outsider_client = self._client_for(outsider)
+        self.manager_client.post(
+            f"{WORK}/projects/{project_id}/members/",
+            {"user_id": outsider.id, "role": "member"},
+            format="json",
+        )
+        blocked_move = outsider_client.patch(
+            f"{WORK}/tasks/{task_id}/",
+            {"status": "done"},
+            format="json",
+        )
+        self.assertEqual(blocked_move.status_code, status.HTTP_403_FORBIDDEN)
+
+        label_res = self.manager_client.post(
+            f"{WORK}/companies/{company_id}/labels/",
+            {"name": "فورس‌ماژور", "color": "#1AAA55"},
+            format="json",
+        )
+        self.assertEqual(label_res.status_code, status.HTTP_201_CREATED, label_res.data)
+        patch_label = self.manager_client.patch(
+            f"{WORK}/tasks/{task_id}/",
+            {"label_ids": [label_res.data["id"]]},
+            format="json",
+        )
+        self.assertEqual(patch_label.status_code, status.HTTP_200_OK, patch_label.data)
+        self.assertEqual(len(patch_label.data["labels"]), 1)
 
         dash = self.manager_client.get(f"{WORK}/dashboard/?company={company_id}")
         self.assertEqual(dash.status_code, status.HTTP_200_OK, dash.data)

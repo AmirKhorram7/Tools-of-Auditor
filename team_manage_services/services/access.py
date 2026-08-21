@@ -107,3 +107,10 @@ def can_work_on_task(user, task) -> bool:
         user=user,
         status=ProjectMember.Status.ACTIVE,
     ).exists()
+
+
+def can_move_task(user, task) -> bool:
+    """Only the assignee and a project/company manager can change column/status."""
+    if is_project_manager(user, task.project):
+        return True
+    return bool(task.assigned_to_id and task.assigned_to.user_id == user.id)

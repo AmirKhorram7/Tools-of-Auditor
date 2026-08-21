@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import BackButton from "@/components/BackButton";
 import {
   Alert,
   Badge,
@@ -17,20 +16,21 @@ import {
   Textarea,
 } from "@/components/ui";
 import DoneCheck from "@/components/work/DoneCheck";
+import JalaliDateField from "@/components/work/JalaliDateField";
 import ProgressBar from "@/components/work/ProgressBar";
+import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { ApiError, apiFetch } from "@/lib/api";
 import {
   PRIORITY_LABELS,
   TASK_STATUS_LABELS,
-  TASK_STATUSES,
+  colorAlpha,
   formatFaDate,
   isOverdue,
-  priorityTone,
-  taskStatusTone,
+  type WorkBoardColumn,
+  type WorkLabel,
   type WorkProject,
   type WorkProjectMember,
   type WorkTaskDetail,
-  type WorkTaskStatus,
 } from "@/lib/work";
 
 export default function WorkTaskPage() {
@@ -40,14 +40,22 @@ export default function WorkTaskPage() {
   const [task, setTask] = useState<WorkTaskDetail | null>(null);
   const [project, setProject] = useState<WorkProject | null>(null);
   const [members, setMembers] = useState<WorkProjectMember[]>([]);
+  const [columns, setColumns] = useState<WorkBoardColumn[]>([]);
+  const [labels, setLabels] = useState<WorkLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [stepTitle, setStepTitle] = useState("");
   const [comment, setComment] = useState("");
-  const [status, setStatus] = useState<WorkTaskStatus>("todo");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [due, setDue] = useState("");
+  const [columnId, setColumnId] = useState("");
   const [assignee, setAssignee] = useState("");
+  const [priority, setPriority] = useState("2");
   const [difficulty, setDifficulty] = useState("3");
+  const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(taskId)) return;
@@ -56,15 +64,27 @@ export default function WorkTaskPage() {
     try {
       const row = await apiFetch<WorkTaskDetail>(`/work/tasks/${taskId}/`);
       setTask(row);
-      setStatus(row.status);
+      setTitle(row.title);
+      setDescription(row.description || "");
+      setStartDate(row.start_date || "");
+      setDue(row.due_date || "");
+      setColumnId(row.column ? String(row.column) : "");
       setAssignee(row.assigned_to ? String(row.assigned_to) : "");
+      setPriority(String(row.priority || 2));
       setDifficulty(String(row.difficulty || 3));
-      const [projectRow, memberRows] = await Promise.all([
+      setSelectedLabels((row.labels || []).map((label) => label.id));
+      const [projectRow, memberRows, columnRows] = await Promise.all([
         apiFetch<WorkProject>(`/work/projects/${row.project}/`),
         apiFetch<WorkProjectMember[]>(`/work/projects/${row.project}/members/`),
+        apiFetch<WorkBoardColumn[]>(`/work/projects/${row.project}/columns/`),
       ]);
       setProject(projectRow);
       setMembers(Array.isArray(memberRows) ? memberRows : []);
+      setColumns(Array.isArray(columnRows) ? columnRows : []);
+      const labelRows = await apiFetch<WorkLabel[]>(
+        `/work/companies/${projectRow.company}/labels/`,
+      );
+      setLabels(Array.isArray(labelRows) ? labelRows : []);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "بارگذاری کار ناموفق بود.");
     } finally {
@@ -94,6 +114,27 @@ export default function WorkTaskPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveDetails = async () => {
+    if (!title.trim()) {
+      setError("عنوان کار الزامی است.");
+      return;
+    }
+    const body: Record<string, unknown> = {
+      title: title.trim(),
+      description: description.trim(),
+      start_date: startDate || null,
+      due_date: due || null,
+    };
+    if (canMove) body.column = columnId ? Number(columnId) : null;
+    if (canManage) {
+      body.assigned_to = assignee ? Number(assignee) : null;
+      body.priority = Number(priority);
+      body.difficulty = Number(difficulty);
+      body.label_ids = selectedLabels;
+    }
+    await patchTask(body);
   };
 
   const toggleStep = async (stepId: number, done: boolean) => {
@@ -149,97 +190,83 @@ export default function WorkTaskPage() {
 
   const overdue = isOverdue(task.due_date, task.status);
   const canManage = Boolean(project?.can_manage);
+  const canMove = Boolean(task.can_move);
 
   return (
-    <div className="space-y-5">
-      <div>
-        <BackButton fallbackHref={`/work/projects/${task.project}`} />
-        <p className="mt-3 text-xs text-gray-500">
-          <Link href={`/work/projects/${task.project}`} className="text-link">
-            {task.project_name}
-          </Link>
-        </p>
-        <div className="mt-3 flex items-start gap-3">
-          <DoneCheck
-            done={task.status === "done"}
-            busy={saving}
-            onToggle={(done) => {
-              const next = done ? "done" : "todo";
-              setStatus(next);
-              patchTask({ status: next });
-            }}
-          />
-          <div className="min-w-0 flex-1">
-            <h1
-              className={`text-lg font-bold ${
-                task.status === "done" ? "text-gray-400 line-through" : "text-ink"
-              }`}
-            >
-              {task.title}
-            </h1>
-            <p className="mt-1 text-xs text-gray-500">
-              تیک بزنید تا کار تمام شود.
-            </p>
+    <div className="space-y-4">
+      <WorkBreadcrumb
+        fallbackHref={`/work/projects/${task.project}`}
+        items={[
+          { href: "/work", label: "کار" },
+          {
+            href: `/work/companies/${project?.company || ""}`,
+            label: project?.company_name || "شرکت",
+          },
+          { href: `/work/projects/${task.project}`, label: task.project_name },
+          { label: task.title },
+        ]}
+      />
+
+      <div className="flex items-start gap-3">
+        <DoneCheck
+          done={task.status === "done"}
+          busy={saving}
+          onToggle={(done) => {
+            if (!canMove) return;
+            patchTask({ status: done ? "done" : "todo" });
+          }}
+        />
+        <div className="min-w-0 flex-1">
+          <h1
+            className={`text-lg font-bold ${
+              task.status === "done" ? "text-gray-400 line-through" : "text-ink"
+            }`}
+          >
+            {task.title}
+          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <span>{TASK_STATUS_LABELS[task.status]}</span>
+            <span>#{task.id}</span>
+            {overdue && <Badge tone="red">گذشته</Badge>}
+            <span className="flex items-center gap-2">
+              <ProgressBar value={task.progress_percent} className="w-20" />
+              {task.progress_percent}٪
+            </span>
           </div>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Badge tone={taskStatusTone(task.status)}>
-            {TASK_STATUS_LABELS[task.status]}
-          </Badge>
-          <Badge tone={priorityTone(task.priority)}>
-            اولویت {PRIORITY_LABELS[task.priority] || task.priority}
-          </Badge>
-          <Badge tone={overdue ? "red" : "gray"}>
-            {overdue ? "گذشته · " : ""}
-            {formatFaDate(task.due_date)}
-          </Badge>
         </div>
       </div>
 
       {error && <Alert>{error}</Alert>}
 
-      {task.description && (
-        <Card>
-          <p className="whitespace-pre-wrap text-sm text-gray-700">{task.description}</p>
-        </Card>
-      )}
-
-      <Card>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">پیشرفت</span>
-          <span className="font-medium text-ink">{task.progress_percent}٪</span>
-        </div>
-        <ProgressBar value={task.progress_percent} className="mt-2" />
-      </Card>
-
       <Card className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink">وضعیت و مسئول</h2>
+        <h2 className="text-sm font-semibold text-ink">جزئیات کار</h2>
+        <Field label="عنوان">
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={!canManage}
+          />
+        </Field>
+        <Field label="توضیح">
+          <Textarea
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={!canManage && !canMove}
+          />
+        </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="وضعیت">
-            <Select
-              value={status}
-              onChange={(e) => {
-                const next = e.target.value as WorkTaskStatus;
-                setStatus(next);
-                patchTask({ status: next });
-              }}
-            >
-              {TASK_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {TASK_STATUS_LABELS[value]}
-                </option>
-              ))}
-            </Select>
+          <Field label="شروع کار">
+            <JalaliDateField value={startDate} onChange={setStartDate} />
+          </Field>
+          <Field label="سررسید">
+            <JalaliDateField value={due} onChange={setDue} />
           </Field>
           <Field label="مسئول">
             <Select
               value={assignee}
               disabled={!canManage}
-              onChange={(e) => {
-                const next = e.target.value;
-                setAssignee(next);
-                patchTask({ assigned_to: next ? Number(next) : null });
-              }}
+              onChange={(e) => setAssignee(e.target.value)}
             >
               <option value="">بدون مسئول</option>
               {members.map((member) => (
@@ -249,16 +276,35 @@ export default function WorkTaskPage() {
               ))}
             </Select>
           </Field>
+          <Field label="ستون بورد">
+            <Select
+              value={columnId}
+              disabled={!canMove}
+              onChange={(e) => setColumnId(e.target.value)}
+            >
+              {columns.map((column) => (
+                <option key={column.id} value={column.id}>
+                  {column.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="اولویت">
+            <Select
+              value={priority}
+              disabled={!canManage}
+              onChange={(e) => setPriority(e.target.value)}
+            >
+              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
           {canManage && (
-            <Field label="سختی (فقط مدیر)">
-              <Select
-                value={difficulty}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setDifficulty(next);
-                  patchTask({ difficulty: Number(next) });
-                }}
-              >
+            <Field label="سختی">
+              <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
                 {[1, 2, 3, 4, 5].map((value) => (
                   <option key={value} value={value}>
                     {value}
@@ -268,15 +314,63 @@ export default function WorkTaskPage() {
             </Field>
           )}
         </div>
-        {saving && <p className="text-xs text-gray-500">در حال ذخیره...</p>}
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-ink">برچسب‌ها</p>
+          {labels.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              برچسب را از تنظیمات پروژه بسازید.
+              {project && (
+                <>
+                  {" "}
+                  <Link href={`/work/projects/${project.id}`} className="text-link">
+                    بازگشت به بورد
+                  </Link>
+                </>
+              )}
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {labels.map((label) => {
+                const active = selectedLabels.includes(label.id);
+                return (
+                  <button
+                    key={label.id}
+                    type="button"
+                    disabled={!canManage}
+                    onClick={() =>
+                      setSelectedLabels((current) =>
+                        active ? current.filter((id) => id !== label.id) : [...current, label.id],
+                      )
+                    }
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium disabled:opacity-60 ${
+                      active ? "ring-2 ring-navy-900/40" : "opacity-70"
+                    }`}
+                    style={{
+                      backgroundColor: colorAlpha(label.color, 0.14),
+                      color: label.color,
+                    }}
+                  >
+                    {label.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" loading={saving} onClick={() => void saveDetails()}>
+            ذخیره
+          </Button>
+        </div>
+        {!canMove && (
+          <p className="text-xs text-gray-500">فقط مسئول این کار و مدیر می‌توانند ستون را عوض کنند.</p>
+        )}
       </Card>
 
       <Card>
         <h2 className="mb-3 text-sm font-semibold text-ink">گام‌ها</h2>
         {(task.steps || []).length === 0 ? (
-          <p className="mb-3 text-sm text-gray-500">
-            بدون گام، پیشرفت صفر است تا وضعیت «تمام» شود.
-          </p>
+          <p className="mb-3 text-sm text-gray-500">بدون گام هم می‌توانید کار را جلو ببرید.</p>
         ) : (
           <ul className="mb-3 space-y-2">
             {task.steps.map((step) => (

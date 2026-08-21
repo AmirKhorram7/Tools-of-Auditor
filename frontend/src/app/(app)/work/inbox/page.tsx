@@ -11,6 +11,7 @@ import {
   EmptyState,
   PageLoader,
 } from "@/components/ui";
+import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
   INVITE_STATUS_LABELS,
@@ -101,12 +102,10 @@ export default function WorkInboxPage() {
   const unread = notes.filter((row) => !row.is_read).length;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      <WorkBreadcrumb fallbackHref="/work" items={[{ href: "/work", label: "کار" }, { label: "اعلان‌ها" }]} />
       <div>
-        <h1 className="text-xl font-bold text-ink">اعلان‌ها و فعالیت</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          دعوت، اعلان و سابقه کار در یک صفحه.
-        </p>
+        <h1 className="text-lg font-bold text-ink">اعلان‌ها و فعالیت</h1>
       </div>
 
       {error && <Alert>{error}</Alert>}
