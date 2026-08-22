@@ -7,7 +7,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from ta_code.views import health
 
 urlpatterns = [
-    path("amir/", admin.site.urls),
+    path("amirkhorram7/", admin.site.urls),
     path("healthz/", health, name="health"),
     path("api/v1/", include("user_management.api.v1.urls")),
     path("api/v1/", include("system_explanation_services.api.v1.urls")),
