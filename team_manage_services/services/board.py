@@ -4,10 +4,10 @@ from team_manage_services.models import BoardColumn, Project, Task, WorkLabel
 from team_manage_services.services.access import is_company_manager, is_project_manager
 
 DEFAULT_BOARD_COLUMNS = (
-    {"name": "برای انجام", "color": "#7A3B55", "status_key": Task.Status.TODO, "is_closed": False},
+    {"name": "برای انجام", "color": "#14233A", "status_key": Task.Status.TODO, "is_closed": False},
     {
         "name": "در حال انجام",
-        "color": "#355F7A",
+        "color": "#1A2B49",
         "status_key": Task.Status.IN_PROGRESS,
         "is_closed": False,
     },
@@ -64,7 +64,7 @@ def apply_column_to_task(task: Task, column: BoardColumn | None) -> None:
         task.status = column.status_key
 
 
-def create_column(*, user, project: Project, name="", color="#355F7A", status_key="", is_closed=False):
+def create_column(*, user, project: Project, name="", color="#1A2B49", status_key="", is_closed=False):
     from rest_framework.exceptions import PermissionDenied, ValidationError
 
     if not is_project_manager(user, project):
@@ -76,7 +76,7 @@ def create_column(*, user, project: Project, name="", color="#355F7A", status_ke
     column = BoardColumn(
         project=project,
         name=name,
-        color=(color or "#355F7A").strip(),
+        color=(color or "#1A2B49").strip(),
         status_key=status_key or Task.Status.IN_PROGRESS,
         is_closed=bool(is_closed or status_key == Task.Status.DONE),
         position=(last.position + 1) if last else 0,

@@ -55,7 +55,7 @@ export default function TaskCard({
         onDragStart?.();
       }}
       className={cx(
-        "block min-h-[118px] rounded-xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_1px_rgba(26,43,73,0.04)] transition hover:border-navy-300/60 hover:shadow-[0_6px_18px_rgba(26,43,73,0.08)]",
+        "block min-h-[88px] rounded-xl border border-black/[0.06] bg-white p-3 shadow-[0_1px_1px_rgba(26,43,73,0.04)] transition hover:border-navy-300/60 hover:shadow-[0_6px_18px_rgba(26,43,73,0.08)]",
         draggable && "cursor-grab active:cursor-grabbing",
       )}
     >

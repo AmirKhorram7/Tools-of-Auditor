@@ -8,7 +8,6 @@ import {
   Avatar,
   Badge,
   Button,
-  Card,
   EmptyState,
   Field,
   Input,
@@ -20,7 +19,7 @@ import PhoneSuggest from "@/components/work/PhoneSuggest";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch } from "@/lib/api";
-import type { WorkTeam, WorkTeamMember } from "@/lib/work";
+import { labelTextColor, teamColor, type WorkTeam, type WorkTeamMember } from "@/lib/work";
 
 export default function WorkTeamPage() {
   const params = useParams<{ id: string }>();
@@ -164,46 +163,76 @@ export default function WorkTeamPage() {
           { label: team.name },
         ]}
       />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-ink">{team.name}</h1>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {canManage ? "عضو اضافه یا حذف کنید." : "فقط مشاهده"}
-          </p>
-        </div>
-        {canManage && (
-          <Button size="sm" onClick={() => { setFormError(null); setInviteOpen(true); }}>
-            دعوت همکار
-          </Button>
-        )}
-      </div>
-
       {error && <Alert>{error}</Alert>}
 
-      {canManage ? (
-        <Card className="space-y-3">
-          <h2 className="text-sm font-semibold text-ink">ویرایش تیم</h2>
-          {formError && !inviteOpen && !editMember && <Alert>{formError}</Alert>}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="نام تیم">
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <Field label="وضعیت">
-              <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="active">فعال</option>
-                <option value="archived">بایگانی</option>
-              </Select>
-            </Field>
+      <div className="overflow-hidden rounded-xl border border-black/[0.06] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className="flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+              style={{
+                backgroundColor: teamColor(team.id),
+                color: labelTextColor(teamColor(team.id)),
+              }}
+            >
+              {team.name.slice(0, 1)}
+            </span>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold text-ink">{team.name}</h1>
+              <p className="mt-0.5 text-[11px] text-gray-500">
+                {team.company_name || "شرکت"} · {members.length} عضو
+              </p>
+            </div>
+            <Badge tone={team.status === "active" ? "green" : "gray"}>
+              {team.status === "active" ? "فعال" : "بایگانی"}
+            </Badge>
           </div>
-          <div className="flex justify-end">
-            <Button size="sm" loading={saving} onClick={saveTeam}>
-              ذخیره تیم
+          {canManage && (
+            <Button size="sm" onClick={() => { setFormError(null); setInviteOpen(true); }}>
+              دعوت همکار
             </Button>
+          )}
+        </div>
+        {canManage ? (
+          <div className="border-t border-black/[0.05] bg-[#F7F8FA] px-3 py-2.5">
+            {formError && !inviteOpen && !editMember && <Alert>{formError}</Alert>}
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[220px] flex-1">
+                <Field label="نام تیم">
+                  <Input value={name} onChange={(e) => setName(e.target.value)} />
+                </Field>
+              </div>
+              <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setStatus("active")}
+                  className={`rounded-md px-2.5 py-1.5 ${
+                    status === "active" ? "bg-navy-900 text-white" : "text-gray-600"
+                  }`}
+                >
+                  فعال
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatus("archived")}
+                  className={`rounded-md px-2.5 py-1.5 ${
+                    status === "archived" ? "bg-navy-900 text-white" : "text-gray-600"
+                  }`}
+                >
+                  بایگانی
+                </button>
+              </div>
+              <Button size="sm" loading={saving} onClick={saveTeam}>
+                ذخیره
+              </Button>
+            </div>
           </div>
-        </Card>
-      ) : (
-        <p className="text-sm text-gray-500">اعضای تیم را می‌بینید؛ تغییر فقط با مدیر است.</p>
-      )}
+        ) : (
+          <p className="border-t border-black/[0.05] px-3 py-2 text-xs text-gray-500">
+            اعضای تیم را می‌بینید؛ تغییر فقط با مدیر است.
+          </p>
+        )}
+      </div>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-ink">اعضای تیم</h2>

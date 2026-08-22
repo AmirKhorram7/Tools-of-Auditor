@@ -190,7 +190,14 @@ export type WorkDashboard = {
         unassigned_count: number;
       }
     >;
-    at_risk: WorkProject[];
+    at_risk: Array<
+      WorkProject & {
+        overdue_count?: number;
+        blocked_count?: number;
+        due_soon_count?: number;
+        unassigned_count?: number;
+      }
+    >;
     unassigned_count: number;
     workload: Array<{ user_id: number; name: string; open_tasks: number }>;
     pending_invites: number;
@@ -377,15 +384,27 @@ export function colorAlpha(hex: string, alpha: number): string {
 }
 
 export const LABEL_COLORS = [
-  "#7A3B55",
-  "#355F7A",
-  "#8A6E32",
-  "#7A3D3D",
-  "#3A6B52",
-  "#554A78",
-  "#3D5F7A",
-  "#A06540",
+  "#14233A",
+  "#1A2B49",
+  "#243656",
+  "#1B3A4A",
+  "#2A2438",
+  "#3A2430",
+  "#1E3328",
+  "#3A2E1C",
 ];
+
+/** Keep column headers navy-dark even if an older light hue is stored. */
+export function toHeaderColor(hex: string): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return "#1A2B49";
+  const luma = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+  if (luma <= 72) return hex;
+  const scale = 62 / luma;
+  return `#${[rgb[0], rgb[1], rgb[2]]
+    .map((value) => Math.max(16, Math.min(80, Math.round(value * scale))).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
 
 export function teamColor(id: number): string {
   return LABEL_COLORS[Math.abs(id) % LABEL_COLORS.length];

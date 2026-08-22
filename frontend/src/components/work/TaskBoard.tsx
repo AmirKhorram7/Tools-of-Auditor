@@ -6,7 +6,8 @@ import { Button, Field, Input } from "@/components/ui";
 import TaskCard from "@/components/work/TaskCard";
 import {
   LABEL_COLORS,
-  colorAlpha,
+  labelTextColor,
+  toHeaderColor,
   type WorkBoard,
   type WorkBoardColumn,
   type WorkTask,
@@ -76,41 +77,34 @@ export default function TaskBoard({
             if (!task || task.column === column.id || !task.can_move) return;
             void onMove(task, column);
           }}
-          className={`flex w-[300px] shrink-0 flex-col overflow-hidden rounded-2xl border bg-white ${
+          className={`flex w-[300px] shrink-0 flex-col overflow-hidden rounded-xl border ${
             dropId === column.id
               ? "border-navy-400 shadow-[0_8px_24px_rgba(26,43,73,0.12)]"
-              : "border-black/[0.06] shadow-[0_1px_2px_rgba(26,43,73,0.05)]"
+              : "border-black/[0.06]"
           }`}
-          style={{
-            borderInlineStartWidth: 3,
-            borderInlineStartColor: column.color,
-          }}
         >
           <header
-            className="flex items-center justify-between gap-2 px-3 py-3"
-            style={{ backgroundColor: colorAlpha(column.color, 0.1) }}
+            className="flex items-center justify-between gap-2 px-3 py-2"
+            style={{
+              backgroundColor: toHeaderColor(column.color),
+              color: labelTextColor(toHeaderColor(column.color)),
+            }}
           >
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold tracking-wide text-navy-900">
-                {column.name}
-              </p>
-              <p className="mt-0.5 text-[11px] text-navy-800/55">{column.tasks.length} کار</p>
+              <p className="truncate text-[13px] font-bold">{column.name}</p>
+              <p className="text-[11px] opacity-70">{column.tasks.length} کار</p>
             </div>
             {canManage && (
               <button
                 type="button"
                 onClick={() => onAddTask(column)}
-                className="flex size-7 items-center justify-center rounded-full text-base leading-none text-navy-800/70 hover:bg-white/70"
-                aria-label="کار جدید"
+                className="shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold hover:bg-white/25"
               >
-                +
+                افزودن کار
               </button>
             )}
           </header>
-          <div
-            className="flex min-h-[220px] max-h-[min(72vh,720px)] flex-col gap-2 overflow-y-auto p-2"
-            style={{ backgroundColor: colorAlpha(column.color, 0.04) }}
-          >
+          <div className="flex min-h-[220px] max-h-[min(72vh,720px)] flex-col gap-2 overflow-y-auto bg-[#F4F5F7] p-2">
             {column.tasks.length === 0 ? (
               <p className="px-1 py-8 text-center text-xs text-navy-800/35">خالی</p>
             ) : (

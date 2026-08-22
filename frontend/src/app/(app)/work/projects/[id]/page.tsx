@@ -18,7 +18,7 @@ import {
 } from "@/components/ui";
 import JalaliDateField from "@/components/work/JalaliDateField";
 import PhoneSuggest from "@/components/work/PhoneSuggest";
-import ProgressBar from "@/components/work/ProgressBar";
+import ProgressGauge from "@/components/work/ProgressGauge";
 import DoneCheck from "@/components/work/DoneCheck";
 import TaskBoard from "@/components/work/TaskBoard";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
@@ -365,10 +365,7 @@ export default function WorkProjectPage() {
             <Badge tone="blue">
               {PROJECT_STATUS_LABELS[project.status] || project.status}
             </Badge>
-            <span className="flex items-center gap-2 text-xs text-gray-500">
-              <ProgressBar value={project.progress_percent} className="w-24" />
-              {project.progress_percent}٪
-            </span>
+            <ProgressGauge value={project.progress_percent} size={58} />
           </div>
           {project.description ? (
             <p className="mt-1 line-clamp-1 text-sm text-gray-500">{project.description}</p>
@@ -376,8 +373,8 @@ export default function WorkProjectPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {project.can_manage && (
-            <Button size="sm" variant="secondary" onClick={() => { setFormError(null); setSettingsOpen(true); }}>
-              تنظیمات
+            <Button size="sm" onClick={() => openTaskModal()}>
+              افزودن کار
             </Button>
           )}
           {project.can_manage && (
@@ -386,8 +383,8 @@ export default function WorkProjectPage() {
             </Button>
           )}
           {project.can_manage && (
-            <Button size="sm" onClick={() => openTaskModal()}>
-              کار جدید
+            <Button size="sm" variant="secondary" onClick={() => { setFormError(null); setSettingsOpen(true); }}>
+              تنظیمات
             </Button>
           )}
         </div>

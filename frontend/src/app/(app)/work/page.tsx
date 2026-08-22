@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -14,10 +13,11 @@ import {
   Modal,
   PageLoader,
 } from "@/components/ui";
-import ProgressBar from "@/components/work/ProgressBar";
+import ProgressGauge from "@/components/work/ProgressGauge";
 import TaskCard from "@/components/work/TaskCard";
 import WeekStrip from "@/components/work/WeekStrip";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
+import WorkSection from "@/components/work/WorkSection";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
@@ -148,37 +148,42 @@ export default function WorkHomePage() {
             }
           />
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {companies.map((company) => (
               <Link
                 key={company.id}
                 href={`/work/companies/${company.id}`}
-                className="rounded-lg bg-navy-900 px-3 py-2 text-sm font-bold text-white hover:bg-navy-800"
+                className="group flex items-center gap-3 rounded-xl border border-black/[0.06] bg-white p-3 shadow-[0_1px_2px_rgba(26,43,73,0.05)] transition hover:border-navy-400 hover:shadow-md"
               >
-                {company.name}
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-navy-900 text-sm font-bold text-white">
+                  {company.name.slice(0, 1)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold text-ink">{company.name}</span>
+                  <span className="mt-0.5 block text-[11px] text-gray-500 group-hover:text-navy-800">
+                    تیم‌ها و پروژه‌ها
+                  </span>
+                </span>
               </Link>
             ))}
           </div>
         )}
       </section>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-bold text-ink">هفته من</h2>
-          <p className="mt-0.5 text-xs text-gray-500">
-            روزهایی که سررسید دارید، روز کار است. بقیه روزها استراحت.
-          </p>
-        </div>
+      <WorkSection
+        id="week"
+        title="هفته من"
+        hint="روزهایی که سررسید دارید، روز کار است."
+      >
         <WeekStrip tasks={weekTasks} />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           <Stat label="کارهای باز" value={counts?.assigned ?? 0} />
           <Stat label="امروز" value={counts?.today ?? 0} />
           <Stat label="عقب‌افتاده" value={counts?.overdue ?? 0} danger />
         </div>
-      </section>
+      </WorkSection>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-bold text-ink">کارهای من</h2>
+      <WorkSection id="my-tasks" title="کارهای من" count={myTasks.length}>
         {myTasks.length === 0 ? (
           <EmptyState
             title="کاری به شما واگذار نشده"
@@ -200,79 +205,119 @@ export default function WorkHomePage() {
             ))}
           </div>
         )}
-      </section>
+      </WorkSection>
 
       {manager && (
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-base font-bold text-ink">گزارش مدیر</h2>
-            <p className="mt-0.5 text-xs text-gray-500">
-              وضعیت پروژه‌ها، کار بدون مسئول، و کارت کارها برای پیگیری.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <WorkSection
+          id="manager"
+          title="گزارش مدیر"
+          hint="وضعیت پروژه‌ها و کارهای نیازمند پیگیری"
+        >
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="بدون مسئول" value={manager.unassigned_count} />
             <Stat label="دعوت‌های باز" value={manager.pending_invites} />
             <Stat label="تمام‌شده این هفته" value={manager.completed_this_week} />
             <Stat label="در ریسک" value={manager.at_risk.length} danger />
           </div>
 
-          {manager.projects.length === 0 ? (
-            <EmptyState
-              title="پروژه کاری ندارید"
-              description="وارد شرکت شوید، تیم بسازید، بعد پروژه و کار تعریف کنید."
-            />
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {manager.projects.map((project) => (
-                <Link key={project.id} href={`/work/projects/${project.id}`}>
-                  <Card className="transition hover:border-brand-500 hover:shadow-md">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-bold text-ink">{project.name}</p>
-                      <Badge tone="blue">{project.progress_percent}٪</Badge>
-                    </div>
-                    <ProgressBar value={project.progress_percent} className="mt-3" />
-                    <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-gray-500">
-                      <span>عقب‌افتاده {project.overdue_count}</span>
-                      <span>مسدود {project.blocked_count}</span>
-                      <span>بدون مسئول {project.unassigned_count}</span>
-                    </div>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
+          <div className="mt-3 space-y-3">
+            {manager.at_risk.length > 0 && (
+              <WorkSection id="risk" title="پروژه‌های در ریسک" count={manager.at_risk.length}>
+                <WorkTable
+                  compact
+                  columns={["پروژه", "عقب", "مسدود", "نزدیک", "بدون مسئول", "پیشرفت"]}
+                >
+                  {manager.at_risk.map((project) => (
+                    <tr key={project.id} className="hover:bg-surface">
+                      <WorkTd>
+                        <Link
+                          href={`/work/projects/${project.id}`}
+                          className="font-semibold text-navy-900 hover:text-link"
+                        >
+                          {project.name}
+                        </Link>
+                      </WorkTd>
+                      <WorkTd className={(project.overdue_count || 0) > 0 ? "font-bold text-red-600" : ""}>
+                        {project.overdue_count || 0}
+                      </WorkTd>
+                      <WorkTd>{project.blocked_count || 0}</WorkTd>
+                      <WorkTd>{project.due_soon_count || 0}</WorkTd>
+                      <WorkTd>{project.unassigned_count || 0}</WorkTd>
+                      <WorkTd>
+                        <ProgressGauge value={project.progress_percent} size={42} />
+                      </WorkTd>
+                    </tr>
+                  ))}
+                </WorkTable>
+              </WorkSection>
+            )}
 
-          {manager.workload.length > 0 && (
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-ink">بار کار افراد</h3>
-              <WorkTable columns={["فرد", "کارهای باز"]}>
-                {manager.workload.map((row) => (
-                  <tr key={row.user_id}>
-                    <WorkTd className="font-medium text-ink">{row.name}</WorkTd>
-                    <WorkTd>{row.open_tasks}</WorkTd>
-                  </tr>
-                ))}
-              </WorkTable>
-            </div>
-          )}
-
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink">کارت کارها</h3>
-            {allTasks.length === 0 ? (
+            {manager.projects.length === 0 ? (
               <EmptyState
-                title="کاری ثبت نشده"
-                description="از صفحه پروژه، روی بورد کار بسازید و مسئول بگذارید."
+                title="پروژه کاری ندارید"
+                description="وارد شرکت شوید، تیم بسازید، بعد پروژه و کار تعریف کنید."
               />
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {allTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-              </div>
+              <WorkSection id="projects" title="پروژه‌ها" count={manager.projects.length}>
+                <WorkTable compact columns={["پروژه", "عقب", "مسدود", "بدون مسئول", "پیشرفت"]}>
+                  {manager.projects.map((project) => (
+                    <tr key={project.id} className="hover:bg-surface">
+                      <WorkTd>
+                        <Link
+                          href={`/work/projects/${project.id}`}
+                          className="font-semibold text-navy-900 hover:text-link"
+                        >
+                          {project.name}
+                        </Link>
+                      </WorkTd>
+                      <WorkTd className={project.overdue_count > 0 ? "font-bold text-red-600" : ""}>
+                        {project.overdue_count}
+                      </WorkTd>
+                      <WorkTd>{project.blocked_count}</WorkTd>
+                      <WorkTd>{project.unassigned_count}</WorkTd>
+                      <WorkTd>
+                        <ProgressGauge value={project.progress_percent} size={42} />
+                      </WorkTd>
+                    </tr>
+                  ))}
+                </WorkTable>
+              </WorkSection>
             )}
+
+            {manager.workload.length > 0 && (
+              <WorkSection id="workload" title="بار کار افراد" count={manager.workload.length}>
+                <WorkTable compact columns={["فرد", "کارهای باز"]}>
+                  {manager.workload.map((row) => (
+                    <tr key={row.user_id}>
+                      <WorkTd className="font-medium text-ink">{row.name}</WorkTd>
+                      <WorkTd>{row.open_tasks}</WorkTd>
+                    </tr>
+                  ))}
+                </WorkTable>
+              </WorkSection>
+            )}
+
+            <WorkSection
+              id="all-tasks"
+              title="کارت کارها"
+              count={allTasks.length}
+              defaultOpen={false}
+            >
+              {allTasks.length === 0 ? (
+                <EmptyState
+                  title="کاری ثبت نشده"
+                  description="از صفحه پروژه، روی بورد کار بسازید و مسئول بگذارید."
+                />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {allTasks.map((task) => (
+                    <TaskCard key={task.id} task={task} />
+                  ))}
+                </div>
+              )}
+            </WorkSection>
           </div>
-        </section>
+        </WorkSection>
       )}
 
       <Modal
@@ -313,9 +358,9 @@ function Stat({
   danger?: boolean;
 }) {
   return (
-    <Card className="p-3 sm:p-5">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className={`mt-1 text-xl font-bold sm:text-2xl ${danger ? "text-red-600" : "text-ink"}`}>
+    <Card className="p-2.5">
+      <p className="text-[11px] text-gray-500">{label}</p>
+      <p className={`mt-0.5 text-lg font-bold ${danger ? "text-red-600" : "text-ink"}`}>
         {value}
       </p>
     </Card>

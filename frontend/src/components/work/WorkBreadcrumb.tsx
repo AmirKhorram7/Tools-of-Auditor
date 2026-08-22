@@ -14,7 +14,7 @@ export default function WorkBreadcrumb({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <BackButton fallbackHref={fallbackHref} />
-      <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg bg-navy-900 px-3 py-2 text-sm">
+      <nav className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-1 gap-y-0.5 rounded-md bg-navy-900 px-2 py-1 text-xs">
         {items.map((item, index) => {
           const last = index === items.length - 1;
           return (
