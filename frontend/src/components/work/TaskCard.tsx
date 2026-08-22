@@ -106,7 +106,7 @@ export default function TaskCard({
       {snippet && (
         <p className="mt-0.5 line-clamp-1 text-[11px] text-gray-500">{snippet}</p>
       )}
-      <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-gray-500">
+      <div className="mt-1.5 flex items-end justify-between gap-2 text-[10px] text-gray-500">
         <span className="flex items-center gap-1.5">
           <span dir="ltr">#{task.id}</span>
           {task.due_date && (
@@ -116,7 +116,12 @@ export default function TaskCard({
           )}
         </span>
         {task.assignee_name ? (
-          <Avatar src={task.assignee_avatar} name={task.assignee_name} size={18} />
+          <span className="flex max-w-[46%] flex-col items-center gap-0.5 text-center">
+            <Avatar src={task.assignee_avatar} name={task.assignee_name} size={36} />
+            <span className="w-full truncate font-medium text-navy-900" title={task.assignee_name}>
+              {task.assignee_name}
+            </span>
+          </span>
         ) : (
           <span className="text-gray-400">بدون مسئول</span>
         )}

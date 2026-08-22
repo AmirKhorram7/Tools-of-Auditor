@@ -271,7 +271,7 @@ export default function WorkTeamPage() {
                     <Avatar
                       src={member.profile_image}
                       name={member.full_name || member.phone_number}
-                      size={36}
+                      size={48}
                     />
                     <span className="font-semibold text-navy-900">
                       {member.full_name || member.phone_number}
