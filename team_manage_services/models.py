@@ -46,6 +46,10 @@ class Company(BaseModel):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
+    require_approval_before_close = models.BooleanField(
+        default=False,
+        help_text=_("When on, only a manager can move a card to the closed board."),
+    )
 
     class Meta:
         ordering = ["name"]
@@ -152,19 +156,25 @@ class WorkLabel(BaseModel):
 
 
 class BoardTemplate(BaseModel):
-    """Reusable column set a company manager applies to new projects."""
+    """Reusable column set. Platform rows have no company and cannot be deleted."""
 
     company = models.ForeignKey(
         Company,
         on_delete=models.CASCADE,
         related_name="board_templates",
+        null=True,
+        blank=True,
     )
     name = models.CharField(max_length=120)
     is_default = models.BooleanField(default=False)
+    is_platform = models.BooleanField(default=False)
+    requires_approval = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="created_board_templates",
+        null=True,
+        blank=True,
     )
 
     class Meta:
@@ -388,6 +398,11 @@ class Project(BaseModel):
     )
     start_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
+    require_approval_before_close = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text=_("Null inherits the company policy."),
+    )
 
     class Meta:
         ordering = ["-created_at"]

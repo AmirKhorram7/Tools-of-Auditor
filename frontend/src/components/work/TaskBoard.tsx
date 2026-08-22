@@ -17,20 +17,24 @@ export default function TaskBoard({
   board,
   canManage,
   canAddTask,
+  requireApproval,
   mineOnly,
   currentUserId,
   onMove,
   onAddTask,
   onAddColumn,
+  onBlockedClose,
 }: {
   board: WorkBoard;
   canManage: boolean;
   canAddTask?: boolean;
+  requireApproval?: boolean;
   mineOnly?: boolean;
   currentUserId?: number | null;
   onMove: (task: WorkTask, column: WorkBoardColumn) => Promise<void> | void;
   onAddTask?: (column: WorkBoardColumn) => void;
   onAddColumn?: (name: string, color: string) => Promise<void> | void;
+  onBlockedClose?: () => void;
 }) {
   const showAddTask = Boolean(canAddTask ?? canManage) && Boolean(onAddTask);
   const [dropId, setDropId] = useState<number | null>(null);
@@ -78,6 +82,10 @@ export default function TaskBoard({
               .flatMap((item) => item.tasks || [])
               .find((item) => item.id === taskId);
             if (!task || task.column === column.id || !task.can_move) return;
+            if (requireApproval && !canManage && (column.is_closed || column.status_key === "done")) {
+              onBlockedClose?.();
+              return;
+            }
             void onMove(task, column);
           }}
           className={`flex w-[300px] shrink-0 flex-col overflow-hidden rounded-xl border ${

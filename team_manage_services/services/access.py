@@ -144,6 +144,27 @@ def can_work_on_task(user, task) -> bool:
     ).exists()
 
 
+def project_requires_approval(project: Project) -> bool:
+    if project.require_approval_before_close is not None:
+        return bool(project.require_approval_before_close)
+    return bool(getattr(project.company, "require_approval_before_close", False))
+
+
 def can_move_task(user, task) -> bool:
     """Maintainer/owner/developer/planner can move cards. Guest cannot."""
     return can_act_on_project(user, task.project)
+
+
+def can_move_task_to_column(user, task, column) -> bool:
+    if not can_move_task(user, task):
+        return False
+    if column is None or not project_requires_approval(task.project):
+        return True
+    if is_project_manager(user, task.project):
+        return True
+    closed = bool(column.is_closed or column.status_key == "done")
+    current = getattr(task, "column", None)
+    leaving_closed = bool(
+        current and (current.is_closed or current.status_key == "done")
+    )
+    return not closed and not leaving_closed

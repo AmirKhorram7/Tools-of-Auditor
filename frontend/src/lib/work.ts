@@ -4,6 +4,7 @@ export type WorkCompany = {
   parent: number | null;
   owner: number;
   status: string;
+  require_approval_before_close?: boolean;
   created_at: string;
 };
 
@@ -40,9 +41,11 @@ export const ASSIGNABLE_TEAM_ROLES = ["maintainer", "developer", "planner", "gue
 
 export type WorkBoardTemplate = {
   id: number;
-  company: number;
+  company: number | null;
   name: string;
   is_default: boolean;
+  is_platform?: boolean;
+  requires_approval?: boolean;
   columns: Array<{
     id: number;
     name: string;
@@ -79,6 +82,8 @@ export type WorkProject = {
   can_manage: boolean;
   can_add_task?: boolean;
   can_manage_company?: boolean;
+  require_approval_before_close?: boolean | null;
+  require_approval?: boolean;
 };
 
 export type WorkProjectMember = {

@@ -23,6 +23,7 @@ from team_manage_services.services.access import (
     can_move_task,
     is_company_manager,
     is_project_manager,
+    project_requires_approval,
 )
 from team_manage_services.services.progress import (
     project_progress_percent,
@@ -39,6 +40,7 @@ class CompanySerializer(serializers.ModelSerializer):
             "parent",
             "owner",
             "status",
+            "require_approval_before_close",
             "created_at",
             "updated_at",
         ]
@@ -218,8 +220,17 @@ class BoardTemplateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BoardTemplate
-        fields = ["id", "company", "name", "is_default", "columns", "created_at"]
-        read_only_fields = ["company", "is_default", "created_at"]
+        fields = [
+            "id",
+            "company",
+            "name",
+            "is_default",
+            "is_platform",
+            "requires_approval",
+            "columns",
+            "created_at",
+        ]
+        read_only_fields = ["company", "is_default", "is_platform", "requires_approval", "created_at"]
 
 
 class BoardTemplateWriteSerializer(serializers.Serializer):
@@ -269,6 +280,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     can_manage = serializers.SerializerMethodField()
     can_add_task = serializers.SerializerMethodField()
     can_manage_company = serializers.SerializerMethodField()
+    require_approval = serializers.SerializerMethodField()
     company_name = serializers.CharField(source="company.name", read_only=True)
 
     class Meta:
@@ -288,6 +300,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "can_manage",
             "can_add_task",
             "can_manage_company",
+            "require_approval_before_close",
+            "require_approval",
             "created_at",
             "updated_at",
         ]
@@ -313,6 +327,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return is_company_manager(request.user, obj.company)
+
+    def get_require_approval(self, obj):
+        return project_requires_approval(obj)
 
 
 class TaskStepSerializer(serializers.ModelSerializer):

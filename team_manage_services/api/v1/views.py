@@ -4,7 +4,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import MethodNotAllowed, PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -58,13 +58,17 @@ from team_manage_services.services.access import (
     is_any_manager,
     is_company_manager,
     is_project_manager,
+    project_requires_approval,
     projects_for_user,
 )
 from team_manage_services.services.board import (
+    apply_template_to_project,
     create_column,
     create_label,
+    delete_label,
     delete_board_template,
     delete_column,
+    ensure_approval_column,
     ensure_project_columns,
     reorder_columns,
     save_board_template,
@@ -131,7 +135,10 @@ class CompanyViewSet(viewsets.ModelViewSet):
     """Org root. Base: `/api/v1/work/companies/`"""
     permission_classes = [IsAuthenticated]
     serializer_class = CompanySerializer
-    http_method_names = ["get", "post", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def destroy(self, request, *args, **kwargs):
+        raise MethodNotAllowed("DELETE")
 
     def get_queryset(self):
         return companies_for_user(self.request.user)
@@ -204,13 +211,18 @@ class CompanyViewSet(viewsets.ModelViewSet):
         return Response(WorkLabelSerializer(label).data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
+        methods=["PATCH"],
         summary="Update a company label",
         request=WorkLabelSerializer,
         responses={200: WorkLabelSerializer},
     )
+    @extend_schema(
+        methods=["DELETE"],
+        summary="Delete a company label",
+    )
     @action(
         detail=True,
-        methods=["patch"],
+        methods=["patch", "delete"],
         url_path=r"labels/(?P<label_id>[^/.]+)",
     )
     def update_label_action(self, request, pk=None, label_id=None):
@@ -218,6 +230,9 @@ class CompanyViewSet(viewsets.ModelViewSet):
         label = WorkLabel.objects.filter(pk=label_id, company=company).first()
         if label is None:
             raise ValidationError({"label_id": "Label not found."})
+        if request.method == "DELETE":
+            call_service(delete_label, user=request.user, label=label)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         serializer = WorkLabelSerializer(label, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         label = call_service(update_label, user=request.user, label=label, **serializer.validated_data)
@@ -231,11 +246,12 @@ class BoardTemplateViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = BoardTemplate.objects.filter(
-            company_id__in=companies_for_user(self.request.user).values("id")
+            Q(is_platform=True)
+            | Q(company_id__in=companies_for_user(self.request.user).values("id"))
         ).prefetch_related("columns")
         company_id = _int_param(self.request, "company")
         if company_id:
-            qs = qs.filter(company_id=company_id)
+            qs = qs.filter(Q(is_platform=True) | Q(company_id=company_id))
         return qs
 
     def get_serializer_class(self):
@@ -490,7 +506,10 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
 class ProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ProjectSerializer
-    http_method_names = ["get", "post", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def destroy(self, request, *args, **kwargs):
+        raise MethodNotAllowed("DELETE")
 
     def get_queryset(self):
         qs = projects_for_user(self.request.user).select_related("company", "owner")
@@ -504,7 +523,22 @@ class ProjectViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         company = data.pop("company")
-        project = call_service(create_project, user=request.user, company=company, **data)
+        template = None
+        template_id = request.data.get("board_template_id")
+        if template_id not in (None, ""):
+            template = BoardTemplate.objects.filter(
+                Q(is_platform=True) | Q(company=company),
+                pk=template_id,
+            ).first()
+            if template is None:
+                raise ValidationError({"board_template_id": "Board not found."})
+        project = call_service(
+            create_project,
+            user=request.user,
+            company=company,
+            board_template=template,
+            **data,
+        )
         return Response(self.get_serializer(project).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
@@ -519,6 +553,27 @@ class ProjectViewSet(viewsets.ModelViewSet):
             setattr(instance, attr, value)
         call_service(instance.full_clean)
         instance.save()
+        if project_requires_approval(instance):
+            ensure_approval_column(instance)
+
+    @action(detail=True, methods=["post"], url_path="apply-template")
+    def apply_template(self, request, pk=None):
+        project = self.get_object()
+        template_id = request.data.get("board_template_id")
+        template = BoardTemplate.objects.filter(
+            Q(is_platform=True) | Q(company=project.company),
+            pk=template_id,
+        ).first()
+        if template is None:
+            raise ValidationError({"board_template_id": "Board not found."})
+        call_service(
+            apply_template_to_project,
+            user=request.user,
+            project=project,
+            template=template,
+        )
+        project.refresh_from_db()
+        return Response(self.get_serializer(project).data)
 
     @extend_schema(
         methods=["GET"],

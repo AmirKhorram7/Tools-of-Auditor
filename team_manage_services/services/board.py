@@ -22,12 +22,34 @@ DEFAULT_BOARD_COLUMNS = (
 )
 
 
+PLATFORM_BOARD_COLUMNS = (
+    {"name": "برای انجام", "color": "#14233A", "status_key": Task.Status.TODO, "is_closed": False},
+    {
+        "name": "در حال انجام",
+        "color": "#1A2B49",
+        "status_key": Task.Status.IN_PROGRESS,
+        "is_closed": False,
+    },
+    {"name": "تست", "color": "#243656", "status_key": Task.Status.IN_PROGRESS, "is_closed": False},
+    {
+        "name": "در انتظار تأیید",
+        "color": "#3A2430",
+        "status_key": Task.Status.IN_REVIEW,
+        "is_closed": False,
+    },
+    {"name": "بسته", "color": "#1E3328", "status_key": Task.Status.DONE, "is_closed": True},
+)
+
+
 def infer_column_status(name: str, is_closed=False) -> tuple[str, bool]:
     text = (name or "").strip().lower()
-    closed_words = ("بسته", "تمام", "close", "closed", "done")
+    closed_words = ("بسته", "تمام", "close", "closed", "done", "finished")
+    review_words = ("تأیید", "تاييد", "تایید", "approve", "approval", "بازبینی", "review")
     progress_words = ("انجام", "progress", "doing")
     if is_closed or any(word in text for word in closed_words):
         return Task.Status.DONE, True
+    if any(word in text for word in review_words):
+        return Task.Status.IN_REVIEW, False
     if any(word in text for word in progress_words) and "برای" not in text:
         return Task.Status.IN_PROGRESS, False
     return Task.Status.TODO, False
@@ -45,11 +67,24 @@ def default_template_columns(company) -> list[BoardTemplateColumn] | None:
     return columns or None
 
 
-def seed_project_columns(project: Project) -> list[BoardColumn]:
+def platform_board_template() -> BoardTemplate | None:
+    return (
+        BoardTemplate.objects.filter(is_platform=True)
+        .prefetch_related("columns")
+        .order_by("id")
+        .first()
+    )
+
+
+def seed_project_columns(project: Project, template: BoardTemplate | None = None) -> list[BoardColumn]:
     existing = list(project.board_columns.order_by("position", "id"))
     if existing:
         return existing
-    specs = default_template_columns(project.company)
+    specs = None
+    if template is not None:
+        specs = list(template.columns.all())
+    if not specs:
+        specs = default_template_columns(project.company)
     created = []
     if specs:
         for index, spec in enumerate(specs):
@@ -208,9 +243,72 @@ def update_label(*, user, label: WorkLabel, **fields) -> WorkLabel:
     return label
 
 
+def delete_label(*, user, label: WorkLabel):
+    from rest_framework.exceptions import PermissionDenied
+
+    if not is_company_manager(user, label.company):
+        raise PermissionDenied("Only the company manager can delete labels.")
+    label.delete()
+
+
+def ensure_approval_column(project: Project) -> BoardColumn:
+    from django.db.models import F
+
+    columns = list(project.board_columns.order_by("position", "id"))
+    for column in columns:
+        if column.status_key == Task.Status.IN_REVIEW or any(
+            word in (column.name or "") for word in ("تأیید", "تایید", "تاييد")
+        ):
+            return column
+    closed = next((col for col in columns if col.is_closed), None)
+    position = closed.position if closed else ((columns[-1].position + 1) if columns else 0)
+    if closed:
+        BoardColumn.objects.filter(project=project, position__gte=position).update(
+            position=F("position") + 1
+        )
+    return BoardColumn.objects.create(
+        project=project,
+        name="در انتظار تأیید",
+        color="#3A2430",
+        status_key=Task.Status.IN_REVIEW,
+        is_closed=False,
+        position=position,
+    )
+
+
+def apply_template_to_project(*, user, project: Project, template: BoardTemplate):
+    from rest_framework.exceptions import PermissionDenied
+
+    if not is_project_manager(user, project):
+        raise PermissionDenied("Only a project manager can change the board.")
+    existing_names = {col.name.strip() for col in project.board_columns.all()}
+    last = project.board_columns.order_by("-position").first()
+    position = (last.position + 1) if last else 0
+    for spec in template.columns.all():
+        if spec.name.strip() in existing_names:
+            continue
+        status_key, is_closed = infer_column_status(spec.name, spec.is_closed)
+        BoardColumn.objects.create(
+            project=project,
+            name=spec.name,
+            color=spec.color or "#1A2B49",
+            status_key=spec.status_key or status_key,
+            is_closed=spec.is_closed or is_closed,
+            position=position,
+        )
+        position += 1
+    if template.requires_approval or template.is_platform:
+        project.require_approval_before_close = True
+        project.save(update_fields=["require_approval_before_close", "updated_at"])
+        ensure_approval_column(project)
+    return list(project.board_columns.order_by("position", "id"))
+
+
 def save_board_template(*, user, company, name: str, columns: list, is_default=False, template=None):
     from rest_framework.exceptions import PermissionDenied, ValidationError
 
+    if template is not None and template.is_platform:
+        raise PermissionDenied("The platform board cannot be changed.")
     if not is_company_manager(user, company):
         raise PermissionDenied("Only the company manager can save a default board.")
     name = (name or "").strip()
@@ -245,8 +343,10 @@ def save_board_template(*, user, company, name: str, columns: list, is_default=F
 
 
 def set_default_board_template(*, user, template: BoardTemplate) -> BoardTemplate:
-    from rest_framework.exceptions import PermissionDenied
+    from rest_framework.exceptions import PermissionDenied, ValidationError
 
+    if template.is_platform:
+        raise ValidationError({"template": "Set the platform board on a project instead."})
     if not is_company_manager(user, template.company):
         raise PermissionDenied("Only the company manager can set the default board.")
     BoardTemplate.objects.filter(company=template.company).update(is_default=False)
@@ -258,6 +358,8 @@ def set_default_board_template(*, user, template: BoardTemplate) -> BoardTemplat
 def delete_board_template(*, user, template: BoardTemplate):
     from rest_framework.exceptions import PermissionDenied
 
+    if template.is_platform:
+        raise PermissionDenied("The platform board cannot be deleted.")
     if not is_company_manager(user, template.company):
         raise PermissionDenied("Only the company manager can delete a default board.")
     template.delete()

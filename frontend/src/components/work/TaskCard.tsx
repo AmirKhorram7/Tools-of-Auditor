@@ -117,7 +117,7 @@ export default function TaskCard({
         </span>
         {task.assignee_name ? (
           <span className="flex max-w-[46%] flex-col items-center gap-0.5 text-center">
-            <Avatar src={task.assignee_avatar} name={task.assignee_name} size={36} />
+            <Avatar src={task.assignee_avatar} name={task.assignee_name} size={32} />
             <span className="w-full truncate font-medium text-navy-900" title={task.assignee_name}>
               {task.assignee_name}
             </span>

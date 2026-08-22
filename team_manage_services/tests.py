@@ -411,3 +411,90 @@ class WorkAPISmokeTests(APITestCase):
         guest_after = guest_client.get(f"{WORK}/projects/{project_id}/")
         self.assertTrue(guest_after.data["can_add_task"])
         self.assertFalse(guest_after.data["can_manage"])
+
+    def test_platform_board_and_approval_gate(self):
+        company_res = self.manager_client.post(
+            f"{WORK}/companies/",
+            {"name": "شرکت تأیید"},
+            format="json",
+        )
+        self.assertEqual(company_res.status_code, status.HTTP_201_CREATED, company_res.data)
+        company_id = company_res.data["id"]
+
+        templates = self.manager_client.get(f"{WORK}/board-templates/?company={company_id}")
+        self.assertEqual(templates.status_code, status.HTTP_200_OK)
+        rows = _results(templates.data)
+        platform = next(row for row in rows if row.get("is_platform"))
+        self.assertEqual(len(platform["columns"]), 5)
+        self.assertTrue(platform["requires_approval"])
+
+        project_res = self.manager_client.post(
+            f"{WORK}/projects/",
+            {
+                "company": company_id,
+                "name": "پروژه استاندارد",
+                "board_template_id": platform["id"],
+            },
+            format="json",
+        )
+        self.assertEqual(project_res.status_code, status.HTTP_201_CREATED, project_res.data)
+        self.assertTrue(project_res.data["require_approval"])
+        project_id = project_res.data["id"]
+
+        board = self.manager_client.get(f"{WORK}/projects/{project_id}/board/")
+        self.assertEqual(board.status_code, status.HTTP_200_OK, board.data)
+        names = [col["name"] for col in board.data["columns"]]
+        self.assertEqual(
+            names,
+            ["برای انجام", "در حال انجام", "تست", "در انتظار تأیید", "بسته"],
+        )
+        closed = next(col for col in board.data["columns"] if col["is_closed"])
+        waiting = next(col for col in board.data["columns"] if col["status_key"] == "in_review")
+
+        team_res = self.manager_client.post(
+            f"{WORK}/teams/",
+            {"company": company_id, "name": "تیم فنی"},
+            format="json",
+        )
+        team_id = team_res.data["id"]
+        invite = self.manager_client.post(
+            f"{WORK}/teams/{team_id}/invite/",
+            {"phone_number": self.employee.phone_number, "role": "developer"},
+            format="json",
+        )
+        self.employee_client.post(f"{WORK}/invitations/{invite.data['id']}/accept/")
+        self.manager_client.post(
+            f"{WORK}/projects/{project_id}/add-team/",
+            {"team_id": team_id},
+            format="json",
+        )
+
+        task_res = self.employee_client.post(
+            f"{WORK}/tasks/",
+            {"project": project_id, "title": "کار برای تأیید"},
+            format="json",
+        )
+        self.assertEqual(task_res.status_code, status.HTTP_201_CREATED, task_res.data)
+        task_id = task_res.data["id"]
+
+        blocked = self.employee_client.patch(
+            f"{WORK}/tasks/{task_id}/",
+            {"column": closed["id"]},
+            format="json",
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_403_FORBIDDEN)
+
+        waiting_move = self.employee_client.patch(
+            f"{WORK}/tasks/{task_id}/",
+            {"column": waiting["id"]},
+            format="json",
+        )
+        self.assertEqual(waiting_move.status_code, status.HTTP_200_OK, waiting_move.data)
+
+        closed_move = self.manager_client.patch(
+            f"{WORK}/tasks/{task_id}/",
+            {"column": closed["id"]},
+            format="json",
+        )
+        self.assertEqual(closed_move.status_code, status.HTTP_200_OK, closed_move.data)
+        self.assertEqual(closed_move.data["status"], "done")

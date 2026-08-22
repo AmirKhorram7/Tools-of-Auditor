@@ -22,6 +22,7 @@ import ProgressGauge from "@/components/work/ProgressGauge";
 import DoneCheck from "@/components/work/DoneCheck";
 import TaskBoard from "@/components/work/TaskBoard";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
+import WorkGuide from "@/components/work/WorkGuide";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { useAuth } from "@/lib/auth";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
@@ -233,7 +234,29 @@ export default function WorkProjectPage() {
     }
   };
 
+  const deleteLabel = async (labelId: number) => {
+    if (!project) return;
+    if (!window.confirm("این برچسب حذف شود؟")) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch(`/work/companies/${project.company}/labels/${labelId}/`, {
+        method: "DELETE",
+      });
+      setLabels((current) => current.filter((label) => label.id !== labelId));
+      setSelectedLabels((current) => current.filter((id) => id !== labelId));
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "حذف برچسب ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const toggleDone = async (id: number, done: boolean) => {
+    if (done && project?.require_approval && !project.can_manage) {
+      setError("این کار باید اول تأیید شود.");
+      return;
+    }
     setBusyId(id);
     setError(null);
     try {
@@ -423,6 +446,38 @@ export default function WorkProjectPage() {
     }
   };
 
+  const applyBoardTemplate = async (templateId: number) => {
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch(`/work/projects/${projectId}/apply-template/`, {
+        method: "POST",
+        body: { board_template_id: templateId },
+      });
+      await load(true);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "اعمال بورد ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setApprovalPolicy = async (value: boolean | null) => {
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch(`/work/projects/${projectId}/`, {
+        method: "PATCH",
+        body: { require_approval_before_close: value },
+      });
+      await load(true);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "ذخیره سیاست ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <PageLoader />;
   if (!project) return <Alert>{error || "پروژه پیدا نشد."}</Alert>;
 
@@ -478,6 +533,7 @@ export default function WorkProjectPage() {
               تنظیمات
             </Button>
           )}
+          <WorkGuide compact />
         </div>
       </div>
 
@@ -516,6 +572,8 @@ export default function WorkProjectPage() {
           board={board}
           canManage={project.can_manage}
           canAddTask={canAddTask}
+          requireApproval={Boolean(project.require_approval)}
+          onBlockedClose={() => setError("این کار باید اول تأیید شود.")}
           mineOnly={mineOnly}
           currentUserId={myUserId}
           onMove={moveTask}
@@ -811,13 +869,24 @@ export default function WorkProjectPage() {
               {labels.map((label) => (
                 <span
                   key={label.id}
-                  className="rounded px-2.5 py-0.5 text-xs font-bold"
+                  className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold"
                   style={{
                     backgroundColor: label.color,
                     color: labelTextColor(label.color),
                   }}
                 >
                   {label.name}
+                  {project.can_manage_company && (
+                    <button
+                      type="button"
+                      onClick={() => void deleteLabel(label.id)}
+                      className="rounded-sm px-0.5 text-[11px] leading-none opacity-80 hover:bg-black/15 hover:opacity-100"
+                      aria-label="حذف برچسب"
+                      title="حذف"
+                    >
+                      ×
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
@@ -967,9 +1036,38 @@ export default function WorkProjectPage() {
           )}
           {settingsTab === "templates" && (
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">بورد پیش‌فرض شرکت</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">سیاست تأیید</h3>
+            <p className="mb-2 text-xs text-gray-500">
+              وقتی روشن است، کارشناس کارت را تا «در انتظار تأیید» می‌برد و فقط مدیر به «بسته» می‌برد.
+            </p>
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {(
+                [
+                  [null, "طبق شرکت"],
+                  [true, "روشن"],
+                  [false, "خاموش"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={String(value)}
+                  type="button"
+                  onClick={() => void setApprovalPolicy(value)}
+                  className={`rounded-md px-2.5 py-1 text-xs ${
+                    project.require_approval_before_close === value
+                      ? "bg-navy-900 text-white"
+                      : "border border-gray-200 text-gray-600"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mb-3 text-[11px] text-gray-500">
+              الان این پروژه: {project.require_approval ? "تأیید لازم است" : "بستن آزاد است"}
+            </p>
+            <h3 className="mb-2 text-sm font-semibold text-ink">بورد پیش‌فرض</h3>
             <p className="mb-3 text-xs text-gray-500">
-              پروژه‌های تازه ستون‌های بورد پیش‌فرض را می‌گیرند. اگر پیش‌فرضی نباشد، برای انجام / در حال انجام / بسته ساخته می‌شود.
+              بورد استاندارد پلتفرم برای هر نوع کار است. بوردهای شرکت را هم می‌توانید بسازید.
             </p>
             <ul className="mb-3 space-y-2">
               {templates.length === 0 && (
@@ -983,31 +1081,44 @@ export default function WorkProjectPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-ink">{template.name}</p>
-                      {template.is_default && (
-                        <span className="text-[11px] font-bold text-brand-700">پیش‌فرض فعلی</span>
+                      {template.is_platform && (
+                        <span className="text-[11px] font-bold text-brand-700">بورد پلتفرم</span>
+                      )}
+                      {template.is_default && !template.is_platform && (
+                        <span className="text-[11px] font-bold text-brand-700">پیش‌فرض شرکت</span>
                       )}
                     </div>
-                    {project.can_manage_company && (
-                      <div className="flex gap-1">
-                        {!template.is_default && (
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={saving}
+                        onClick={() => void applyBoardTemplate(template.id)}
+                      >
+                        استفاده
+                      </Button>
+                      {project.can_manage_company && !template.is_platform && (
+                        <>
+                          {!template.is_default && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              loading={saving}
+                              onClick={() => void setDefaultTemplate(template.id)}
+                            >
+                              پیش‌فرض
+                            </Button>
+                          )}
                           <Button
                             size="sm"
-                            variant="secondary"
-                            loading={saving}
-                            onClick={() => void setDefaultTemplate(template.id)}
+                            variant="ghost"
+                            onClick={() => void deleteTemplate(template.id)}
                           >
-                            پیش‌فرض
+                            حذف
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void deleteTemplate(template.id)}
-                        >
-                          حذف
-                        </Button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {template.columns.map((column) => (

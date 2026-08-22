@@ -19,13 +19,16 @@ from team_manage_services.models import (
 from team_manage_services.services.access import (
     can_add_task,
     can_move_task,
+    can_move_task_to_column,
     can_work_on_task,
     is_company_manager,
     is_project_manager,
+    project_requires_approval,
 )
 from team_manage_services.services.board import (
     apply_column_to_task,
     column_for_status,
+    ensure_approval_column,
     ensure_project_columns,
     seed_project_columns,
 )
@@ -63,15 +66,21 @@ def _ensure_project_owner_member(project: Project) -> ProjectMember:
 
 
 @transaction.atomic
-def create_project(*, user, company, **fields) -> Project:
+def create_project(*, user, company, board_template=None, **fields) -> Project:
     if not is_company_manager(user, company):
         raise PermissionDenied("Only the company manager can create a project.")
     owner = fields.pop("owner", user) or user
+    if board_template is not None and (
+        board_template.requires_approval or board_template.is_platform
+    ):
+        fields.setdefault("require_approval_before_close", True)
     project = Project(company=company, owner=owner, **fields)
     project.full_clean()
     project.save()
     _ensure_project_owner_member(project)
-    seed_project_columns(project)
+    seed_project_columns(project, template=board_template)
+    if project_requires_approval(project):
+        ensure_approval_column(project)
     log_activity(
         actor=user,
         action=ActivityLog.Action.CREATED,
@@ -239,7 +248,16 @@ def update_task(*, user, task: Task, **fields) -> Task:
     labels = fields.pop("labels", None)
     moving = "status" in fields or "column" in fields
     if moving and not can_move_task(user, task):
-        raise PermissionDenied("Only the assignee or a manager can move this task.")
+        raise PermissionDenied("You cannot move this task.")
+    dest_column = fields.get("column")
+    if dest_column is not None and not can_move_task_to_column(user, task, dest_column):
+        raise PermissionDenied("این کار باید اول تأیید شود.")
+    if (
+        fields.get("status") == Task.Status.DONE
+        and project_requires_approval(task.project)
+        and not is_project_manager(user, task.project)
+    ):
+        raise PermissionDenied("این کار باید اول تأیید شود.")
     if not is_project_manager(user, task.project):
         if "difficulty" in fields and fields["difficulty"] != task.difficulty:
             raise PermissionDenied("Employees cannot change task difficulty.")

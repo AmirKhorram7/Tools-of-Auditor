@@ -19,6 +19,7 @@ import {
 import JalaliDateField from "@/components/work/JalaliDateField";
 import ProgressBar from "@/components/work/ProgressBar";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
+import WorkGuide from "@/components/work/WorkGuide";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
@@ -27,6 +28,7 @@ import {
   formatFaDate,
   labelTextColor,
   teamColor,
+  type WorkBoardTemplate,
   type WorkCompany,
   type WorkProject,
   type WorkTeam,
@@ -49,6 +51,8 @@ export default function WorkCompanyPage() {
   const [projectDesc, setProjectDesc] = useState("");
   const [projectDue, setProjectDue] = useState("");
   const [projectPriority, setProjectPriority] = useState("2");
+  const [boardTemplateId, setBoardTemplateId] = useState("");
+  const [templates, setTemplates] = useState<WorkBoardTemplate[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -57,14 +61,18 @@ export default function WorkCompanyPage() {
     setLoading(true);
     setError(null);
     try {
-      const [row, teamRows, projectRows] = await Promise.all([
+      const [row, teamRows, projectRows, templateRows] = await Promise.all([
         apiFetch<WorkCompany>(`/work/companies/${companyId}/`),
         apiList<WorkTeam>(`/work/teams/?company=${companyId}`),
         apiList<WorkProject>(`/work/projects/?company=${companyId}`),
+        apiList<WorkBoardTemplate>(`/work/board-templates/?company=${companyId}`),
       ]);
       setCompany(row);
       setTeams(teamRows);
       setProjects(projectRows);
+      setTemplates(templateRows);
+      const platform = templateRows.find((item) => item.is_platform);
+      setBoardTemplateId((current) => current || (platform ? String(platform.id) : current));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "بارگذاری شرکت ناموفق بود.");
     } finally {
@@ -114,6 +122,7 @@ export default function WorkCompanyPage() {
           description: projectDesc.trim(),
           due_date: projectDue || null,
           priority: Number(projectPriority),
+          board_template_id: boardTemplateId ? Number(boardTemplateId) : undefined,
         },
       });
       setProjectOpen(false);
@@ -153,10 +162,45 @@ export default function WorkCompanyPage() {
           <Button size="sm" onClick={() => { setFormError(null); setProjectOpen(true); }}>
             پروژه جدید
           </Button>
+          <WorkGuide compact />
         </div>
       </div>
 
       {error && <Alert>{error}</Alert>}
+
+      <section className="rounded-xl border border-black/[0.06] bg-white px-3 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-ink">سیاست تأیید شرکت</p>
+            <p className="text-xs text-gray-500">
+              اگر روشن باشد، پروژه‌های تازه بدون تنظیم جدا، تأیید مدیر برای بستن کار می‌خواهند.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const updated = await apiFetch<WorkCompany>(`/work/companies/${companyId}/`, {
+                  method: "PATCH",
+                  body: {
+                    require_approval_before_close: !company.require_approval_before_close,
+                  },
+                });
+                setCompany(updated);
+              } catch (err) {
+                setError(err instanceof ApiError ? err.message : "ذخیره سیاست ناموفق بود.");
+              }
+            }}
+            className={`rounded-md px-3 py-1.5 text-xs font-bold ${
+              company.require_approval_before_close
+                ? "bg-navy-900 text-white"
+                : "border border-gray-200 text-gray-600"
+            }`}
+          >
+            {company.require_approval_before_close ? "روشن است" : "خاموش است"}
+          </button>
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink">تیم‌ها</h2>
@@ -281,6 +325,20 @@ export default function WorkCompanyPage() {
               {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="بورد">
+            <Select
+              value={boardTemplateId}
+              onChange={(e) => setBoardTemplateId(e.target.value)}
+            >
+              <option value="">ساده — برای انجام / در حال انجام / بسته</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                  {template.is_platform ? " (پلتفرم)" : ""}
                 </option>
               ))}
             </Select>

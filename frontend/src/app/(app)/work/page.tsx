@@ -17,6 +17,7 @@ import ProgressGauge from "@/components/work/ProgressGauge";
 import TaskCard from "@/components/work/TaskCard";
 import WeekStrip from "@/components/work/WeekStrip";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
+import WorkGuide from "@/components/work/WorkGuide";
 import WorkSection from "@/components/work/WorkSection";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
@@ -105,6 +106,7 @@ export default function WorkHomePage() {
           <h1 className="text-xl font-bold text-ink">مدیریت کار</h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <WorkGuide compact />
           <Link href="/work/inbox">
             <Button variant="secondary" size="sm">
               اعلان‌ها
