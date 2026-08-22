@@ -23,9 +23,9 @@ import { ApiError, apiFetch } from "@/lib/api";
 import {
   PRIORITY_LABELS,
   TASK_STATUS_LABELS,
-  colorAlpha,
   formatFaDate,
   isOverdue,
+  labelTextColor,
   type WorkBoardColumn,
   type WorkLabel,
   type WorkProject,
@@ -342,12 +342,12 @@ export default function WorkTaskPage() {
                         active ? current.filter((id) => id !== label.id) : [...current, label.id],
                       )
                     }
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium disabled:opacity-60 ${
+                    className={`rounded px-2.5 py-0.5 text-xs font-bold disabled:opacity-60 ${
                       active ? "ring-2 ring-navy-900/40" : "opacity-70"
                     }`}
                     style={{
-                      backgroundColor: colorAlpha(label.color, 0.14),
-                      color: label.color,
+                      backgroundColor: label.color,
+                      color: labelTextColor(label.color),
                     }}
                   >
                     {label.name}

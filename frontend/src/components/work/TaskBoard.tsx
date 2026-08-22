@@ -16,6 +16,7 @@ import {
 export default function TaskBoard({
   board,
   canManage,
+  canAddTask,
   mineOnly,
   currentUserId,
   onMove,
@@ -24,12 +25,14 @@ export default function TaskBoard({
 }: {
   board: WorkBoard;
   canManage: boolean;
+  canAddTask?: boolean;
   mineOnly?: boolean;
   currentUserId?: number | null;
   onMove: (task: WorkTask, column: WorkBoardColumn) => Promise<void> | void;
-  onAddTask: (column: WorkBoardColumn) => void;
+  onAddTask?: (column: WorkBoardColumn) => void;
   onAddColumn?: (name: string, color: string) => Promise<void> | void;
 }) {
+  const showAddTask = Boolean(canAddTask ?? canManage) && Boolean(onAddTask);
   const [dropId, setDropId] = useState<number | null>(null);
   const [columnName, setColumnName] = useState("");
   const [columnColor, setColumnColor] = useState(LABEL_COLORS[1]);
@@ -94,22 +97,29 @@ export default function TaskBoard({
               <p className="truncate text-[13px] font-bold">{column.name}</p>
               <p className="text-[11px] opacity-70">{column.tasks.length} کار</p>
             </div>
-            {canManage && (
+            {showAddTask && (
               <button
                 type="button"
-                onClick={() => onAddTask(column)}
+                onClick={() => onAddTask?.(column)}
                 className="shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold hover:bg-white/25"
               >
                 افزودن کار
               </button>
             )}
           </header>
-          <div className="flex min-h-[220px] max-h-[min(72vh,720px)] flex-col gap-2 overflow-y-auto bg-[#F4F5F7] p-2">
+          <div className="flex h-[calc(100vh-14rem)] min-h-[280px] flex-col gap-1.5 overflow-y-auto bg-[#F4F5F7] p-1.5">
             {column.tasks.length === 0 ? (
               <p className="px-1 py-8 text-center text-xs text-navy-800/35">خالی</p>
             ) : (
               column.tasks.map((task) => (
-                <TaskCard key={task.id} task={task} draggable={task.can_move} />
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  draggable={task.can_move}
+                  mine={Boolean(currentUserId && task.assignee_user_id === currentUserId)}
+                  columnName={column.name}
+                  columnColor={column.color}
+                />
               ))
             )}
           </div>

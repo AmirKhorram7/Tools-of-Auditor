@@ -6,6 +6,8 @@ from team_manage_services.models import (
     ActivityLog,
     Attachment,
     BoardColumn,
+    BoardTemplate,
+    BoardTemplateColumn,
     Company,
     CompanyMember,
     Invitation,
@@ -143,7 +145,7 @@ class TeamMemberInline(admin.TabularInline):
     model = TeamMember
     extra = 0
     autocomplete_fields = ("user",)
-    fields = ("user", "position_title", "status", "joined_at")
+    fields = ("user", "role", "position_title", "status", "joined_at")
     readonly_fields = ("joined_at",)
     show_change_link = True
 
@@ -154,6 +156,7 @@ class InvitationInline(admin.TabularInline):
     autocomplete_fields = ("invited_by", "invited_user")
     fields = (
         "phone_number",
+        "role",
         "position_title",
         "status",
         "invited_by",
@@ -217,12 +220,13 @@ class TeamMemberAdmin(admin.ModelAdmin):
         "company_name",
         "user_name",
         "phone",
+        "role",
         "position_title",
         "status",
         "joined_at",
         "created_at",
     )
-    list_filter = ("status", "created_at")
+    list_filter = ("role", "status", "created_at")
     search_fields = (
         "team__name",
         "team__company__name",
@@ -255,6 +259,7 @@ class InvitationAdmin(admin.ModelAdmin):
         "id",
         "phone_number",
         "team",
+        "role",
         "position_title",
         "status",
         "invited_by_name",
@@ -263,7 +268,7 @@ class InvitationAdmin(admin.ModelAdmin):
         "sms_sent_at",
         "created_at",
     )
-    list_filter = ("status", "created_at", "expires_at")
+    list_filter = ("role", "status", "created_at", "expires_at")
     search_fields = (
         "phone_number",
         "team__name",
@@ -683,3 +688,23 @@ class BoardColumnAdmin(admin.ModelAdmin):
     list_filter = ("status_key", "is_closed")
     autocomplete_fields = ("project",)
     ordering = ("project", "position")
+
+
+class BoardTemplateColumnInline(admin.TabularInline):
+    model = BoardTemplateColumn
+    extra = 0
+    fields = ("name", "color", "position", "status_key", "is_closed")
+    ordering = ("position",)
+
+
+@admin.register(BoardTemplate)
+class BoardTemplateAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "company", "is_default", "created_by_name", "created_at")
+    list_filter = ("is_default", "company")
+    search_fields = ("name", "company__name")
+    autocomplete_fields = ("company", "created_by")
+    inlines = [BoardTemplateColumnInline]
+
+    @admin.display(description=_("Created by"), ordering="created_by__first_name")
+    def created_by_name(self, obj):
+        return person_name(obj.created_by)

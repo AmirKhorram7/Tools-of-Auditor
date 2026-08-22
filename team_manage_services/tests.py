@@ -187,7 +187,7 @@ class WorkAPISmokeTests(APITestCase):
 
         board = self.manager_client.get(f"{WORK}/projects/{project_id}/board/")
         self.assertEqual(board.status_code, status.HTTP_200_OK, board.data)
-        self.assertGreaterEqual(len(board.data["columns"]), 4)
+        self.assertGreaterEqual(len(board.data["columns"]), 3)
 
         outsider = User.objects.create_user(
             phone_number="09120000003",
@@ -199,7 +199,7 @@ class WorkAPISmokeTests(APITestCase):
         outsider_client = self._client_for(outsider)
         self.manager_client.post(
             f"{WORK}/projects/{project_id}/members/",
-            {"user_id": outsider.id, "role": "member"},
+            {"user_id": outsider.id, "role": "guest"},
             format="json",
         )
         blocked_move = outsider_client.patch(
@@ -262,3 +262,152 @@ class WorkAPISmokeTests(APITestCase):
         self.assertEqual(unread.status_code, status.HTTP_200_OK)
         self.assertIn("unread", unread.data)
         self.assertGreaterEqual(unread.data["unread"], 1)
+
+    def test_default_board_template_and_team_roles(self):
+        guest = User.objects.create_user(
+            phone_number="09120000004",
+            password="pass-guest",
+            first_name="مهمان",
+            last_name="تست",
+            is_phone_verified=True,
+        )
+        maintainer = User.objects.create_user(
+            phone_number="09120000005",
+            password="pass-maint",
+            first_name="نگهدارنده",
+            last_name="تست",
+            is_phone_verified=True,
+        )
+        guest_client = self._client_for(guest)
+        maintainer_client = self._client_for(maintainer)
+
+        company_res = self.manager_client.post(
+            f"{WORK}/companies/",
+            {"name": "شرکت نقش‌ها"},
+            format="json",
+        )
+        self.assertEqual(company_res.status_code, status.HTTP_201_CREATED, company_res.data)
+        company_id = company_res.data["id"]
+
+        template_res = self.manager_client.post(
+            f"{WORK}/board-templates/",
+            {
+                "company": company_id,
+                "name": "x_boards_list",
+                "is_default": True,
+                "columns": [
+                    {"name": "بک‌لاگ", "color": "#14233A"},
+                    {"name": "برای انجام", "color": "#1A2B49"},
+                    {"name": "در حال انجام", "color": "#243656"},
+                    {"name": "بازبینی", "color": "#1B3A4A"},
+                    {"name": "آماده تحویل", "color": "#2A2438"},
+                    {"name": "بسته", "color": "#1E3328"},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(template_res.status_code, status.HTTP_201_CREATED, template_res.data)
+        self.assertTrue(template_res.data["is_default"])
+        self.assertEqual(len(template_res.data["columns"]), 6)
+
+        project_res = self.manager_client.post(
+            f"{WORK}/projects/",
+            {"company": company_id, "name": "پروژه قالب"},
+            format="json",
+        )
+        self.assertEqual(project_res.status_code, status.HTTP_201_CREATED, project_res.data)
+        project_id = project_res.data["id"]
+        board = self.manager_client.get(f"{WORK}/projects/{project_id}/board/")
+        self.assertEqual(board.status_code, status.HTTP_200_OK, board.data)
+        self.assertEqual(
+            [col["name"] for col in board.data["columns"]],
+            ["بک‌لاگ", "برای انجام", "در حال انجام", "بازبینی", "آماده تحویل", "بسته"],
+        )
+
+        team_res = self.manager_client.post(
+            f"{WORK}/teams/",
+            {"company": company_id, "name": "تیم حسابرسی"},
+            format="json",
+        )
+        self.assertEqual(team_res.status_code, status.HTTP_201_CREATED, team_res.data)
+        team_id = team_res.data["id"]
+
+        guest_invite = self.manager_client.post(
+            f"{WORK}/teams/{team_id}/invite/",
+            {"phone_number": guest.phone_number, "role": "guest"},
+            format="json",
+        )
+        self.assertEqual(guest_invite.status_code, status.HTTP_201_CREATED, guest_invite.data)
+        self.assertEqual(guest_invite.data["role"], "guest")
+        accept_guest = guest_client.post(
+            f"{WORK}/invitations/{guest_invite.data['id']}/accept/"
+        )
+        self.assertEqual(accept_guest.status_code, status.HTTP_200_OK, accept_guest.data)
+
+        maint_invite = self.manager_client.post(
+            f"{WORK}/teams/{team_id}/invite/",
+            {"phone_number": maintainer.phone_number, "role": "maintainer"},
+            format="json",
+        )
+        self.assertEqual(maint_invite.status_code, status.HTTP_201_CREATED, maint_invite.data)
+        accept_maint = maintainer_client.post(
+            f"{WORK}/invitations/{maint_invite.data['id']}/accept/"
+        )
+        self.assertEqual(accept_maint.status_code, status.HTTP_200_OK, accept_maint.data)
+
+        add_team = self.manager_client.post(
+            f"{WORK}/projects/{project_id}/add-team/",
+            {"team_id": team_id},
+            format="json",
+        )
+        self.assertEqual(add_team.status_code, status.HTTP_200_OK, add_team.data)
+        guest_pm = next(row for row in add_team.data if row["user"] == guest.id)
+        maint_pm = next(row for row in add_team.data if row["user"] == maintainer.id)
+        self.assertEqual(guest_pm["role"], "guest")
+        self.assertEqual(maint_pm["role"], "maintainer")
+
+        guest_project = guest_client.get(f"{WORK}/projects/{project_id}/")
+        self.assertEqual(guest_project.status_code, status.HTTP_200_OK)
+        self.assertFalse(guest_project.data["can_add_task"])
+        self.assertFalse(guest_project.data["can_manage"])
+
+        maint_project = maintainer_client.get(f"{WORK}/projects/{project_id}/")
+        self.assertEqual(maint_project.status_code, status.HTTP_200_OK)
+        self.assertTrue(maint_project.data["can_add_task"])
+        self.assertTrue(maint_project.data["can_manage"])
+
+        guest_task = guest_client.post(
+            f"{WORK}/tasks/",
+            {"project": project_id, "title": "کار مهمان"},
+            format="json",
+        )
+        self.assertEqual(guest_task.status_code, status.HTTP_403_FORBIDDEN)
+
+        maint_task = maintainer_client.post(
+            f"{WORK}/tasks/",
+            {"project": project_id, "title": "کار نگهدارنده"},
+            format="json",
+        )
+        self.assertEqual(maint_task.status_code, status.HTTP_201_CREATED, maint_task.data)
+
+        column_res = maintainer_client.post(
+            f"{WORK}/projects/{project_id}/columns/",
+            {"name": "بازگشت", "color": "#3A2E1C"},
+            format="json",
+        )
+        self.assertEqual(column_res.status_code, status.HTTP_201_CREATED, column_res.data)
+
+        members = self.manager_client.get(f"{WORK}/teams/{team_id}/members/")
+        self.assertEqual(members.status_code, status.HTTP_200_OK)
+        guest_member = next(row for row in members.data if row["user"] == guest.id)
+        patch_role = self.manager_client.patch(
+            f"{WORK}/teams/{team_id}/members/{guest_member['id']}/",
+            {"role": "developer"},
+            format="json",
+        )
+        self.assertEqual(patch_role.status_code, status.HTTP_200_OK, patch_role.data)
+        self.assertEqual(patch_role.data["role"], "developer")
+
+        guest_after = guest_client.get(f"{WORK}/projects/{project_id}/")
+        self.assertTrue(guest_after.data["can_add_task"])
+        self.assertFalse(guest_after.data["can_manage"])

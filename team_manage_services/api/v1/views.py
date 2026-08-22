@@ -17,6 +17,8 @@ from team_manage_services.api.v1.serializers import (
     BoardColumnReorderSerializer,
     BoardColumnSerializer,
     BoardColumnWriteSerializer,
+    BoardTemplateSerializer,
+    BoardTemplateWriteSerializer,
     CommentWriteSerializer,
     CompanyMemberSerializer,
     CompanySerializer,
@@ -37,6 +39,7 @@ from team_manage_services.api.v1.serializers import (
 )
 from team_manage_services.models import (
     BoardColumn,
+    BoardTemplate,
     Invitation,
     Notification,
     Task,
@@ -60,9 +63,12 @@ from team_manage_services.services.access import (
 from team_manage_services.services.board import (
     create_column,
     create_label,
+    delete_board_template,
     delete_column,
     ensure_project_columns,
     reorder_columns,
+    save_board_template,
+    set_default_board_template,
     update_column,
     update_label,
 )
@@ -78,6 +84,7 @@ from team_manage_services.services.work import (
     add_project_member,
     add_task_step,
     add_team_to_project,
+    sync_team_role_to_projects,
     create_project,
     create_task,
     set_step_done,
@@ -217,6 +224,74 @@ class CompanyViewSet(viewsets.ModelViewSet):
         return Response(WorkLabelSerializer(label).data)
 
 
+@extend_schema(tags=["Work Board Templates"])
+class BoardTemplateViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        qs = BoardTemplate.objects.filter(
+            company_id__in=companies_for_user(self.request.user).values("id")
+        ).prefetch_related("columns")
+        company_id = _int_param(self.request, "company")
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+        return qs
+
+    def get_serializer_class(self):
+        if self.action in ("create", "partial_update"):
+            return BoardTemplateWriteSerializer
+        return BoardTemplateSerializer
+
+    def create(self, request, *args, **kwargs):
+        company = companies_for_user(request.user).filter(pk=request.data.get("company")).first()
+        if company is None:
+            raise ValidationError({"company": "Company not found."})
+        serializer = BoardTemplateWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        template = call_service(
+            save_board_template,
+            user=request.user,
+            company=company,
+            **serializer.validated_data,
+        )
+        return Response(BoardTemplateSerializer(template).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        template = self.get_object()
+        serializer = BoardTemplateWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        template = call_service(
+            save_board_template,
+            user=request.user,
+            company=template.company,
+            name=data.get("name", template.name),
+            columns=data.get("columns")
+            or [
+                {"name": col.name, "color": col.color, "is_closed": col.is_closed}
+                for col in template.columns.all()
+            ],
+            is_default=data.get("is_default", template.is_default),
+            template=template,
+        )
+        return Response(BoardTemplateSerializer(template).data)
+
+    def destroy(self, request, *args, **kwargs):
+        template = self.get_object()
+        call_service(delete_board_template, user=request.user, template=template)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"])
+    def default(self, request, pk=None):
+        template = call_service(
+            set_default_board_template,
+            user=request.user,
+            template=self.get_object(),
+        )
+        return Response(BoardTemplateSerializer(template).data)
+
+
 @extend_schema(tags=["Work Teams"])
 @extend_schema_view(
     list=extend_schema(
@@ -278,7 +353,8 @@ class TeamViewSet(viewsets.ModelViewSet):
     @extend_schema(
         summary="Invite to team by phone",
         description=(
-            "Company manager only. `{phone_number, position_title}`.\n"
+            "Company manager only. `{phone_number, position_title, role}`.\n"
+            "Role: owner / maintainer / developer / planner / guest.\n"
             "- Registered user → in-app invitation notification\n"
             "- Unknown phone → SMS hook (logged until bulk SMS is configured)\n"
             "After they log in, pending invites attach automatically."
@@ -297,6 +373,7 @@ class TeamViewSet(viewsets.ModelViewSet):
             team=team,
             phone_number=serializer.validated_data["phone_number"],
             position_title=serializer.validated_data.get("position_title", ""),
+            role=serializer.validated_data.get("role"),
         )
         return Response(
             InvitationSerializer(invitation).data,
@@ -305,7 +382,7 @@ class TeamViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Update a team member",
-        description="Company manager only. `{position_title?, status?}` (`active` | `inactive`).",
+        description="Company manager only. `{position_title?, role?, status?}` (`active` | `inactive`).",
         request=TeamMemberUpdateSerializer,
         responses={200: TeamMemberSerializer},
     )
@@ -329,7 +406,11 @@ class TeamViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         for attr, value in serializer.validated_data.items():
             setattr(member, attr, value)
+        if member.user_id == team.owner_id:
+            member.role = TeamMember.Role.OWNER
         member.save()
+        if "role" in serializer.validated_data:
+            sync_team_role_to_projects(member)
         return Response(TeamMemberSerializer(member).data)
 
 

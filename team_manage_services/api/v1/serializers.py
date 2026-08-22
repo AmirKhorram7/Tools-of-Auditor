@@ -3,6 +3,8 @@ from rest_framework import serializers
 from team_manage_services.models import (
     Attachment,
     BoardColumn,
+    BoardTemplate,
+    BoardTemplateColumn,
     Company,
     CompanyMember,
     Invitation,
@@ -17,6 +19,7 @@ from team_manage_services.models import (
     WorkLabel,
 )
 from team_manage_services.services.access import (
+    can_add_task,
     can_move_task,
     is_company_manager,
     is_project_manager,
@@ -102,6 +105,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
             "phone_number",
             "full_name",
             "profile_image",
+            "role",
             "position_title",
             "status",
             "joined_at",
@@ -124,6 +128,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
 class TeamMemberUpdateSerializer(serializers.Serializer):
     position_title = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    role = serializers.ChoiceField(choices=TeamMember.Role.choices, required=False)
     status = serializers.ChoiceField(
         choices=TeamMember.Status.choices,
         required=False,
@@ -133,6 +138,11 @@ class TeamMemberUpdateSerializer(serializers.Serializer):
 class InviteSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=15)
     position_title = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    role = serializers.ChoiceField(
+        choices=TeamMember.Role.choices,
+        required=False,
+        default=TeamMember.Role.DEVELOPER,
+    )
 
 
 class InvitationSerializer(serializers.ModelSerializer):
@@ -151,6 +161,7 @@ class InvitationSerializer(serializers.ModelSerializer):
             "invited_by_name",
             "invited_user",
             "phone_number",
+            "role",
             "position_title",
             "status",
             "expires_at",
@@ -195,6 +206,28 @@ class AddProjectTeamSerializer(serializers.Serializer):
     team_id = serializers.IntegerField()
 
 
+class BoardTemplateColumnSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BoardTemplateColumn
+        fields = ["id", "name", "color", "position", "status_key", "is_closed"]
+        read_only_fields = ["id", "position"]
+
+
+class BoardTemplateSerializer(serializers.ModelSerializer):
+    columns = BoardTemplateColumnSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = BoardTemplate
+        fields = ["id", "company", "name", "is_default", "columns", "created_at"]
+        read_only_fields = ["company", "is_default", "created_at"]
+
+
+class BoardTemplateWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=120, required=False)
+    is_default = serializers.BooleanField(required=False, default=False)
+    columns = serializers.ListField(child=serializers.DictField(), required=False)
+
+
 class WorkLabelSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkLabel
@@ -234,6 +267,8 @@ class BoardColumnReorderSerializer(serializers.Serializer):
 class ProjectSerializer(serializers.ModelSerializer):
     progress_percent = serializers.SerializerMethodField()
     can_manage = serializers.SerializerMethodField()
+    can_add_task = serializers.SerializerMethodField()
+    can_manage_company = serializers.SerializerMethodField()
     company_name = serializers.CharField(source="company.name", read_only=True)
 
     class Meta:
@@ -251,6 +286,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "due_date",
             "progress_percent",
             "can_manage",
+            "can_add_task",
+            "can_manage_company",
             "created_at",
             "updated_at",
         ]
@@ -264,6 +301,18 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return is_project_manager(request.user, obj)
+
+    def get_can_add_task(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return can_add_task(request.user, obj)
+
+    def get_can_manage_company(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return is_company_manager(request.user, obj.company)
 
 
 class TaskStepSerializer(serializers.ModelSerializer):

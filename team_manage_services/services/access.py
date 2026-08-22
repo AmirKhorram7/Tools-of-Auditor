@@ -11,8 +11,40 @@ COMPANY_MANAGE_ROLES = {
 }
 PROJECT_MANAGE_ROLES = {
     ProjectMember.Role.OWNER,
+    ProjectMember.Role.MAINTAINER,
     ProjectMember.Role.MANAGER,
 }
+PROJECT_ACT_ROLES = {
+    ProjectMember.Role.OWNER,
+    ProjectMember.Role.MAINTAINER,
+    ProjectMember.Role.MANAGER,
+    ProjectMember.Role.DEVELOPER,
+    ProjectMember.Role.PLANNER,
+    ProjectMember.Role.MEMBER,
+}
+
+
+def project_role(user, project: Project) -> str | None:
+    if project.owner_id == user.id:
+        return ProjectMember.Role.OWNER
+    row = ProjectMember.objects.filter(
+        project=project,
+        user=user,
+        status=ProjectMember.Status.ACTIVE,
+    ).first()
+    return row.role if row else None
+
+
+def can_act_on_project(user, project: Project) -> bool:
+    """Developer / planner / maintainer / owner can add and move work. Guest cannot."""
+    if is_company_manager(user, project.company):
+        return True
+    role = project_role(user, project)
+    return role in PROJECT_ACT_ROLES
+
+
+def can_add_task(user, project: Project) -> bool:
+    return can_act_on_project(user, project)
 
 
 def companies_for_user(user):
@@ -100,17 +132,18 @@ def can_work_on_task(user, task) -> bool:
         return True
     if not can_view_project(user, task.project):
         return False
+    if not can_act_on_project(user, task.project):
+        return False
     if task.assigned_to_id and task.assigned_to.user_id == user.id:
         return True
     return ProjectMember.objects.filter(
         project=task.project,
         user=user,
         status=ProjectMember.Status.ACTIVE,
+        role__in=PROJECT_ACT_ROLES,
     ).exists()
 
 
 def can_move_task(user, task) -> bool:
-    """Only the assignee and a project/company manager can change column/status."""
-    if is_project_manager(user, task.project):
-        return True
-    return bool(task.assigned_to_id and task.assigned_to.user_id == user.id)
+    """Maintainer/owner/developer/planner can move cards. Guest cannot."""
+    return can_act_on_project(user, task.project)

@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from team_manage_services.api.v1.views import (
+    BoardTemplateViewSet,
     CommentAttachmentViewSet,
     CompanyViewSet,
     InvitationViewSet,
@@ -15,6 +16,7 @@ from team_manage_services.api.v1.views import (
 
 router = DefaultRouter()
 router.register("companies", CompanyViewSet, basename="work-companies")
+router.register("board-templates", BoardTemplateViewSet, basename="work-board-templates")
 router.register("teams", TeamViewSet, basename="work-teams")
 router.register("invitations", InvitationViewSet, basename="work-invitations")
 router.register("projects", ProjectViewSet, basename="work-projects")

@@ -151,6 +151,54 @@ class WorkLabel(BaseModel):
         return self.name
 
 
+class BoardTemplate(BaseModel):
+    """Reusable column set a company manager applies to new projects."""
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="board_templates",
+    )
+    name = models.CharField(max_length=120)
+    is_default = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_board_templates",
+    )
+
+    class Meta:
+        ordering = ["-is_default", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "name"],
+                name="tm_unique_board_template_name",
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class BoardTemplateColumn(BaseModel):
+    template = models.ForeignKey(
+        BoardTemplate,
+        on_delete=models.CASCADE,
+        related_name="columns",
+    )
+    name = models.CharField(max_length=80)
+    color = models.CharField(max_length=7, default="#1A2B49")
+    position = models.PositiveIntegerField(default=0)
+    status_key = models.CharField(max_length=20, default="todo")
+    is_closed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["position", "id"]
+
+    def __str__(self):
+        return f"{self.template} / {self.name}"
+
+
 class Team(BaseModel):
     class Status(models.TextChoices):
         ACTIVE = "active", _("Active")
@@ -189,6 +237,13 @@ class Team(BaseModel):
 
 
 class TeamMember(BaseModel):
+    class Role(models.TextChoices):
+        OWNER = "owner", _("Owner")
+        MAINTAINER = "maintainer", _("Maintainer")
+        DEVELOPER = "developer", _("Developer")
+        PLANNER = "planner", _("Planner")
+        GUEST = "guest", _("Guest")
+
     class Status(models.TextChoices):
         ACTIVE = "active", _("Active")
         INACTIVE = "inactive", _("Inactive")
@@ -202,6 +257,11 @@ class TeamMember(BaseModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="team_memberships",
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default=Role.DEVELOPER,
     )
     position_title = models.CharField(max_length=150, blank=True, default="")
     status = models.CharField(
@@ -255,6 +315,11 @@ class Invitation(BaseModel):
         blank=True,
     )
     phone_number = models.CharField(max_length=15)
+    role = models.CharField(
+        max_length=20,
+        choices=TeamMember.Role.choices,
+        default=TeamMember.Role.DEVELOPER,
+    )
     position_title = models.CharField(max_length=150, blank=True, default="")
     status = models.CharField(
         max_length=20,
@@ -370,6 +435,10 @@ class ProjectTeam(BaseModel):
 class ProjectMember(BaseModel):
     class Role(models.TextChoices):
         OWNER = "owner", _("Owner")
+        MAINTAINER = "maintainer", _("Maintainer")
+        DEVELOPER = "developer", _("Developer")
+        PLANNER = "planner", _("Planner")
+        GUEST = "guest", _("Guest")
         MANAGER = "manager", _("Manager")
         MEMBER = "member", _("Member")
 

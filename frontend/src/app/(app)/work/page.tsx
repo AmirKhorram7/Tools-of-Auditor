@@ -194,6 +194,8 @@ export default function WorkHomePage() {
             {myTasks.map((task) => (
               <TaskCard
                 key={task.id}
+                href={`/work/projects/${task.project_id}`}
+                columnName={task.project_name}
                 task={{
                   id: task.id,
                   title: task.title,

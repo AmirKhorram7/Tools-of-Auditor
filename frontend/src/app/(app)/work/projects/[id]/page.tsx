@@ -26,11 +26,13 @@ import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { useAuth } from "@/lib/auth";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
+  ASSIGNABLE_TEAM_ROLES,
   LABEL_COLORS,
+  TAG_COLORS,
   PRIORITY_LABELS,
   PROJECT_STATUS_LABELS,
   TASK_STATUS_LABELS,
-  colorAlpha,
+  TEAM_ROLE_LABELS,
   formatFaDate,
   isOverdue,
   labelTextColor,
@@ -42,6 +44,7 @@ import {
   type WorkProject,
   type WorkProjectMember,
   type WorkTask,
+  type WorkBoardTemplate,
   type WorkTeam,
 } from "@/lib/work";
 
@@ -67,6 +70,15 @@ export default function WorkProjectPage() {
   const [taskOpen, setTaskOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"teams" | "labels" | "board" | "templates">("labels");
+  const [templates, setTemplates] = useState<WorkBoardTemplate[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDefault, setTemplateDefault] = useState(true);
+  const [templateCols, setTemplateCols] = useState([
+    { name: "برای انجام", color: LABEL_COLORS[0] },
+    { name: "در حال انجام", color: LABEL_COLORS[1] },
+    { name: "بسته", color: LABEL_COLORS[6] },
+  ]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -77,7 +89,7 @@ export default function WorkProjectPage() {
   const [columnId, setColumnId] = useState<number | "">("");
   const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
   const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[4]);
+  const [newLabelColor, setNewLabelColor] = useState(TAG_COLORS[0]);
   const [newColumnName, setNewColumnName] = useState("");
   const [newColumnColor, setNewColumnColor] = useState(LABEL_COLORS[1]);
   const [columnNames, setColumnNames] = useState<Record<number, string>>({});
@@ -85,6 +97,7 @@ export default function WorkProjectPage() {
   const [inviteTeamId, setInviteTeamId] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteTitle, setInviteTitle] = useState("");
+  const [inviteRole, setInviteRole] = useState("developer");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -124,6 +137,14 @@ export default function WorkProjectPage() {
       setTeams(teamRows);
       setLabels(Array.isArray(labelRows) ? labelRows : []);
       setProjectTeams(Array.isArray(linkedTeams) ? linkedTeams : []);
+      try {
+        const templateRows = await apiList<WorkBoardTemplate>(
+          `/work/board-templates/?company=${row.company}`,
+        );
+        setTemplates(templateRows);
+      } catch {
+        setTemplates([]);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "بارگذاری پروژه ناموفق بود.");
     } finally {
@@ -237,7 +258,7 @@ export default function WorkProjectPage() {
       });
       await load(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "جابه‌جایی کار فقط برای مسئول و مدیر است.");
+      setError(err instanceof ApiError ? err.message : "جابه‌جایی این کار مجاز نیست.");
     }
   };
 
@@ -304,6 +325,7 @@ export default function WorkProjectPage() {
         body: {
           phone_number: invitePhone.trim(),
           position_title: inviteTitle.trim(),
+          role: inviteRole,
         },
       });
       await apiFetch(`/work/projects/${projectId}/add-team/`, {
@@ -312,6 +334,7 @@ export default function WorkProjectPage() {
       });
       setInvitePhone("");
       setInviteTitle("");
+      setInviteRole("developer");
       await load(true);
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "دعوت همکار ناموفق بود.");
@@ -342,11 +365,71 @@ export default function WorkProjectPage() {
     }
   };
 
+  const saveTemplate = async () => {
+    if (!project || !templateName.trim()) {
+      setFormError("نام بورد پیش‌فرض الزامی است.");
+      return;
+    }
+    const columns = templateCols.filter((row) => row.name.trim());
+    if (columns.length === 0) {
+      setFormError("حداقل یک ستون بنویسید.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch("/work/board-templates/", {
+        method: "POST",
+        body: {
+          company: project.company,
+          name: templateName.trim(),
+          is_default: templateDefault,
+          columns,
+        },
+      });
+      setTemplateName("");
+      await load(true);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "ذخیره بورد پیش‌فرض ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setDefaultTemplate = async (templateId: number) => {
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch(`/work/board-templates/${templateId}/default/`, { method: "POST" });
+      await load(true);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "تعیین پیش‌فرض ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteTemplate = async (templateId: number) => {
+    if (!window.confirm("این بورد پیش‌فرض حذف شود؟")) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch(`/work/board-templates/${templateId}/`, { method: "DELETE" });
+      await load(true);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : "حذف بورد پیش‌فرض ناموفق بود.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <PageLoader />;
   if (!project) return <Alert>{error || "پروژه پیدا نشد."}</Alert>;
 
+  const canAddTask = Boolean(project.can_add_task ?? project.can_manage);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <WorkBreadcrumb
         fallbackHref={`/work/companies/${project.company}`}
         items={[
@@ -358,21 +441,29 @@ export default function WorkProjectPage() {
           { label: project.name },
         ]}
       />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-ink">{project.name}</h1>
-            <Badge tone="blue">
-              {PROJECT_STATUS_LABELS[project.status] || project.status}
-            </Badge>
-            <ProgressGauge value={project.progress_percent} size={58} />
-          </div>
-          {project.description ? (
-            <p className="mt-1 line-clamp-1 text-sm text-gray-500">{project.description}</p>
-          ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <h1 className="text-lg font-bold text-ink">{project.name}</h1>
+          <Badge tone="blue">
+            {PROJECT_STATUS_LABELS[project.status] || project.status}
+          </Badge>
+          {projectTeams.map((team) => (
+            <Link
+              key={team.id}
+              href={`/work/teams/${team.id}`}
+              className="rounded-md px-2 py-0.5 text-xs font-bold"
+              style={{
+                backgroundColor: teamColor(team.id),
+                color: labelTextColor(teamColor(team.id)),
+              }}
+            >
+              {team.name}
+            </Link>
+          ))}
+          <ProgressGauge value={project.progress_percent} size={44} />
         </div>
         <div className="flex flex-wrap gap-2">
-          {project.can_manage && (
+          {canAddTask && (
             <Button size="sm" onClick={() => openTaskModal()}>
               افزودن کار
             </Button>
@@ -391,24 +482,6 @@ export default function WorkProjectPage() {
       </div>
 
       {error && <Alert>{error}</Alert>}
-
-      {projectTeams.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {projectTeams.map((team) => (
-            <Link
-              key={team.id}
-              href={`/work/teams/${team.id}`}
-              className="rounded-lg px-3 py-1.5 text-sm font-bold shadow-sm"
-              style={{
-                backgroundColor: teamColor(team.id),
-                color: labelTextColor(teamColor(team.id)),
-              }}
-            >
-              {team.name}
-            </Link>
-          ))}
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 text-sm">
@@ -442,22 +515,23 @@ export default function WorkProjectPage() {
         <TaskBoard
           board={board}
           canManage={project.can_manage}
+          canAddTask={canAddTask}
           mineOnly={mineOnly}
           currentUserId={myUserId}
           onMove={moveTask}
-          onAddTask={openTaskModal}
+          onAddTask={canAddTask ? openTaskModal : undefined}
           onAddColumn={project.can_manage ? addColumn : undefined}
         />
       ) : visibleTasks.length === 0 ? (
         <EmptyState
           title="کاری در این نما نیست"
           description={
-            project.can_manage
+            canAddTask
               ? "یک کار بسازید و مسئول بگذارید تا روی بورد دیده شود."
               : "هنوز کاری به این پروژه اضافه نشده."
           }
           action={
-            project.can_manage ? (
+            canAddTask ? (
               <Button size="sm" onClick={() => openTaskModal()}>
                 کار جدید
               </Button>
@@ -498,10 +572,10 @@ export default function WorkProjectPage() {
                     {(task.labels || []).map((label) => (
                       <span
                         key={label.id}
-                        className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                        className="rounded px-1.5 py-0.5 text-[10px] font-bold"
                         style={{
-                          backgroundColor: colorAlpha(label.color, 0.14),
-                          color: label.color,
+                          backgroundColor: label.color,
+                          color: labelTextColor(label.color),
                         }}
                       >
                         {label.name}
@@ -604,8 +678,8 @@ export default function WorkProjectPage() {
                         active ? "ring-2 ring-navy-900/40" : "opacity-70"
                       }`}
                       style={{
-                        backgroundColor: colorAlpha(label.color, 0.14),
-                        color: label.color,
+                        backgroundColor: label.color,
+                        color: labelTextColor(label.color),
                       }}
                     >
                       {label.name}
@@ -632,8 +706,30 @@ export default function WorkProjectPage() {
         onClose={() => setSettingsOpen(false)}
         className="max-w-lg max-h-[90vh] overflow-y-auto"
       >
-        <div className="space-y-5">
+        <div className="space-y-4">
           {formError && <Alert>{formError}</Alert>}
+          <div className="flex flex-wrap rounded-lg border border-gray-200 bg-[#F7F8FA] p-0.5 text-xs">
+            {(
+              [
+                ["labels", "برچسب"],
+                ["board", "بورد"],
+                ["teams", "تیم"],
+                ["templates", "پیش‌فرض"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSettingsTab(id)}
+                className={`flex-1 rounded-md px-2 py-1.5 ${
+                  settingsTab === id ? "bg-navy-900 text-white" : "text-gray-600"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {settingsTab === "teams" && (
           <section>
             <h3 className="mb-2 text-sm font-semibold text-ink">تیم‌ها</h3>
             <div className="mb-3 flex flex-wrap gap-2">
@@ -683,6 +779,13 @@ export default function WorkProjectPage() {
                 ))}
               </Select>
               <PhoneSuggest value={invitePhone} onChange={setInvitePhone} />
+              <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+                {ASSIGNABLE_TEAM_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {TEAM_ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </Select>
               <Input
                 value={inviteTitle}
                 onChange={(e) => setInviteTitle(e.target.value)}
@@ -696,50 +799,67 @@ export default function WorkProjectPage() {
               روی نام تیم بزنید تا عضو را حذف یا ویرایش کنید.
             </p>
           </section>
+          )}
+          {settingsTab === "labels" && (
           <section>
             <h3 className="mb-2 text-sm font-semibold text-ink">برچسب‌ها</h3>
-            <div className="mb-2 flex flex-wrap gap-1.5">
+            <p className="mb-2 text-xs text-gray-500">رنگ انتخابی، پس‌زمینه برچسب می‌شود.</p>
+            <div className="mb-3 flex flex-wrap gap-1.5">
               {labels.length === 0 && (
                 <p className="text-xs text-gray-500">مثلاً فورس‌ماژور یا مهم.</p>
               )}
               {labels.map((label) => (
                 <span
                   key={label.id}
-                  className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                  className="rounded px-2.5 py-0.5 text-xs font-bold"
                   style={{
-                    backgroundColor: colorAlpha(label.color, 0.14),
-                    color: label.color,
+                    backgroundColor: label.color,
+                    color: labelTextColor(label.color),
                   }}
                 >
                   {label.name}
                 </span>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="space-y-2">
               <Input
                 value={newLabelName}
                 onChange={(e) => setNewLabelName(e.target.value)}
                 placeholder="نام برچسب"
-                className="max-w-[180px]"
               />
-              {LABEL_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setNewLabelColor(color)}
-                  className={`size-5 rounded-full border ${
-                    newLabelColor === color ? "border-navy-900" : "border-white"
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+              <div className="flex flex-wrap items-center gap-2">
+                {TAG_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewLabelColor(color)}
+                    className={`size-6 rounded-full ${
+                      newLabelColor === color ? "ring-2 ring-navy-900/40 ring-offset-1" : ""
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              {newLabelName.trim() && (
+                <span
+                  className="inline-flex rounded px-2.5 py-0.5 text-xs font-bold"
+                  style={{
+                    backgroundColor: newLabelColor,
+                    color: labelTextColor(newLabelColor),
+                  }}
+                >
+                  {newLabelName.trim()}
+                </span>
+              )}
               <Button size="sm" loading={saving} onClick={() => void createLabel()}>
-                ساخت
+                ساخت برچسب
               </Button>
             </div>
           </section>
+          )}
+          {settingsTab === "board" && (
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">کارت‌های بورد</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">ستون‌های بورد</h3>
             <p className="mb-3 text-xs text-gray-500">
               نام و رنگ هر ستون را اینجا عوض کنید.
             </p>
@@ -844,6 +964,161 @@ export default function WorkProjectPage() {
               </Button>
             </div>
           </section>
+          )}
+          {settingsTab === "templates" && (
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-ink">بورد پیش‌فرض شرکت</h3>
+            <p className="mb-3 text-xs text-gray-500">
+              پروژه‌های تازه ستون‌های بورد پیش‌فرض را می‌گیرند. اگر پیش‌فرضی نباشد، برای انجام / در حال انجام / بسته ساخته می‌شود.
+            </p>
+            <ul className="mb-3 space-y-2">
+              {templates.length === 0 && (
+                <li className="text-xs text-gray-500">هنوز بورد پیش‌فرضی ذخیره نشده.</li>
+              )}
+              {templates.map((template) => (
+                <li
+                  key={template.id}
+                  className="rounded-xl border border-black/[0.06] p-2.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{template.name}</p>
+                      {template.is_default && (
+                        <span className="text-[11px] font-bold text-brand-700">پیش‌فرض فعلی</span>
+                      )}
+                    </div>
+                    {project.can_manage_company && (
+                      <div className="flex gap-1">
+                        {!template.is_default && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={saving}
+                            onClick={() => void setDefaultTemplate(template.id)}
+                          >
+                            پیش‌فرض
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void deleteTemplate(template.id)}
+                        >
+                          حذف
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {template.columns.map((column) => (
+                      <span
+                        key={column.id}
+                        className="rounded px-2 py-0.5 text-[11px] font-bold"
+                        style={{
+                          backgroundColor: column.color,
+                          color: labelTextColor(column.color),
+                        }}
+                      >
+                        {column.name}
+                      </span>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {project.can_manage_company ? (
+              <div className="space-y-2 rounded-xl border border-dashed border-black/10 p-2.5">
+                <p className="text-xs font-medium text-ink">بورد پیش‌فرض تازه</p>
+                <Input
+                  value={templateName}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                  placeholder="مثلاً x_boards_list"
+                />
+                <label className="flex items-center gap-2 text-xs text-ink">
+                  <input
+                    type="checkbox"
+                    checked={templateDefault}
+                    onChange={(event) => setTemplateDefault(event.target.checked)}
+                  />
+                  به‌عنوان پیش‌فرض شرکت ذخیره شود
+                </label>
+                {templateCols.map((row, index) => (
+                  <div key={index} className="space-y-1.5 rounded-lg bg-[#F7F8FA] p-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={row.name}
+                        onChange={(event) =>
+                          setTemplateCols((current) =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, name: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        placeholder={`ستون ${index + 1}`}
+                      />
+                      {templateCols.length > 1 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setTemplateCols((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                          }
+                        >
+                          حذف
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {LABEL_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() =>
+                            setTemplateCols((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, color } : item,
+                              ),
+                            )
+                          }
+                          className={`size-5 rounded-full ${
+                            row.color.toLowerCase() === color.toLowerCase()
+                              ? "ring-2 ring-navy-900/30 ring-offset-1"
+                              : ""
+                          }`}
+                          style={{ backgroundColor: color }}
+                          aria-label={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setTemplateCols((current) => [
+                      ...current,
+                      { name: "", color: LABEL_COLORS[current.length % LABEL_COLORS.length] },
+                    ])
+                  }
+                >
+                  ستون دیگر
+                </Button>
+                <Button size="sm" loading={saving} onClick={() => void saveTemplate()}>
+                  ذخیره بورد پیش‌فرض
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">
+                فقط مدیر شرکت می‌تواند بورد پیش‌فرض بسازد یا عوض کند.
+              </p>
+            )}
+          </section>
+          )}
           <div className="flex justify-end">
             <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
               بستن

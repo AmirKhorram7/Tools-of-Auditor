@@ -1,6 +1,13 @@
 """Project board columns and company labels (GitLab-style lists + tags)."""
 
-from team_manage_services.models import BoardColumn, Project, Task, WorkLabel
+from team_manage_services.models import (
+    BoardColumn,
+    BoardTemplate,
+    BoardTemplateColumn,
+    Project,
+    Task,
+    WorkLabel,
+)
 from team_manage_services.services.access import is_company_manager, is_project_manager
 
 DEFAULT_BOARD_COLUMNS = (
@@ -11,14 +18,53 @@ DEFAULT_BOARD_COLUMNS = (
         "status_key": Task.Status.IN_PROGRESS,
         "is_closed": False,
     },
+    {"name": "بسته", "color": "#1E3328", "status_key": Task.Status.DONE, "is_closed": True},
 )
+
+
+def infer_column_status(name: str, is_closed=False) -> tuple[str, bool]:
+    text = (name or "").strip().lower()
+    closed_words = ("بسته", "تمام", "close", "closed", "done")
+    progress_words = ("انجام", "progress", "doing")
+    if is_closed or any(word in text for word in closed_words):
+        return Task.Status.DONE, True
+    if any(word in text for word in progress_words) and "برای" not in text:
+        return Task.Status.IN_PROGRESS, False
+    return Task.Status.TODO, False
+
+
+def default_template_columns(company) -> list[BoardTemplateColumn] | None:
+    template = (
+        BoardTemplate.objects.filter(company=company, is_default=True)
+        .prefetch_related("columns")
+        .first()
+    )
+    if template is None:
+        return None
+    columns = list(template.columns.all())
+    return columns or None
 
 
 def seed_project_columns(project: Project) -> list[BoardColumn]:
     existing = list(project.board_columns.order_by("position", "id"))
     if existing:
         return existing
+    specs = default_template_columns(project.company)
     created = []
+    if specs:
+        for index, spec in enumerate(specs):
+            status_key, is_closed = infer_column_status(spec.name, spec.is_closed)
+            created.append(
+                BoardColumn.objects.create(
+                    project=project,
+                    name=spec.name,
+                    color=spec.color or "#1A2B49",
+                    status_key=spec.status_key or status_key,
+                    is_closed=spec.is_closed or is_closed,
+                    position=spec.position if spec.position is not None else index,
+                )
+            )
+        return created
     for index, spec in enumerate(DEFAULT_BOARD_COLUMNS):
         created.append(
             BoardColumn.objects.create(
@@ -160,3 +206,58 @@ def update_label(*, user, label: WorkLabel, **fields) -> WorkLabel:
     label.full_clean()
     label.save()
     return label
+
+
+def save_board_template(*, user, company, name: str, columns: list, is_default=False, template=None):
+    from rest_framework.exceptions import PermissionDenied, ValidationError
+
+    if not is_company_manager(user, company):
+        raise PermissionDenied("Only the company manager can save a default board.")
+    name = (name or "").strip()
+    if not name:
+        raise ValidationError({"name": "Template name is required."})
+    rows = [row for row in (columns or []) if (row.get("name") or "").strip()]
+    if not rows:
+        raise ValidationError({"columns": "Add at least one column."})
+    if template is None:
+        template = BoardTemplate(company=company, created_by=user)
+    template.name = name
+    template.is_default = bool(is_default)
+    template.full_clean()
+    template.save()
+    if is_default:
+        BoardTemplate.objects.filter(company=company).exclude(pk=template.pk).update(is_default=False)
+        template.is_default = True
+        template.save(update_fields=["is_default"])
+    template.columns.all().delete()
+    for index, row in enumerate(rows):
+        col_name = row["name"].strip()
+        status_key, is_closed = infer_column_status(col_name, row.get("is_closed", False))
+        BoardTemplateColumn.objects.create(
+            template=template,
+            name=col_name,
+            color=(row.get("color") or "#1A2B49").strip(),
+            position=index,
+            status_key=row.get("status_key") or status_key,
+            is_closed=bool(row.get("is_closed") or is_closed),
+        )
+    return template
+
+
+def set_default_board_template(*, user, template: BoardTemplate) -> BoardTemplate:
+    from rest_framework.exceptions import PermissionDenied
+
+    if not is_company_manager(user, template.company):
+        raise PermissionDenied("Only the company manager can set the default board.")
+    BoardTemplate.objects.filter(company=template.company).update(is_default=False)
+    template.is_default = True
+    template.save(update_fields=["is_default", "updated_at"])
+    return template
+
+
+def delete_board_template(*, user, template: BoardTemplate):
+    from rest_framework.exceptions import PermissionDenied
+
+    if not is_company_manager(user, template.company):
+        raise PermissionDenied("Only the company manager can delete a default board.")
+    template.delete()

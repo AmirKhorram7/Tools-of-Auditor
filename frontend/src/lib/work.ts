@@ -23,8 +23,33 @@ export type WorkTeamMember = {
   phone_number: string;
   full_name: string;
   profile_image?: string | null;
+  role: string;
   position_title: string;
   status: string;
+};
+
+export const TEAM_ROLE_LABELS: Record<string, string> = {
+  owner: "مالک",
+  maintainer: "نگهدارنده",
+  developer: "توسعه‌دهنده",
+  planner: "برنامه‌ریز",
+  guest: "مهمان",
+};
+
+export const ASSIGNABLE_TEAM_ROLES = ["maintainer", "developer", "planner", "guest"] as const;
+
+export type WorkBoardTemplate = {
+  id: number;
+  company: number;
+  name: string;
+  is_default: boolean;
+  columns: Array<{
+    id: number;
+    name: string;
+    color: string;
+    position: number;
+    is_closed: boolean;
+  }>;
 };
 
 export type WorkInvitation = {
@@ -52,6 +77,8 @@ export type WorkProject = {
   due_date: string | null;
   progress_percent: number;
   can_manage: boolean;
+  can_add_task?: boolean;
+  can_manage_company?: boolean;
 };
 
 export type WorkProjectMember = {
@@ -392,6 +419,17 @@ export const LABEL_COLORS = [
   "#3A2430",
   "#1E3328",
   "#3A2E1C",
+];
+
+export const TAG_COLORS = [
+  "#C91C69",
+  "#1F75CB",
+  "#C2940A",
+  "#C91C1C",
+  "#1AAA55",
+  "#6B4FBB",
+  "#E67E22",
+  "#1A2B49",
 ];
 
 /** Keep column headers navy-dark even if an older light hue is stored. */

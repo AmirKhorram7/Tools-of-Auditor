@@ -19,7 +19,14 @@ import PhoneSuggest from "@/components/work/PhoneSuggest";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch } from "@/lib/api";
-import { labelTextColor, teamColor, type WorkTeam, type WorkTeamMember } from "@/lib/work";
+import {
+  ASSIGNABLE_TEAM_ROLES,
+  TEAM_ROLE_LABELS,
+  labelTextColor,
+  teamColor,
+  type WorkTeam,
+  type WorkTeamMember,
+} from "@/lib/work";
 
 export default function WorkTeamPage() {
   const params = useParams<{ id: string }>();
@@ -37,9 +44,11 @@ export default function WorkTeamPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteTitle, setInviteTitle] = useState("");
+  const [inviteRole, setInviteRole] = useState("developer");
   const [editMember, setEditMember] = useState<WorkTeamMember | null>(null);
   const [memberTitle, setMemberTitle] = useState("");
   const [memberStatus, setMemberStatus] = useState("active");
+  const [memberRole, setMemberRole] = useState("developer");
 
   const load = useCallback(async () => {
     if (!Number.isFinite(teamId)) return;
@@ -100,11 +109,13 @@ export default function WorkTeamPage() {
         body: {
           phone_number: invitePhone.trim(),
           position_title: inviteTitle.trim(),
+          role: inviteRole,
         },
       });
       setInviteOpen(false);
       setInvitePhone("");
       setInviteTitle("");
+      setInviteRole("developer");
       await load();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "ارسال دعوت ناموفق بود.");
@@ -120,7 +131,7 @@ export default function WorkTeamPage() {
     try {
       await apiFetch(`/work/teams/${teamId}/members/${editMember.id}/`, {
         method: "PATCH",
-        body: { position_title: memberTitle.trim(), status: memberStatus },
+        body: { position_title: memberTitle.trim(), status: memberStatus, role: memberRole },
       });
       setEditMember(null);
       await load();
@@ -249,8 +260,8 @@ export default function WorkTeamPage() {
           <WorkTable
             columns={
               canManage
-                ? ["نام", "موبایل", "سمت", "وضعیت", ""]
-                : ["نام", "موبایل", "سمت", "وضعیت"]
+                ? ["نام", "نقش", "موبایل", "سمت", "وضعیت", ""]
+                : ["نام", "نقش", "موبایل", "سمت", "وضعیت"]
             }
           >
             {members.map((member) => (
@@ -266,6 +277,9 @@ export default function WorkTeamPage() {
                       {member.full_name || member.phone_number}
                     </span>
                   </div>
+                </WorkTd>
+                <WorkTd>
+                  {TEAM_ROLE_LABELS[member.role] || member.role || "توسعه‌دهنده"}
                 </WorkTd>
                 <WorkTd>
                   <span dir="ltr">{member.phone_number}</span>
@@ -286,6 +300,7 @@ export default function WorkTeamPage() {
                           setEditMember(member);
                           setMemberTitle(member.position_title || "");
                           setMemberStatus(member.status);
+                          setMemberRole(member.role || "developer");
                           setFormError(null);
                         }}
                       >
@@ -318,6 +333,15 @@ export default function WorkTeamPage() {
           {formError && <Alert>{formError}</Alert>}
           <Field label="شماره موبایل">
             <PhoneSuggest value={invitePhone} onChange={setInvitePhone} />
+          </Field>
+          <Field label="نقش">
+            <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+              {ASSIGNABLE_TEAM_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {TEAM_ROLE_LABELS[role]}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label="سمت (اختیاری)">
             <Input
@@ -354,6 +378,16 @@ export default function WorkTeamPage() {
               {editMember?.full_name || editMember?.phone_number}
             </p>
           </div>
+          <Field label="نقش">
+            <Select value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
+              {memberRole === "owner" && <option value="owner">{TEAM_ROLE_LABELS.owner}</option>}
+              {ASSIGNABLE_TEAM_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {TEAM_ROLE_LABELS[role]}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label="سمت">
             <Input
               value={memberTitle}

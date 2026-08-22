@@ -63,10 +63,11 @@ def create_team(*, user, company: Company, name: str) -> Team:
     team = Team(company=company, name=name.strip(), owner=user)
     team.full_clean()
     team.save()
-    TeamMember.objects.get_or_create(
+    TeamMember.objects.update_or_create(
         team=team,
         user=user,
         defaults={
+            "role": TeamMember.Role.OWNER,
             "position_title": "مدیر",
             "status": TeamMember.Status.ACTIVE,
             "joined_at": timezone.now(),
@@ -90,6 +91,7 @@ def invite_to_team(
     team: Team,
     phone_number: str,
     position_title: str = "",
+    role: str = TeamMember.Role.DEVELOPER,
 ) -> Invitation:
     if not is_company_manager(user, team.company):
         raise PermissionDenied("Only the company manager can invite to this team.")
@@ -105,6 +107,7 @@ def invite_to_team(
         invited_by=user,
         invited_user=invited_user,
         phone_number=phone,
+        role=role or TeamMember.Role.DEVELOPER,
         position_title=position_title.strip(),
         expires_at=timezone.now() + timedelta(days=INVITE_DAYS),
     )
@@ -187,6 +190,7 @@ def respond_to_invitation(*, user, invitation: Invitation, accept: bool) -> Invi
         team=invitation.team,
         user=user,
         defaults={
+            "role": invitation.role or TeamMember.Role.DEVELOPER,
             "position_title": invitation.position_title,
             "status": TeamMember.Status.ACTIVE,
             "joined_at": timezone.now(),

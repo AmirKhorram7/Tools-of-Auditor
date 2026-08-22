@@ -17,6 +17,7 @@ from team_manage_services.models import (
     TeamMember,
 )
 from team_manage_services.services.access import (
+    can_add_task,
     can_move_task,
     can_work_on_task,
     is_company_manager,
@@ -29,6 +30,24 @@ from team_manage_services.services.board import (
     seed_project_columns,
 )
 from team_manage_services.services.notify import log_activity, notify_user
+
+
+def project_role_from_team(role: str) -> str:
+    if role in (TeamMember.Role.OWNER, TeamMember.Role.MAINTAINER):
+        return ProjectMember.Role.MAINTAINER
+    if role == TeamMember.Role.PLANNER:
+        return ProjectMember.Role.PLANNER
+    if role == TeamMember.Role.GUEST:
+        return ProjectMember.Role.GUEST
+    return ProjectMember.Role.DEVELOPER
+
+
+def sync_team_role_to_projects(team_member: TeamMember) -> None:
+    mapped = project_role_from_team(team_member.role)
+    ProjectMember.objects.filter(
+        added_from_team=team_member.team,
+        user=team_member.user,
+    ).exclude(role=ProjectMember.Role.OWNER).update(role=mapped)
 
 
 def _ensure_project_owner_member(project: Project) -> ProjectMember:
@@ -74,15 +93,20 @@ def add_team_to_project(*, user, project: Project, team: Team) -> ProjectTeam:
     link, created = ProjectTeam.objects.get_or_create(project=project, team=team)
     if created:
         for tm in team.members.filter(status=TeamMember.Status.ACTIVE):
-            ProjectMember.objects.get_or_create(
+            mapped = project_role_from_team(tm.role)
+            member, created = ProjectMember.objects.get_or_create(
                 project=project,
                 user=tm.user,
                 defaults={
-                    "role": ProjectMember.Role.MEMBER,
+                    "role": mapped,
                     "status": ProjectMember.Status.ACTIVE,
                     "added_from_team": team,
                 },
             )
+            if not created and member.role != ProjectMember.Role.OWNER:
+                member.role = mapped
+                member.status = ProjectMember.Status.ACTIVE
+                member.save(update_fields=["role", "status", "updated_at"])
         log_activity(
             actor=user,
             action=ActivityLog.Action.MEMBER_ADDED,
@@ -130,8 +154,8 @@ def add_project_member(*, user, project: Project, member_user, role=None) -> Pro
 
 @transaction.atomic
 def create_task(*, user, project: Project, labels=None, **fields) -> Task:
-    if not is_project_manager(user, project):
-        raise PermissionDenied("Only a project manager can create a task.")
+    if not can_add_task(user, project):
+        raise PermissionDenied("Guests can view the board but cannot add work.")
     assigned = fields.get("assigned_to")
     if assigned and assigned.project_id != project.id:
         raise ValidationError({"assigned_to": "Assignee must be a member of this project."})
