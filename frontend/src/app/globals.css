@@ -104,3 +104,18 @@
   font-weight: 700;
   color: #1a2b49;
 }
+
+.rich-content a.step-mention {
+  display: inline;
+  border-radius: 4px;
+  background: #e8eef6;
+  color: #1a2b49;
+  padding: 0 0.3rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.rich-content a.step-mention:hover {
+  background: #d5deea;
+  color: #1a2b49;
+}

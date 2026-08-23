@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import BackButton from "@/components/BackButton";
 import StepCanvas from "@/components/StepCanvas";
 import ColorPicker from "@/components/explanation/ColorPicker";
+import ExplanationGuide from "@/components/explanation/ExplanationGuide";
 import {
   Alert,
   Button,
@@ -341,21 +342,22 @@ export default function ProcessCanvasPage() {
           {pdfLoading ? t("exp.buildingPdf") : t("exp.downloadPdf")}
         </Button>
         {editable && (
-          <>
-            <Button variant="secondary" onClick={openEdit}>
-              {t("common.edit")}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setDeleteError(null);
-                setPending({ kind: "process" });
-              }}
-              className="text-red-600 hover:border-red-300 hover:bg-red-50"
-            >
-              {t("exp.deleteProcess")}
-            </Button>
-          </>
+          <Button variant="secondary" onClick={openEdit}>
+            {t("common.edit")}
+          </Button>
+        )}
+        <ExplanationGuide compact />
+        {editable && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDeleteError(null);
+              setPending({ kind: "process" });
+            }}
+            className="text-red-600 hover:border-red-300 hover:bg-red-50"
+          >
+            {t("exp.deleteProcess")}
+          </Button>
         )}
       </div>
 

@@ -129,13 +129,36 @@ type TableResize = {
   rtl: boolean;
 };
 
+export type EditorMention = {
+  id: number;
+  title: string;
+  href: string;
+};
+
 type Props = {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: number;
   readOnly?: boolean;
+  /** Other steps in this process. When set, `/` opens a picker and inserts a link. */
+  mentions?: EditorMention[];
 };
+
+function findSlashTrigger(editor: HTMLElement): { node: Text; start: number; query: string } | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) return null;
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.startContainer)) return null;
+  const node = range.startContainer;
+  if (!(node instanceof Text)) return null;
+  if (node.parentElement?.closest("a")) return null;
+  const before = node.data.slice(0, range.startOffset);
+  if (!/(?:^|[\s\u200c\u200B(\u060c،])\/[^\s/<]*$/.test(before)) return null;
+  const start = before.lastIndexOf("/");
+  if (start < 0) return null;
+  return { node, start, query: before.slice(start + 1) };
+}
 
 function selectedText(): string {
   return window.getSelection()?.toString().trim() ?? "";
@@ -267,6 +290,7 @@ export default function RichTextEditor({
   placeholder,
   minHeight = 180,
   readOnly = false,
+  mentions,
 }: Props) {
   const { t, dir } = useI18n();
   const resolvedPlaceholder = placeholder ?? t("editor.placeholder");
@@ -277,6 +301,15 @@ export default function RichTextEditor({
   const [currentFont, setCurrentFont] = useState(DEFAULT_FONT);
   const [currentSize, setCurrentSize] = useState(DEFAULT_SIZE);
   const [inTable, setInTable] = useState(false);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionPos, setMentionPos] = useState({ top: 0, left: 0 });
+  const mentionItems = mentions || [];
+  const mentionEnabled = mentions != null && !readOnly;
+  const mentionMatches = mentionItems
+    .filter((item) => item.title.toLowerCase().includes(mentionQuery.toLowerCase()))
+    .slice(0, 8);
 
   // Only sync from props when the DOM differs, so typing keeps the caret stable.
   useEffect(() => {
@@ -288,6 +321,31 @@ export default function RichTextEditor({
 
   const emit = () => {
     onChange(editorRef.current?.innerHTML ?? "");
+  };
+
+  const refreshMention = () => {
+    if (!mentionEnabled) {
+      if (mentionOpen) setMentionOpen(false);
+      return;
+    }
+    const editor = editorRef.current;
+    if (!editor) return;
+    const found = findSlashTrigger(editor);
+    if (!found) {
+      setMentionOpen(false);
+      return;
+    }
+    const range = document.createRange();
+    range.setStart(found.node, found.start);
+    range.setEnd(found.node, found.start + 1 + found.query.length);
+    const rect = range.getBoundingClientRect();
+    setMentionQuery(found.query);
+    setMentionIndex(0);
+    setMentionPos({
+      top: Math.min(rect.bottom + 6, window.innerHeight - 220),
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - 280)),
+    });
+    setMentionOpen(true);
   };
 
   const saveSelection = () => {
@@ -549,16 +607,74 @@ export default function RichTextEditor({
     });
   };
 
+  const insertMention = (item: EditorMention) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const found = findSlashTrigger(editor);
+    editor.focus();
+    const selection = window.getSelection();
+    if (found && selection) {
+      const range = document.createRange();
+      range.setStart(found.node, found.start);
+      range.setEnd(found.node, found.start + 1 + found.query.length);
+      range.deleteContents();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    const safeHref = item.href.replace(/"/g, "&quot;");
+    const safeTitle = item.title
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    document.execCommand(
+      "insertHTML",
+      false,
+      `<a class="step-mention" href="${safeHref}" target="_blank" rel="noopener noreferrer">${safeTitle}</a>&nbsp;`,
+    );
+    setMentionOpen(false);
+    emit();
+  };
+
   const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = (event.target as HTMLElement | null)?.closest("a");
     if (!target || !(target instanceof HTMLAnchorElement)) return;
 
-    if (readOnly || event.ctrlKey || event.metaKey) {
+    const isStepLink = target.classList.contains("step-mention");
+    if (readOnly || isStepLink || event.ctrlKey || event.metaKey) {
       event.preventDefault();
       event.stopPropagation();
       if (target.href) {
         window.open(target.href, "_blank", "noopener,noreferrer");
       }
+    }
+  };
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!mentionOpen) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setMentionOpen(false);
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setMentionIndex((current) =>
+        mentionMatches.length === 0 ? 0 : (current + 1) % mentionMatches.length,
+      );
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setMentionIndex((current) =>
+        mentionMatches.length === 0
+          ? 0
+          : (current - 1 + mentionMatches.length) % mentionMatches.length,
+      );
+      return;
+    }
+    if ((event.key === "Enter" || event.key === "Tab") && mentionMatches[mentionIndex]) {
+      event.preventDefault();
+      insertMention(mentionMatches[mentionIndex]);
     }
   };
 
@@ -728,13 +844,20 @@ export default function RichTextEditor({
         suppressContentEditableWarning
         data-placeholder={resolvedPlaceholder}
         onInput={() => {
-          if (!readOnly) emit();
+          if (!readOnly) {
+            emit();
+            refreshMention();
+          }
         }}
         onBlur={() => {
           if (!readOnly) emit();
         }}
+        onKeyDown={handleEditorKeyDown}
+        onKeyUp={() => {
+          readCurrentStyle();
+          if (!readOnly) refreshMention();
+        }}
         onClick={handleEditorClick}
-        onKeyUp={readCurrentStyle}
         onMouseUp={readCurrentStyle}
         onMouseMove={handleTablePointerMove}
         onMouseDown={handleTableResizeStart}
@@ -748,9 +871,44 @@ export default function RichTextEditor({
         )}
       />
 
+      {!readOnly && mentionOpen && (
+        <div
+          className="fixed z-50 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+          style={{ top: mentionPos.top, left: mentionPos.left }}
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          <p className="border-b border-gray-100 px-2.5 py-1.5 text-[11px] font-medium text-gray-500">
+            {t("editor.mentionTitle")}
+          </p>
+          {mentionMatches.length === 0 ? (
+            <p className="px-2.5 py-2 text-xs text-gray-500">{t("editor.mentionEmpty")}</p>
+          ) : (
+            <ul className="max-h-52 overflow-y-auto py-1">
+              {mentionMatches.map((item, index) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => insertMention(item)}
+                    className={cx(
+                      "flex w-full px-2.5 py-1.5 text-right text-sm",
+                      index === mentionIndex
+                        ? "bg-navy-900 text-white"
+                        : "text-navy-900 hover:bg-surface",
+                    )}
+                  >
+                    <span className="line-clamp-2">{item.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {!readOnly && (
         <p className="border-t border-gray-100 bg-gray-50 px-3 py-1 text-[11px] text-gray-500">
           {t("editor.hint")}
+          {mentionEnabled ? ` ${t("editor.mentionHint")}` : ""}
         </p>
       )}
     </div>

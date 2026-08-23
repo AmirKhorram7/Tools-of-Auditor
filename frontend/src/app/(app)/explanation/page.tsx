@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import ExplanationGuide from "@/components/explanation/ExplanationGuide";
 import FolderCard from "@/components/explanation/FolderCard";
 import {
   Alert,
@@ -170,6 +171,7 @@ export default function ExplanationServicePage() {
           <p className="mt-1 text-sm text-gray-500">{t("exp.subtitle")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ExplanationGuide compact />
           <Link href="/explanation/tree">
             <Button variant="secondary">{t("exp.treeView")}</Button>
           </Link>

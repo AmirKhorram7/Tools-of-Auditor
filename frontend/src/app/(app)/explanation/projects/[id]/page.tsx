@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import BackButton from "@/components/BackButton";
 import ColorPicker from "@/components/explanation/ColorPicker";
+import ExplanationGuide from "@/components/explanation/ExplanationGuide";
 import FolderCard from "@/components/explanation/FolderCard";
 import ProcessCard from "@/components/explanation/ProcessCard";
 import {
@@ -656,6 +657,7 @@ export default function ProjectDetailPage() {
             {t("exp.share")}
           </Button>
         )}
+        <ExplanationGuide compact />
         {(canDeleteRoot || (editable && !project.is_root)) && (
           <Button
             variant="secondary"

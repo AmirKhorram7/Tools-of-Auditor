@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import BackButton from "@/components/BackButton";
+import ExplanationGuide from "@/components/explanation/ExplanationGuide";
 import MediaPanel from "@/components/MediaPanel";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
@@ -18,13 +19,15 @@ import {
   PageLoader,
   cx,
 } from "@/components/ui";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
   canEditProject,
+  type ProcessStep,
   type ProcessStepDetail,
   type StepItem,
 } from "@/lib/types";
+import type { EditorMention } from "@/components/RichTextEditor";
 
 type Tab = "explanation" | "risk" | "control";
 
@@ -34,6 +37,7 @@ export default function StepDetailPage() {
   const stepId = Number(params.id);
 
   const [step, setStep] = useState<ProcessStepDetail | null>(null);
+  const [processSteps, setProcessSteps] = useState<ProcessStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("explanation");
@@ -54,6 +58,12 @@ export default function StepDetailPage() {
       const data = await apiFetch<ProcessStepDetail>(`/steps/${stepId}/`);
       setStep(data);
       setExplanation(data.explanation ?? "");
+      try {
+        const rows = await apiList<ProcessStep>(`/steps/?process=${data.process}`);
+        setProcessSteps(rows);
+      } catch {
+        setProcessSteps([]);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("exp.loadStepFail"));
     } finally {
@@ -130,6 +140,14 @@ export default function StepDetailPage() {
 
   // Missing my_role (older API) keeps the editor open; API still enforces writes.
   const editable = step.my_role == null || canEditProject(step.my_role);
+  const stepMentions: EditorMention[] = processSteps
+    .filter((item) => item.id !== step.id)
+    .sort((a, b) => a.order - b.order || a.id - b.id)
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      href: `/explanation/steps/${item.id}`,
+    }));
 
   return (
     <div className="space-y-5">
@@ -162,11 +180,14 @@ export default function StepDetailPage() {
         </nav>
       </div>
 
-      <div>
-        <h1 className="text-lg font-bold text-ink">{step.title}</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {editable ? t("exp.stepHintEdit") : t("exp.stepHintView")}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-bold text-ink">{step.title}</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {editable ? t("exp.stepHintEdit") : t("exp.stepHintView")}
+          </p>
+        </div>
+        <ExplanationGuide compact />
       </div>
 
       {error && <Alert>{error}</Alert>}
@@ -205,6 +226,7 @@ export default function StepDetailPage() {
             placeholder={t("exp.explanationPlaceholder")}
             minHeight={240}
             readOnly={!editable}
+            mentions={stepMentions}
           />
 
           <MediaPanel
@@ -232,6 +254,7 @@ export default function StepDetailPage() {
           kind="risk"
           items={step.risks}
           stepId={step.id}
+          mentions={stepMentions}
           editable={editable}
           onAdd={() => {
             setFormError(null);
@@ -265,6 +288,7 @@ export default function StepDetailPage() {
           kind="control"
           items={step.controls}
           stepId={step.id}
+          mentions={stepMentions}
           editable={editable}
           onAdd={() => {
             setFormError(null);
@@ -348,10 +372,12 @@ function ItemSection({
   onChanged,
   onItemUpdated,
   onItemRemoved,
+  mentions,
 }: {
   kind: "risk" | "control";
   items: StepItem[];
   stepId: number;
+  mentions?: EditorMention[];
   editable: boolean;
   onAdd: () => void;
   onChanged: () => void;
@@ -399,6 +425,7 @@ function ItemSection({
             item={item}
             stepId={stepId}
             editable={editable}
+            mentions={mentions}
             onChanged={onChanged}
             onUpdated={onItemUpdated}
             onRemoved={onItemRemoved}
@@ -414,11 +441,13 @@ function ItemEditor({
   item,
   stepId,
   editable,
+  mentions,
   onChanged,
   onUpdated,
   onRemoved,
 }: {
   kind: "risk" | "control";
+  mentions?: EditorMention[];
   item: StepItem;
   stepId: number;
   editable: boolean;
@@ -504,6 +533,7 @@ function ItemEditor({
         }
         minHeight={150}
         readOnly={!editable}
+        mentions={mentions}
       />
 
       <MediaPanel
