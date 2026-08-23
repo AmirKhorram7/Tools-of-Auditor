@@ -23,6 +23,12 @@ import DoneCheck from "@/components/work/DoneCheck";
 import TaskBoard from "@/components/work/TaskBoard";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkGuide from "@/components/work/WorkGuide";
+import {
+  WorkMeetButton,
+  WorkMeetLiveBar,
+  WorkMeetModal,
+  WorkMeetScope,
+} from "@/components/work/meet/WorkMeetPanel";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { useAuth } from "@/lib/auth";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
@@ -490,6 +496,12 @@ export default function WorkProjectPage() {
   const canAddTask = Boolean(project.can_add_task ?? project.can_manage);
 
   return (
+    <WorkMeetScope
+      projectId={project.id}
+      members={members}
+      teams={projectTeams}
+      canCreate={canAddTask}
+    >
     <div className="space-y-2.5">
       <WorkBreadcrumb
         fallbackHref={`/work/companies/${project.company}`}
@@ -539,9 +551,12 @@ export default function WorkProjectPage() {
               {t("work.settings")}
             </Button>
           )}
+          <WorkMeetButton />
           <WorkGuide compact />
         </div>
       </div>
+
+      <WorkMeetLiveBar />
 
       {error && <Alert>{error}</Alert>}
 
@@ -1279,6 +1294,8 @@ export default function WorkProjectPage() {
           </div>
         </div>
       </Modal>
+      <WorkMeetModal />
     </div>
+    </WorkMeetScope>
   );
 }

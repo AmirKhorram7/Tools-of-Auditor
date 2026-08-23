@@ -810,3 +810,7 @@ class ActivityLog(BaseModel):
 
     def __str__(self):
         return f"{self.action} {self.entity_type}:{self.entity_id}"
+
+
+# Isolated Google Meet feature — imported so Django discovers the table.
+from team_manage_services.meetings import ProjectMeeting  # noqa: E402, F401

@@ -498,3 +498,118 @@ class WorkAPISmokeTests(APITestCase):
         )
         self.assertEqual(closed_move.status_code, status.HTTP_200_OK, closed_move.data)
         self.assertEqual(closed_move.data["status"], "done")
+
+
+class WorkMeetingTests(APITestCase):
+    """Isolated Google Meet room sharing on a project."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(
+            phone_number="09120000011",
+            password="pass-manager",
+            first_name="Host",
+            is_phone_verified=True,
+        )
+        self.employee = User.objects.create_user(
+            phone_number="09120000012",
+            password="pass-employee",
+            first_name="Guest",
+            is_phone_verified=True,
+        )
+        self.outsider = User.objects.create_user(
+            phone_number="09120000013",
+            password="pass-out",
+            first_name="Out",
+            is_phone_verified=True,
+        )
+        self.manager_client = self._client_for(self.manager)
+        self.employee_client = self._client_for(self.employee)
+        self.outsider_client = self._client_for(self.outsider)
+        company = self.manager_client.post(
+            f"{WORK}/companies/", {"name": "Meet Co"}, format="json"
+        ).data
+        team = self.manager_client.post(
+            f"{WORK}/teams/",
+            {"company": company["id"], "name": "Meet Team"},
+            format="json",
+        ).data
+        invite = self.manager_client.post(
+            f"{WORK}/teams/{team['id']}/invite/",
+            {"phone_number": self.employee.phone_number},
+            format="json",
+        ).data
+        self.employee_client.post(f"{WORK}/invitations/{invite['id']}/accept/")
+        project = self.manager_client.post(
+            f"{WORK}/projects/",
+            {"company": company["id"], "name": "Meet Project"},
+            format="json",
+        ).data
+        self.manager_client.post(
+            f"{WORK}/projects/{project['id']}/add-team/",
+            {"team_id": team["id"]},
+            format="json",
+        )
+        self.project_id = project["id"]
+
+    def _client_for(self, user):
+        client = self.client_class()
+        token = str(RefreshToken.for_user(user).access_token)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        return client
+
+    def test_manager_shares_meet_and_member_can_join(self):
+        created = self.manager_client.post(
+            f"{WORK}/projects/{self.project_id}/meetings/",
+            {
+                "title": "Standup",
+                "meet_url": "https://meet.google.com/abc-defg-hij",
+                "audience": "all",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        self.assertEqual(created.data["meet_url"], "https://meet.google.com/abc-defg-hij")
+        self.assertTrue(created.data["is_live"])
+
+        listed = self.employee_client.get(f"{WORK}/projects/{self.project_id}/meetings/")
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(listed.data["results"][0]["meet_url"], created.data["meet_url"])
+
+        bad = self.manager_client.post(
+            f"{WORK}/projects/{self.project_id}/meetings/",
+            {"title": "Bad", "meet_url": "https://example.com/room"},
+            format="json",
+        )
+        self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_selected_guest_hides_link_from_other_member(self):
+        outsider_on_project = self.outsider
+        self.manager_client.post(
+            f"{WORK}/projects/{self.project_id}/members/",
+            {"user_id": outsider_on_project.id, "role": "guest"},
+            format="json",
+        )
+        created = self.manager_client.post(
+            f"{WORK}/projects/{self.project_id}/meetings/",
+            {
+                "title": "Private",
+                "meet_url": "abc-defg-hij",
+                "audience": "selected",
+                "user_ids": [self.employee.id],
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+
+        invited = self.employee_client.get(f"{WORK}/projects/{self.project_id}/meetings/")
+        self.assertTrue(invited.data["results"])
+        self.assertTrue(invited.data["results"][0]["meet_url"])
+
+        hidden = self.outsider_client.get(f"{WORK}/projects/{self.project_id}/meetings/")
+        self.assertEqual(hidden.data["results"], [])
+
+        ended = self.manager_client.post(
+            f"{WORK}/projects/{self.project_id}/meetings/{created.data['id']}/end/",
+        )
+        self.assertEqual(ended.status_code, status.HTTP_200_OK)
+        self.assertEqual(ended.data["status"], "ended")

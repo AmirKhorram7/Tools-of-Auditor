@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 
+from team_manage_services.meetings import ProjectMeeting
 from team_manage_services.models import (
     ActivityLog,
     Attachment,
@@ -708,3 +709,12 @@ class BoardTemplateAdmin(admin.ModelAdmin):
     @admin.display(description=_("Created by"), ordering="created_by__first_name")
     def created_by_name(self, obj):
         return person_name(obj.created_by)
+
+
+@admin.register(ProjectMeeting)
+class ProjectMeetingAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "project", "status", "audience", "created_by", "started_at")
+    list_filter = ("status", "audience")
+    search_fields = ("title", "project__name", "meet_url")
+    autocomplete_fields = ("project", "created_by", "guests")
+    readonly_fields = ("started_at", "ended_at")

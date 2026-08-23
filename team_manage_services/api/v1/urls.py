@@ -1,6 +1,10 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from team_manage_services.api.v1.meeting_views import (
+    ProjectMeetingEndView,
+    ProjectMeetingListCreateView,
+)
 from team_manage_services.api.v1.views import (
     BoardTemplateViewSet,
     CommentAttachmentViewSet,
@@ -27,5 +31,15 @@ router.register("notifications", NotificationViewSet, basename="work-notificatio
 urlpatterns = [
     path("dashboard/", WorkDashboardView.as_view(), name="work-dashboard"),
     path("dashboard/timeline/", WorkTimelineView.as_view(), name="work-timeline"),
+    path(
+        "projects/<int:project_id>/meetings/",
+        ProjectMeetingListCreateView.as_view(),
+        name="work-project-meetings",
+    ),
+    path(
+        "projects/<int:project_id>/meetings/<int:meeting_id>/end/",
+        ProjectMeetingEndView.as_view(),
+        name="work-project-meeting-end",
+    ),
     path("", include(router.urls)),
 ]
