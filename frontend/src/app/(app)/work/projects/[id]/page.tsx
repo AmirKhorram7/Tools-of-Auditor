@@ -26,19 +26,20 @@ import WorkGuide from "@/components/work/WorkGuide";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { useAuth } from "@/lib/auth";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
   ASSIGNABLE_TEAM_ROLES,
   LABEL_COLORS,
   TAG_COLORS,
-  PRIORITY_LABELS,
-  PROJECT_STATUS_LABELS,
-  TASK_STATUS_LABELS,
-  TEAM_ROLE_LABELS,
-  formatFaDate,
+  formatWorkDate,
   isOverdue,
   labelTextColor,
   taskStatusTone,
   teamColor,
+  workPriorityLabel,
+  workProjectStatusLabel,
+  workRoleLabel,
+  workStatusLabel,
   type WorkBoard,
   type WorkBoardColumn,
   type WorkLabel,
@@ -55,6 +56,7 @@ export default function WorkProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = Number(params.id);
   const { profile } = useAuth();
+  const { t, locale } = useI18n();
 
   const [project, setProject] = useState<WorkProject | null>(null);
   const [board, setBoard] = useState<WorkBoard | null>(null);
@@ -75,11 +77,7 @@ export default function WorkProjectPage() {
   const [templates, setTemplates] = useState<WorkBoardTemplate[]>([]);
   const [templateName, setTemplateName] = useState("");
   const [templateDefault, setTemplateDefault] = useState(true);
-  const [templateCols, setTemplateCols] = useState([
-    { name: "برای انجام", color: LABEL_COLORS[0] },
-    { name: "در حال انجام", color: LABEL_COLORS[1] },
-    { name: "بسته", color: LABEL_COLORS[6] },
-  ]);
+  const [templateCols, setTemplateCols] = useState<Array<{ name: string; color: string }>>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -107,6 +105,14 @@ export default function WorkProjectPage() {
     const stored = window.localStorage.getItem(VIEW_KEY);
     if (stored === "list" || stored === "board") setView(stored);
   }, []);
+
+  useEffect(() => {
+    setTemplateCols([
+      { name: t("work.col.todo"), color: LABEL_COLORS[0] },
+      { name: t("work.col.doing"), color: LABEL_COLORS[1] },
+      { name: t("work.col.done"), color: LABEL_COLORS[6] },
+    ]);
+  }, [locale, t]);
 
   const setSavedView = (next: "board" | "list") => {
     setView(next);
@@ -147,11 +153,11 @@ export default function WorkProjectPage() {
         setTemplates([]);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "بارگذاری پروژه ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.loadProjectFail"));
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     load();
@@ -179,7 +185,7 @@ export default function WorkProjectPage() {
 
   const createTask = async () => {
     if (!title.trim()) {
-      setFormError("عنوان کار الزامی است.");
+      setFormError(t("work.taskTitleRequired"));
       return;
     }
     setSaving(true);
@@ -209,7 +215,7 @@ export default function WorkProjectPage() {
       setSelectedLabels([]);
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت کار ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.createTaskFail"));
     } finally {
       setSaving(false);
     }
@@ -228,7 +234,7 @@ export default function WorkProjectPage() {
       setSelectedLabels((current) => [...current, label.id]);
       setNewLabelName("");
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت برچسب ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.createLabelFail"));
     } finally {
       setSaving(false);
     }
@@ -236,7 +242,7 @@ export default function WorkProjectPage() {
 
   const deleteLabel = async (labelId: number) => {
     if (!project) return;
-    if (!window.confirm("این برچسب حذف شود؟")) return;
+    if (!window.confirm(t("work.deleteLabelConfirm"))) return;
     setSaving(true);
     setFormError(null);
     try {
@@ -246,7 +252,7 @@ export default function WorkProjectPage() {
       setLabels((current) => current.filter((label) => label.id !== labelId));
       setSelectedLabels((current) => current.filter((id) => id !== labelId));
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "حذف برچسب ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.deleteLabelFail"));
     } finally {
       setSaving(false);
     }
@@ -254,7 +260,7 @@ export default function WorkProjectPage() {
 
   const toggleDone = async (id: number, done: boolean) => {
     if (done && project?.require_approval && !project.can_manage) {
-      setError("این کار باید اول تأیید شود.");
+      setError(t("work.needApproval"));
       return;
     }
     setBusyId(id);
@@ -266,7 +272,7 @@ export default function WorkProjectPage() {
       });
       await load(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "تغییر وضعیت کار ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.moveTaskFail"));
     } finally {
       setBusyId(null);
     }
@@ -281,7 +287,7 @@ export default function WorkProjectPage() {
       });
       await load(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "جابه‌جایی این کار مجاز نیست.");
+      setError(err instanceof ApiError ? err.message : t("work.moveNotAllowed"));
     }
   };
 
@@ -305,7 +311,7 @@ export default function WorkProjectPage() {
       });
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ذخیره ستون ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.saveColumnFail"));
     } finally {
       setSaving(false);
     }
@@ -313,10 +319,10 @@ export default function WorkProjectPage() {
 
   const removeColumn = async (columnId: number) => {
     if (columns.length < 2) {
-      setFormError("حداقل یک ستون باید بماند.");
+      setFormError(t("work.minOneColumn"));
       return;
     }
-    if (!window.confirm("این ستون حذف شود؟ کارها به ستون دیگر می‌روند.")) return;
+    if (!window.confirm(t("work.deleteColumnConfirm"))) return;
     setSaving(true);
     setFormError(null);
     try {
@@ -325,7 +331,7 @@ export default function WorkProjectPage() {
       });
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "حذف ستون ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.deleteColumnFail"));
     } finally {
       setSaving(false);
     }
@@ -333,11 +339,11 @@ export default function WorkProjectPage() {
 
   const inviteToTeam = async () => {
     if (!inviteTeamId) {
-      setFormError("یک تیم انتخاب کنید.");
+      setFormError(t("work.selectTeam"));
       return;
     }
     if (!invitePhone.trim()) {
-      setFormError("شماره موبایل الزامی است.");
+      setFormError(t("work.phoneRequired"));
       return;
     }
     setSaving(true);
@@ -360,7 +366,7 @@ export default function WorkProjectPage() {
       setInviteRole("developer");
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "دعوت همکار ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.inviteColleagueFail"));
     } finally {
       setSaving(false);
     }
@@ -368,7 +374,7 @@ export default function WorkProjectPage() {
 
   const addTeam = async () => {
     if (!teamId) {
-      setFormError("یک تیم انتخاب کنید.");
+      setFormError(t("work.selectTeam"));
       return;
     }
     setSaving(true);
@@ -382,7 +388,7 @@ export default function WorkProjectPage() {
       setTeamId("");
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "افزودن تیم ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.addTeamFail"));
     } finally {
       setSaving(false);
     }
@@ -390,12 +396,12 @@ export default function WorkProjectPage() {
 
   const saveTemplate = async () => {
     if (!project || !templateName.trim()) {
-      setFormError("نام بورد پیش‌فرض الزامی است.");
+      setFormError(t("work.templateNameRequired"));
       return;
     }
     const columns = templateCols.filter((row) => row.name.trim());
     if (columns.length === 0) {
-      setFormError("حداقل یک ستون بنویسید.");
+      setFormError(t("work.minOneTemplateCol"));
       return;
     }
     setSaving(true);
@@ -413,7 +419,7 @@ export default function WorkProjectPage() {
       setTemplateName("");
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ذخیره بورد پیش‌فرض ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.saveTemplateFail"));
     } finally {
       setSaving(false);
     }
@@ -426,21 +432,21 @@ export default function WorkProjectPage() {
       await apiFetch(`/work/board-templates/${templateId}/default/`, { method: "POST" });
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "تعیین پیش‌فرض ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.setDefaultFail"));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteTemplate = async (templateId: number) => {
-    if (!window.confirm("این بورد پیش‌فرض حذف شود؟")) return;
+    if (!window.confirm(t("work.deleteTemplateConfirm"))) return;
     setSaving(true);
     setFormError(null);
     try {
       await apiFetch(`/work/board-templates/${templateId}/`, { method: "DELETE" });
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "حذف بورد پیش‌فرض ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.deleteTemplateFail"));
     } finally {
       setSaving(false);
     }
@@ -456,7 +462,7 @@ export default function WorkProjectPage() {
       });
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "اعمال بورد ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.applyBoardFail"));
     } finally {
       setSaving(false);
     }
@@ -472,14 +478,14 @@ export default function WorkProjectPage() {
       });
       await load(true);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ذخیره سیاست ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.savePolicyFail"));
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) return <PageLoader />;
-  if (!project) return <Alert>{error || "پروژه پیدا نشد."}</Alert>;
+  if (!project) return <Alert>{error || t("work.projectMissing")}</Alert>;
 
   const canAddTask = Boolean(project.can_add_task ?? project.can_manage);
 
@@ -488,10 +494,10 @@ export default function WorkProjectPage() {
       <WorkBreadcrumb
         fallbackHref={`/work/companies/${project.company}`}
         items={[
-          { href: "/work", label: "کار" },
+          { href: "/work", label: t("work.crumb") },
           {
             href: `/work/companies/${project.company}`,
-            label: project.company_name || "شرکت",
+            label: project.company_name || t("work.company"),
           },
           { label: project.name },
         ]}
@@ -500,7 +506,7 @@ export default function WorkProjectPage() {
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold text-ink">{project.name}</h1>
           <Badge tone="blue">
-            {PROJECT_STATUS_LABELS[project.status] || project.status}
+            {workProjectStatusLabel(t, project.status) || project.status}
           </Badge>
           {projectTeams.map((team) => (
             <Link
@@ -520,17 +526,17 @@ export default function WorkProjectPage() {
         <div className="flex flex-wrap gap-2">
           {canAddTask && (
             <Button size="sm" onClick={() => openTaskModal()}>
-              افزودن کار
+              {t("work.addTask")}
             </Button>
           )}
           {project.can_manage && (
             <Button size="sm" variant="secondary" onClick={() => setTeamOpen(true)}>
-              افزودن تیم
+              {t("work.addTeam")}
             </Button>
           )}
           {project.can_manage && (
             <Button size="sm" variant="secondary" onClick={() => { setFormError(null); setSettingsOpen(true); }}>
-              تنظیمات
+              {t("work.settings")}
             </Button>
           )}
           <WorkGuide compact />
@@ -546,14 +552,14 @@ export default function WorkProjectPage() {
             onClick={() => setSavedView("board")}
             className={`rounded-md px-3 py-1.5 ${view === "board" ? "bg-navy-900 text-white" : "text-gray-600"}`}
           >
-            بورد
+            {t("work.board")}
           </button>
           <button
             type="button"
             onClick={() => setSavedView("list")}
             className={`rounded-md px-3 py-1.5 ${view === "list" ? "bg-navy-900 text-white" : "text-gray-600"}`}
           >
-            فهرست
+            {t("work.list")}
           </button>
         </div>
         <button
@@ -563,7 +569,7 @@ export default function WorkProjectPage() {
             mineOnly ? "border-brand-500 bg-brand-100 text-ink" : "border-gray-200 bg-white text-gray-600"
           }`}
         >
-          {mineOnly ? "کارهای من" : "همه کارها"}
+          {mineOnly ? t("work.mine") : t("work.allTasks")}
         </button>
       </div>
 
@@ -573,7 +579,7 @@ export default function WorkProjectPage() {
           canManage={project.can_manage}
           canAddTask={canAddTask}
           requireApproval={Boolean(project.require_approval)}
-          onBlockedClose={() => setError("این کار باید اول تأیید شود.")}
+          onBlockedClose={() => setError(t("work.needApproval"))}
           mineOnly={mineOnly}
           currentUserId={myUserId}
           onMove={moveTask}
@@ -582,22 +588,31 @@ export default function WorkProjectPage() {
         />
       ) : visibleTasks.length === 0 ? (
         <EmptyState
-          title="کاری در این نما نیست"
+          title={t("work.emptyBoardTitle")}
           description={
             canAddTask
-              ? "یک کار بسازید و مسئول بگذارید تا روی بورد دیده شود."
-              : "هنوز کاری به این پروژه اضافه نشده."
+              ? t("work.emptyBoardManage")
+              : t("work.emptyBoardOther")
           }
           action={
             canAddTask ? (
               <Button size="sm" onClick={() => openTaskModal()}>
-                کار جدید
+                {t("work.newTask")}
               </Button>
             ) : undefined
           }
         />
       ) : (
-        <WorkTable columns={["تمام", "کار", "مسئول", "وضعیت", "برچسب", "سررسید"]}>
+        <WorkTable
+          columns={[
+            t("work.colDone"),
+            t("work.colTask"),
+            t("work.colAssignee"),
+            t("work.colStatus"),
+            t("work.colLabel"),
+            t("work.colDue"),
+          ]}
+        >
           {visibleTasks.map((task) => {
             const overdue = isOverdue(task.due_date, task.status);
             return (
@@ -619,10 +634,10 @@ export default function WorkProjectPage() {
                     {task.title}
                   </Link>
                 </WorkTd>
-                <WorkTd>{task.assignee_name || "بدون مسئول"}</WorkTd>
+                <WorkTd>{task.assignee_name || t("work.unassigned")}</WorkTd>
                 <WorkTd>
                   <Badge tone={taskStatusTone(task.status)}>
-                    {task.column_name || TASK_STATUS_LABELS[task.status]}
+                    {task.column_name || workStatusLabel(t, task.status)}
                   </Badge>
                 </WorkTd>
                 <WorkTd>
@@ -642,7 +657,7 @@ export default function WorkProjectPage() {
                   </div>
                 </WorkTd>
                 <WorkTd className={overdue ? "font-medium text-red-600" : ""}>
-                  {formatFaDate(task.due_date)}
+                  {formatWorkDate(task.due_date, locale, t("work.noDue"))}
                 </WorkTd>
               </tr>
             );
@@ -652,16 +667,16 @@ export default function WorkProjectPage() {
 
       <Modal
         open={taskOpen}
-        title="کار جدید"
+        title={t("work.newTask")}
         onClose={() => setTaskOpen(false)}
         className="max-w-xl max-h-[90vh] overflow-y-auto"
       >
         <div className="space-y-3">
           {formError && <Alert>{formError}</Alert>}
-          <Field label="عنوان">
+          <Field label={t("work.taskTitle")}>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </Field>
-          <Field label="توضیح">
+          <Field label={t("work.description")}>
             <Textarea
               rows={3}
               value={description}
@@ -669,15 +684,15 @@ export default function WorkProjectPage() {
             />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="شروع کار">
+            <Field label={t("work.startDate")}>
               <JalaliDateField value={startDate} onChange={setStartDate} />
             </Field>
-            <Field label="سررسید">
+            <Field label={t("work.due")}>
               <JalaliDateField value={due} onChange={setDue} />
             </Field>
-            <Field label="مسئول">
+            <Field label={t("work.assignee")}>
               <Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-                <option value="">بعداً تعیین می‌شود</option>
+                <option value="">{t("work.assignLater")}</option>
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.full_name || member.phone_number}
@@ -685,7 +700,7 @@ export default function WorkProjectPage() {
                 ))}
               </Select>
             </Field>
-            <Field label="ستون بورد">
+            <Field label={t("work.boardColumn")}>
               <Select value={String(columnId)} onChange={(e) => setColumnId(Number(e.target.value) || "")}>
                 {columns.map((column) => (
                   <option key={column.id} value={column.id}>
@@ -694,16 +709,16 @@ export default function WorkProjectPage() {
                 ))}
               </Select>
             </Field>
-            <Field label="اولویت">
+            <Field label={t("work.priority")}>
               <Select value={priority} onChange={(e) => setPriority(e.target.value)}>
-                {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                {[1, 2, 3, 4].map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {workPriorityLabel(t, value)}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="سختی (وزن پیشرفت)">
+            <Field label={t("work.difficultyHint")}>
               <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
                 {[1, 2, 3, 4, 5].map((value) => (
                   <option key={value} value={value}>
@@ -714,10 +729,10 @@ export default function WorkProjectPage() {
             </Field>
           </div>
           <div>
-            <p className="mb-1.5 text-sm font-medium text-ink">برچسب‌ها</p>
+            <p className="mb-1.5 text-sm font-medium text-ink">{t("work.labelsTitle")}</p>
             {labels.length === 0 ? (
               <p className="text-xs text-gray-500">
-                هنوز برچسبی نیست. از تنظیمات پروژه بسازید.
+                {t("work.noLabelsYet")}
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
@@ -749,10 +764,10 @@ export default function WorkProjectPage() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setTaskOpen(false)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button loading={saving} onClick={createTask}>
-              ساخت
+              {t("common.create")}
             </Button>
           </div>
         </div>
@@ -760,7 +775,7 @@ export default function WorkProjectPage() {
 
       <Modal
         open={settingsOpen}
-        title="تنظیمات پروژه"
+        title={t("work.settingsTitle")}
         onClose={() => setSettingsOpen(false)}
         className="max-w-lg max-h-[90vh] overflow-y-auto"
       >
@@ -769,10 +784,10 @@ export default function WorkProjectPage() {
           <div className="flex flex-wrap rounded-lg border border-gray-200 bg-[#F7F8FA] p-0.5 text-xs">
             {(
               [
-                ["labels", "برچسب"],
-                ["board", "بورد"],
-                ["teams", "تیم"],
-                ["templates", "پیش‌فرض"],
+                ["labels", t("work.tab.labels")],
+                ["board", t("work.tab.board")],
+                ["teams", t("work.tab.teams")],
+                ["templates", t("work.tab.templates")],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -789,10 +804,10 @@ export default function WorkProjectPage() {
           </div>
           {settingsTab === "teams" && (
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">تیم‌ها</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">{t("work.teamsTitle")}</h3>
             <div className="mb-3 flex flex-wrap gap-2">
               {projectTeams.length === 0 && (
-                <p className="text-xs text-gray-500">یک تیم را به پروژه وصل کنید، بعد همکار دعوت کنید.</p>
+                <p className="text-xs text-gray-500">{t("work.noLinkedTeam")}</p>
               )}
               {projectTeams.map((team) => (
                 <Link
@@ -809,9 +824,9 @@ export default function WorkProjectPage() {
               ))}
             </div>
             <div className="mb-3 flex flex-wrap items-end gap-2">
-              <Field label="وصل کردن تیم">
+              <Field label={t("work.linkTeam")}>
                 <Select value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-                  <option value="">انتخاب کنید</option>
+                  <option value="">{t("work.choose")}</option>
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
                       {team.name}
@@ -820,16 +835,16 @@ export default function WorkProjectPage() {
                 </Select>
               </Field>
               <Button size="sm" loading={saving} onClick={() => void addTeam()}>
-                افزودن
+                {t("common.add")}
               </Button>
             </div>
-            <p className="mb-1.5 text-xs font-medium text-ink">دعوت / افزودن همکار</p>
+            <p className="mb-1.5 text-xs font-medium text-ink">{t("work.inviteColleague")}</p>
             <div className="space-y-2">
               <Select
                 value={inviteTeamId}
                 onChange={(e) => setInviteTeamId(e.target.value)}
               >
-                <option value="">تیم مقصد</option>
+                <option value="">{t("work.targetTeam")}</option>
                 {(projectTeams.length ? projectTeams : teams).map((team) => (
                   <option key={team.id} value={team.id}>
                     {team.name}
@@ -840,31 +855,31 @@ export default function WorkProjectPage() {
               <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
                 {ASSIGNABLE_TEAM_ROLES.map((role) => (
                   <option key={role} value={role}>
-                    {TEAM_ROLE_LABELS[role]}
+                    {workRoleLabel(t, role)}
                   </option>
                 ))}
               </Select>
               <Input
                 value={inviteTitle}
                 onChange={(e) => setInviteTitle(e.target.value)}
-                placeholder="سمت (اختیاری)"
+                placeholder={t("work.positionOptional")}
               />
               <Button size="sm" loading={saving} onClick={() => void inviteToTeam()}>
-                دعوت و افزودن
+                {t("work.inviteAdd")}
               </Button>
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              روی نام تیم بزنید تا عضو را حذف یا ویرایش کنید.
+              {t("work.teamClickHint")}
             </p>
           </section>
           )}
           {settingsTab === "labels" && (
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">برچسب‌ها</h3>
-            <p className="mb-2 text-xs text-gray-500">رنگ انتخابی، پس‌زمینه برچسب می‌شود.</p>
+            <h3 className="mb-2 text-sm font-semibold text-ink">{t("work.labelsTitle")}</h3>
+            <p className="mb-2 text-xs text-gray-500">{t("work.labelsHint")}</p>
             <div className="mb-3 flex flex-wrap gap-1.5">
               {labels.length === 0 && (
-                <p className="text-xs text-gray-500">مثلاً فورس‌ماژور یا مهم.</p>
+                <p className="text-xs text-gray-500">{t("work.labelExample")}</p>
               )}
               {labels.map((label) => (
                 <span
@@ -881,8 +896,8 @@ export default function WorkProjectPage() {
                       type="button"
                       onClick={() => void deleteLabel(label.id)}
                       className="rounded-sm px-0.5 text-[11px] leading-none opacity-80 hover:bg-black/15 hover:opacity-100"
-                      aria-label="حذف برچسب"
-                      title="حذف"
+                      aria-label={t("work.deleteLabel")}
+                      title={t("common.delete")}
                     >
                       ×
                     </button>
@@ -894,7 +909,7 @@ export default function WorkProjectPage() {
               <Input
                 value={newLabelName}
                 onChange={(e) => setNewLabelName(e.target.value)}
-                placeholder="نام برچسب"
+                placeholder={t("work.labelName")}
               />
               <div className="flex flex-wrap items-center gap-2">
                 {TAG_COLORS.map((color) => (
@@ -921,16 +936,16 @@ export default function WorkProjectPage() {
                 </span>
               )}
               <Button size="sm" loading={saving} onClick={() => void createLabel()}>
-                ساخت برچسب
+                {t("work.createLabel")}
               </Button>
             </div>
           </section>
           )}
           {settingsTab === "board" && (
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">ستون‌های بورد</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">{t("work.columnsTitle")}</h3>
             <p className="mb-3 text-xs text-gray-500">
-              نام و رنگ هر ستون را اینجا عوض کنید.
+              {t("work.columnsHint")}
             </p>
             <ul className="space-y-3">
               {columns.map((column) => (
@@ -959,7 +974,7 @@ export default function WorkProjectPage() {
                         })
                       }
                     >
-                      ذخیره
+                      {t("common.save")}
                     </Button>
                     {columns.length > 1 && (
                       <Button
@@ -967,7 +982,7 @@ export default function WorkProjectPage() {
                         variant="ghost"
                         onClick={() => void removeColumn(column.id)}
                       >
-                        حذف
+                        {t("common.delete")}
                       </Button>
                     )}
                   </div>
@@ -991,11 +1006,11 @@ export default function WorkProjectPage() {
               ))}
             </ul>
             <div className="mt-3 space-y-2 rounded-xl border border-dashed border-black/10 p-2.5">
-              <p className="text-xs font-medium text-ink">ستون تازه</p>
+              <p className="text-xs font-medium text-ink">{t("work.newColumn")}</p>
               <Input
                 value={newColumnName}
                 onChange={(event) => setNewColumnName(event.target.value)}
-                placeholder="مثلاً بازبینی"
+                placeholder={t("work.columnExample")}
               />
               <div className="flex flex-wrap gap-1.5">
                 {LABEL_COLORS.map((color) => (
@@ -1016,36 +1031,36 @@ export default function WorkProjectPage() {
                 loading={saving}
                 onClick={() => {
                   if (!newColumnName.trim()) {
-                    setFormError("نام ستون الزامی است.");
+                    setFormError(t("work.columnNameRequired"));
                     return;
                   }
                   setSaving(true);
                   void addColumn(newColumnName.trim(), newColumnColor)
                     .catch((err) => {
                       setFormError(
-                        err instanceof ApiError ? err.message : "افزودن ستون ناموفق بود.",
+                        err instanceof ApiError ? err.message : t("work.addColumnFail"),
                       );
                     })
                     .finally(() => setSaving(false));
                 }}
               >
-                افزودن ستون
+                {t("work.addColumn")}
               </Button>
             </div>
           </section>
           )}
           {settingsTab === "templates" && (
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-ink">سیاست تأیید</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">{t("work.policyTitle")}</h3>
             <p className="mb-2 text-xs text-gray-500">
-              وقتی روشن است، کارشناس کارت را تا «در انتظار تأیید» می‌برد و فقط مدیر به «بسته» می‌برد.
+              {t("work.policyHint")}
             </p>
             <div className="mb-4 flex flex-wrap gap-1.5">
               {(
                 [
-                  [null, "طبق شرکت"],
-                  [true, "روشن"],
-                  [false, "خاموش"],
+                  [null, t("work.policyFollow")],
+                  [true, t("work.policyOn")],
+                  [false, t("work.policyOff")],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -1063,15 +1078,15 @@ export default function WorkProjectPage() {
               ))}
             </div>
             <p className="mb-3 text-[11px] text-gray-500">
-              الان این پروژه: {project.require_approval ? "تأیید لازم است" : "بستن آزاد است"}
+              {project.require_approval ? t("work.policyNowOn") : t("work.policyNowOff")}
             </p>
-            <h3 className="mb-2 text-sm font-semibold text-ink">بورد پیش‌فرض</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">{t("work.defaultBoards")}</h3>
             <p className="mb-3 text-xs text-gray-500">
-              بورد استاندارد پلتفرم برای هر نوع کار است. بوردهای شرکت را هم می‌توانید بسازید.
+              {t("work.defaultBoardsHint")}
             </p>
             <ul className="mb-3 space-y-2">
               {templates.length === 0 && (
-                <li className="text-xs text-gray-500">هنوز بورد پیش‌فرضی ذخیره نشده.</li>
+                <li className="text-xs text-gray-500">{t("work.noTemplate")}</li>
               )}
               {templates.map((template) => (
                 <li
@@ -1082,10 +1097,10 @@ export default function WorkProjectPage() {
                     <div>
                       <p className="text-sm font-semibold text-ink">{template.name}</p>
                       {template.is_platform && (
-                        <span className="text-[11px] font-bold text-brand-700">بورد پلتفرم</span>
+                        <span className="text-[11px] font-bold text-brand-700">{t("work.platformBoard")}</span>
                       )}
                       {template.is_default && !template.is_platform && (
-                        <span className="text-[11px] font-bold text-brand-700">پیش‌فرض شرکت</span>
+                        <span className="text-[11px] font-bold text-brand-700">{t("work.companyDefault")}</span>
                       )}
                     </div>
                     <div className="flex gap-1">
@@ -1095,7 +1110,7 @@ export default function WorkProjectPage() {
                         loading={saving}
                         onClick={() => void applyBoardTemplate(template.id)}
                       >
-                        استفاده
+                        {t("work.useBoard")}
                       </Button>
                       {project.can_manage_company && !template.is_platform && (
                         <>
@@ -1106,7 +1121,7 @@ export default function WorkProjectPage() {
                               loading={saving}
                               onClick={() => void setDefaultTemplate(template.id)}
                             >
-                              پیش‌فرض
+                              {t("work.makeDefault")}
                             </Button>
                           )}
                           <Button
@@ -1114,7 +1129,7 @@ export default function WorkProjectPage() {
                             variant="ghost"
                             onClick={() => void deleteTemplate(template.id)}
                           >
-                            حذف
+                            {t("common.delete")}
                           </Button>
                         </>
                       )}
@@ -1139,11 +1154,11 @@ export default function WorkProjectPage() {
             </ul>
             {project.can_manage_company ? (
               <div className="space-y-2 rounded-xl border border-dashed border-black/10 p-2.5">
-                <p className="text-xs font-medium text-ink">بورد پیش‌فرض تازه</p>
+                <p className="text-xs font-medium text-ink">{t("work.newDefaultBoard")}</p>
                 <Input
                   value={templateName}
                   onChange={(event) => setTemplateName(event.target.value)}
-                  placeholder="مثلاً x_boards_list"
+                  placeholder={t("work.templateName")}
                 />
                 <label className="flex items-center gap-2 text-xs text-ink">
                   <input
@@ -1151,7 +1166,7 @@ export default function WorkProjectPage() {
                     checked={templateDefault}
                     onChange={(event) => setTemplateDefault(event.target.checked)}
                   />
-                  به‌عنوان پیش‌فرض شرکت ذخیره شود
+                  {t("work.saveAsDefault")}
                 </label>
                 {templateCols.map((row, index) => (
                   <div key={index} className="space-y-1.5 rounded-lg bg-[#F7F8FA] p-2">
@@ -1167,7 +1182,7 @@ export default function WorkProjectPage() {
                             ),
                           )
                         }
-                        placeholder={`ستون ${index + 1}`}
+                        placeholder={t("work.columnN", { n: index + 1 })}
                       />
                       {templateCols.length > 1 && (
                         <Button
@@ -1179,7 +1194,7 @@ export default function WorkProjectPage() {
                             )
                           }
                         >
-                          حذف
+                          {t("common.delete")}
                         </Button>
                       )}
                     </div>
@@ -1217,33 +1232,33 @@ export default function WorkProjectPage() {
                     ])
                   }
                 >
-                  ستون دیگر
+                  {t("work.anotherColumn")}
                 </Button>
                 <Button size="sm" loading={saving} onClick={() => void saveTemplate()}>
-                  ذخیره بورد پیش‌فرض
+                  {t("work.saveTemplate")}
                 </Button>
               </div>
             ) : (
               <p className="text-xs text-gray-500">
-                فقط مدیر شرکت می‌تواند بورد پیش‌فرض بسازد یا عوض کند.
+                {t("work.onlyCompanyTemplate")}
               </p>
             )}
           </section>
           )}
           <div className="flex justify-end">
             <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
-              بستن
+              {t("common.close")}
             </Button>
           </div>
         </div>
       </Modal>
 
-      <Modal open={teamOpen} title="افزودن تیم به پروژه" onClose={() => setTeamOpen(false)}>
+      <Modal open={teamOpen} title={t("work.addTeamToProject")} onClose={() => setTeamOpen(false)}>
         <div className="space-y-3">
           {formError && <Alert>{formError}</Alert>}
-          <Field label="تیم">
+          <Field label={t("work.tab.teams")}>
             <Select value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-              <option value="">انتخاب کنید</option>
+              <option value="">{t("work.choose")}</option>
               {teams.map((team) => (
                 <option key={team.id} value={team.id}>
                   {team.name}
@@ -1252,14 +1267,14 @@ export default function WorkProjectPage() {
             </Select>
           </Field>
           <p className="text-xs text-gray-500">
-            اعضای فعال تیم به پروژه اضافه می‌شوند.
+            {t("work.teamMembersHint")}
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setTeamOpen(false)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button loading={saving} onClick={addTeam}>
-              افزودن
+              {t("common.add")}
             </Button>
           </div>
         </div>

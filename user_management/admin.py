@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
@@ -13,6 +14,7 @@ from user_management.models import (
     TicketMessage,
     TicketStatus,
 )
+from user_management.ranking import build_explanation_ranking, build_work_ranking
 from user_management.reports import build_user_activity
 
 
@@ -28,6 +30,7 @@ class ProfileInline(admin.StackedInline):
 class CustomUserAdmin(BaseUserAdmin):
     model = CustomUser
     change_form_template = "admin/user_management/customuser/change_form.html"
+    change_list_template = "admin/user_management/customuser/change_list.html"
     list_display = (
         "id",
         "first_name",
@@ -102,12 +105,43 @@ class CustomUserAdmin(BaseUserAdmin):
         urls = super().get_urls()
         extra = [
             path(
+                "ranking/explanation/",
+                self.admin_site.admin_view(self.explanation_ranking_view),
+                name="user_explanation_ranking",
+            ),
+            path(
+                "ranking/work/",
+                self.admin_site.admin_view(self.work_ranking_view),
+                name="user_work_ranking",
+            ),
+            path(
                 "<int:user_id>/activity/",
                 self.admin_site.admin_view(self.activity_report_view),
                 name="user_activity_report",
             ),
         ]
         return extra + urls
+
+    def _ranking_view(self, request, builder):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        context = {
+            **self.admin_site.each_context(request),
+            **builder(),
+            "opts": self.model._meta,
+            "has_view_permission": True,
+        }
+        return render(
+            request,
+            "admin/user_management/customuser/ranking_report.html",
+            context,
+        )
+
+    def explanation_ranking_view(self, request):
+        return self._ranking_view(request, build_explanation_ranking)
+
+    def work_ranking_view(self, request):
+        return self._ranking_view(request, build_work_ranking)
 
     def activity_report_view(self, request, user_id):
         user = get_object_or_404(

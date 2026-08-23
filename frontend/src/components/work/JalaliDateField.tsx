@@ -4,23 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { jalaaliMonthLength, toGregorian, toJalaali } from "jalaali-js";
 
 import { cx } from "@/components/ui";
-
-const MONTHS = [
-  "فروردین",
-  "اردیبهشت",
-  "خرداد",
-  "تیر",
-  "مرداد",
-  "شهریور",
-  "مهر",
-  "آبان",
-  "آذر",
-  "دی",
-  "بهمن",
-  "اسفند",
-];
-
-const WEEKDAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
+import { useI18n } from "@/lib/i18n";
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
@@ -46,22 +30,29 @@ function parseIso(iso: string): { jy: number; jm: number; jd: number } | null {
   return toJalaali(year, month, day);
 }
 
-export function formatJalaliDisplay(iso: string | null | undefined): string {
+export function formatJalaliDisplay(
+  iso: string | null | undefined,
+  latinDigits = false,
+): string {
   if (!iso) return "";
   const jalali = parseIso(iso);
   if (!jalali) return iso;
-  return faDigits(`${jalali.jy}/${pad(jalali.jm)}/${pad(jalali.jd)}`);
+  const text = `${jalali.jy}/${pad(jalali.jm)}/${pad(jalali.jd)}`;
+  return latinDigits ? text : faDigits(text);
 }
 
 export default function JalaliDateField({
   value,
   onChange,
-  placeholder = "انتخاب تاریخ شمسی",
+  placeholder,
 }: {
   value: string;
   onChange: (iso: string) => void;
   placeholder?: string;
 }) {
+  const { t, locale } = useI18n();
+  const latin = locale === "en";
+  const show = (n: string | number) => (latin ? String(n) : faDigits(n));
   const today = todayJalali();
   const selected = parseIso(value);
   const [open, setOpen] = useState(false);
@@ -117,9 +108,9 @@ export default function JalaliDateField({
         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-start text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
       >
         {value ? (
-          formatJalaliDisplay(value)
+          formatJalaliDisplay(value, latin)
         ) : (
-          <span className="text-gray-400">{placeholder}</span>
+          <span className="text-gray-400">{placeholder || t("work.pickDate")}</span>
         )}
       </button>
 
@@ -134,7 +125,7 @@ export default function JalaliDateField({
               ‹
             </button>
             <p className="text-sm font-semibold text-ink">
-              {MONTHS[cursor.jm - 1]} {faDigits(cursor.jy)}
+              {t(`work.month.${cursor.jm}`)} {show(cursor.jy)}
             </p>
             <button
               type="button"
@@ -145,8 +136,8 @@ export default function JalaliDateField({
             </button>
           </div>
           <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[11px] text-gray-500">
-            {WEEKDAYS.map((day) => (
-              <span key={day}>{day}</span>
+            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              <span key={i}>{t(`work.wdShort.${i}`)}</span>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -177,7 +168,7 @@ export default function JalaliDateField({
                         : "text-ink hover:bg-surface",
                   )}
                 >
-                  {faDigits(day)}
+                  {show(day)}
                 </button>
               );
             })}
@@ -191,7 +182,7 @@ export default function JalaliDateField({
                 setOpen(false);
               }}
             >
-              پاک کردن
+              {t("work.clearDate")}
             </button>
             <button
               type="button"
@@ -203,7 +194,7 @@ export default function JalaliDateField({
                 setOpen(false);
               }}
             >
-              امروز
+              {t("work.today")}
             </button>
           </div>
         </div>

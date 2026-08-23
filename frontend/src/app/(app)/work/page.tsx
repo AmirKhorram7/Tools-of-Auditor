@@ -21,6 +21,7 @@ import WorkGuide from "@/components/work/WorkGuide";
 import WorkSection from "@/components/work/WorkSection";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
   type WorkCompany,
   type WorkDashboard,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/work";
 
 export default function WorkHomePage() {
+  const { t } = useI18n();
   const [data, setData] = useState<WorkDashboard | null>(null);
   const [companies, setCompanies] = useState<WorkCompany[]>([]);
   const [invites, setInvites] = useState<WorkInvitation[]>([]);
@@ -55,11 +57,11 @@ export default function WorkHomePage() {
       setInvites(inbox.filter((row) => row.status === "pending"));
       setAllTasks(taskRows);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "بارگذاری پیشخوان ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.loadHomeFail"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -67,7 +69,7 @@ export default function WorkHomePage() {
 
   const createCompany = async () => {
     if (!companyName.trim()) {
-      setFormError("نام شرکت الزامی است.");
+      setFormError(t("work.companyRequired"));
       return;
     }
     setSaving(true);
@@ -81,7 +83,7 @@ export default function WorkHomePage() {
       setCompanyName("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت شرکت ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.companyFail"));
     } finally {
       setSaving(false);
     }
@@ -100,21 +102,21 @@ export default function WorkHomePage() {
 
   return (
     <div className="space-y-4">
-      <WorkBreadcrumb fallbackHref="/dashboard" items={[{ label: "کار" }]} />
+      <WorkBreadcrumb fallbackHref="/dashboard" items={[{ label: t("work.crumb") }]} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-ink">مدیریت کار</h1>
+          <h1 className="text-xl font-bold text-ink">{t("work.title")}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <WorkGuide compact />
           <Link href="/work/inbox">
             <Button variant="secondary" size="sm">
-              اعلان‌ها
+              {t("work.inbox")}
               {invites.length > 0 ? ` (${invites.length})` : ""}
             </Button>
           </Link>
           <Button size="sm" onClick={() => setCompanyOpen(true)}>
-            شرکت جدید
+            {t("work.newCompany")}
           </Button>
         </div>
       </div>
@@ -124,28 +126,28 @@ export default function WorkHomePage() {
       {invites.length > 0 && (
         <Card className="border-brand-200 bg-brand-50">
           <p className="text-sm font-medium text-ink">
-            {invites.length} دعوت در انتظار شماست.
+            {t("work.pendingInvites", { count: invites.length })}
           </p>
           <Link href="/work/inbox" className="mt-3 inline-block">
-            <Button size="sm">مشاهده و پذیرش</Button>
+            <Button size="sm">{t("work.seeAccept")}</Button>
           </Link>
         </Card>
       )}
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold text-ink">شرکت‌ها</h2>
+          <h2 className="text-base font-bold text-ink">{t("work.companies")}</h2>
           <Button size="sm" variant="secondary" onClick={() => setCompanyOpen(true)}>
-            افزودن
+            {t("common.add")}
           </Button>
         </div>
         {companies.length === 0 ? (
           <EmptyState
-            title="هنوز شرکتی ندارید"
-            description="اول شرکت را بسازید، بعد تیم دعوت کنید و کار تعریف کنید."
+            title={t("work.noCompanyTitle")}
+            description={t("work.noCompanyDesc")}
             action={
               <Button size="sm" onClick={() => setCompanyOpen(true)}>
-                ساخت اولین شرکت
+                {t("work.firstCompany")}
               </Button>
             }
           />
@@ -163,7 +165,7 @@ export default function WorkHomePage() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-bold text-ink">{company.name}</span>
                   <span className="mt-0.5 block text-[11px] text-gray-500 group-hover:text-navy-800">
-                    تیم‌ها و پروژه‌ها
+                    {t("work.teamsAndProjects")}
                   </span>
                 </span>
               </Link>
@@ -174,22 +176,22 @@ export default function WorkHomePage() {
 
       <WorkSection
         id="week"
-        title="هفته من"
-        hint="روزهایی که سررسید دارید، روز کار است."
+        title={t("work.myWeek")}
+        hint={t("work.myWeekHint")}
       >
         <WeekStrip tasks={weekTasks} />
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <Stat label="کارهای باز" value={counts?.assigned ?? 0} />
-          <Stat label="امروز" value={counts?.today ?? 0} />
-          <Stat label="عقب‌افتاده" value={counts?.overdue ?? 0} danger />
+          <Stat label={t("work.openTasks")} value={counts?.assigned ?? 0} />
+          <Stat label={t("work.today")} value={counts?.today ?? 0} />
+          <Stat label={t("work.overdue")} value={counts?.overdue ?? 0} danger />
         </div>
       </WorkSection>
 
-      <WorkSection id="my-tasks" title="کارهای من" count={myTasks.length}>
+      <WorkSection id="my-tasks" title={t("work.myTasks")} count={myTasks.length}>
         {myTasks.length === 0 ? (
           <EmptyState
-            title="کاری به شما واگذار نشده"
-            description="وقتی مدیر کاری به شما بدهد، اینجا و روی بورد پروژه دیده می‌شود."
+            title={t("work.noAssignedTitle")}
+            description={t("work.noAssignedDesc")}
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -214,22 +216,29 @@ export default function WorkHomePage() {
       {manager && (
         <WorkSection
           id="manager"
-          title="گزارش مدیر"
-          hint="وضعیت پروژه‌ها و کارهای نیازمند پیگیری"
+          title={t("work.managerReport")}
+          hint={t("work.managerHint")}
         >
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="بدون مسئول" value={manager.unassigned_count} />
-            <Stat label="دعوت‌های باز" value={manager.pending_invites} />
-            <Stat label="تمام‌شده این هفته" value={manager.completed_this_week} />
-            <Stat label="در ریسک" value={manager.at_risk.length} danger />
+            <Stat label={t("work.unassigned")} value={manager.unassigned_count} />
+            <Stat label={t("work.openInvites")} value={manager.pending_invites} />
+            <Stat label={t("work.doneThisWeek")} value={manager.completed_this_week} />
+            <Stat label={t("work.atRisk")} value={manager.at_risk.length} danger />
           </div>
 
           <div className="mt-3 space-y-3">
             {manager.at_risk.length > 0 && (
-              <WorkSection id="risk" title="پروژه‌های در ریسک" count={manager.at_risk.length}>
+              <WorkSection id="risk" title={t("work.riskProjects")} count={manager.at_risk.length}>
                 <WorkTable
                   compact
-                  columns={["پروژه", "عقب", "مسدود", "نزدیک", "بدون مسئول", "پیشرفت"]}
+                  columns={[
+                    t("work.colProject"),
+                    t("work.colLate"),
+                    t("work.colBlocked"),
+                    t("work.colSoon"),
+                    t("work.unassigned"),
+                    t("work.colProgress"),
+                  ]}
                 >
                   {manager.at_risk.map((project) => (
                     <tr key={project.id} className="hover:bg-surface">
@@ -258,12 +267,21 @@ export default function WorkHomePage() {
 
             {manager.projects.length === 0 ? (
               <EmptyState
-                title="پروژه کاری ندارید"
-                description="وارد شرکت شوید، تیم بسازید، بعد پروژه و کار تعریف کنید."
+                title={t("work.noWorkProjectTitle")}
+                description={t("work.noWorkProjectDesc")}
               />
             ) : (
-              <WorkSection id="projects" title="پروژه‌ها" count={manager.projects.length}>
-                <WorkTable compact columns={["پروژه", "عقب", "مسدود", "بدون مسئول", "پیشرفت"]}>
+              <WorkSection id="projects" title={t("work.projects")} count={manager.projects.length}>
+                <WorkTable
+                  compact
+                  columns={[
+                    t("work.colProject"),
+                    t("work.colLate"),
+                    t("work.colBlocked"),
+                    t("work.unassigned"),
+                    t("work.colProgress"),
+                  ]}
+                >
                   {manager.projects.map((project) => (
                     <tr key={project.id} className="hover:bg-surface">
                       <WorkTd>
@@ -289,8 +307,8 @@ export default function WorkHomePage() {
             )}
 
             {manager.workload.length > 0 && (
-              <WorkSection id="workload" title="بار کار افراد" count={manager.workload.length}>
-                <WorkTable compact columns={["فرد", "کارهای باز"]}>
+              <WorkSection id="workload" title={t("work.workload")} count={manager.workload.length}>
+                <WorkTable compact columns={[t("work.person"), t("work.openTasks")]}>
                   {manager.workload.map((row) => (
                     <tr key={row.user_id}>
                       <WorkTd className="font-medium text-ink">{row.name}</WorkTd>
@@ -303,14 +321,14 @@ export default function WorkHomePage() {
 
             <WorkSection
               id="all-tasks"
-              title="کارت کارها"
+              title={t("work.taskCards")}
               count={allTasks.length}
               defaultOpen={false}
             >
               {allTasks.length === 0 ? (
                 <EmptyState
-                  title="کاری ثبت نشده"
-                  description="از صفحه پروژه، روی بورد کار بسازید و مسئول بگذارید."
+                  title={t("work.noTaskTitle")}
+                  description={t("work.noTaskDesc")}
                 />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -326,24 +344,24 @@ export default function WorkHomePage() {
 
       <Modal
         open={companyOpen}
-        title="شرکت جدید"
+        title={t("work.newCompany")}
         onClose={() => setCompanyOpen(false)}
       >
         <div className="space-y-3">
           {formError && <Alert>{formError}</Alert>}
-          <Field label="نام شرکت">
+          <Field label={t("work.companyName")}>
             <Input
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="مثلاً هلدینگ نمونه"
+              placeholder={t("work.companyPlaceholder")}
             />
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCompanyOpen(false)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button loading={saving} onClick={createCompany}>
-              ساخت
+              {t("common.create")}
             </Button>
           </div>
         </div>

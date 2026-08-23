@@ -13,9 +13,10 @@ import {
 } from "@/components/ui";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
-  INVITE_STATUS_LABELS,
   notificationHref,
+  workInviteStatusLabel,
   type WorkInvitation,
   type WorkNotification,
   type WorkTimeline,
@@ -25,6 +26,7 @@ import {
 type Tab = "notes" | "invites" | "activity";
 
 export default function WorkInboxPage() {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("notes");
   const [invites, setInvites] = useState<WorkInvitation[]>([]);
   const [notes, setNotes] = useState<WorkNotification[]>([]);
@@ -47,11 +49,11 @@ export default function WorkInboxPage() {
       setNotes(notifications);
       setActivity(timeline.activity || timeline.items || []);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "بارگذاری صندوق ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.loadInboxFail"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -66,7 +68,7 @@ export default function WorkInboxPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "پاسخ به دعوت ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("profile.inviteFail"));
     } finally {
       setBusyId(null);
     }
@@ -90,7 +92,7 @@ export default function WorkInboxPage() {
       await apiFetch("/work/notifications/read-all/", { method: "POST" });
       setNotes((rows) => rows.map((row) => ({ ...row, is_read: true })));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "علامت‌گذاری ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.markFail"));
     } finally {
       setMarking(false);
     }
@@ -103,9 +105,12 @@ export default function WorkInboxPage() {
 
   return (
     <div className="space-y-4">
-      <WorkBreadcrumb fallbackHref="/work" items={[{ href: "/work", label: "کار" }, { label: "اعلان‌ها" }]} />
+      <WorkBreadcrumb
+        fallbackHref="/work"
+        items={[{ href: "/work", label: t("work.crumb") }, { label: t("work.inbox") }]}
+      />
       <div>
-        <h1 className="text-lg font-bold text-ink">اعلان‌ها و فعالیت</h1>
+        <h1 className="text-lg font-bold text-ink">{t("work.inboxAndActivity")}</h1>
       </div>
 
       {error && <Alert>{error}</Alert>}
@@ -114,17 +119,21 @@ export default function WorkInboxPage() {
         <TabBtn
           active={tab === "notes"}
           onClick={() => setTab("notes")}
-          label={unread > 0 ? `اعلان‌ها (${unread})` : "اعلان‌ها"}
+          label={unread > 0 ? `${t("work.tab.notes")} (${unread})` : t("work.tab.notes")}
         />
         <TabBtn
           active={tab === "invites"}
           onClick={() => setTab("invites")}
-          label={pending.length > 0 ? `دعوت‌ها (${pending.length})` : "دعوت‌ها"}
+          label={
+            pending.length > 0
+              ? `${t("work.tab.invites")} (${pending.length})`
+              : t("work.tab.invites")
+          }
         />
         <TabBtn
           active={tab === "activity"}
           onClick={() => setTab("activity")}
-          label="فعالیت"
+          label={t("work.tab.activity")}
         />
       </div>
 
@@ -132,8 +141,8 @@ export default function WorkInboxPage() {
         <section className="space-y-3">
           {pending.length === 0 ? (
             <EmptyState
-              title="دعوت بازی ندارید"
-              description="وقتی مدیر تیمی شما را دعوت کند، اینجا دیده می‌شود."
+              title={t("work.noOpenInvite")}
+              description={t("work.noOpenInviteDesc")}
             />
           ) : (
             pending.map((invite) => (
@@ -142,7 +151,7 @@ export default function WorkInboxPage() {
                   <div>
                     <p className="font-bold text-ink">{invite.team_name}</p>
                     <p className="mt-1 text-xs text-gray-500">
-                      از طرف {invite.invited_by_name}
+                      {t("work.fromParty", { name: invite.invited_by_name })}
                       {invite.position_title ? ` · ${invite.position_title}` : ""}
                     </p>
                   </div>
@@ -153,14 +162,14 @@ export default function WorkInboxPage() {
                       loading={busyId === invite.id}
                       onClick={() => respond(invite.id, false)}
                     >
-                      رد
+                      {t("work.reject")}
                     </Button>
                     <Button
                       size="sm"
                       loading={busyId === invite.id}
                       onClick={() => respond(invite.id, true)}
                     >
-                      پذیرش
+                      {t("work.accept")}
                     </Button>
                   </div>
                 </div>
@@ -169,13 +178,13 @@ export default function WorkInboxPage() {
           )}
           {invites.some((row) => row.status !== "pending") && (
             <p className="text-xs text-gray-400">
-              قبلی:{" "}
+              {t("work.previous")}:{" "}
               {invites
                 .filter((row) => row.status !== "pending")
                 .slice(0, 4)
                 .map(
                   (row) =>
-                    `${row.team_name} (${INVITE_STATUS_LABELS[row.status] || row.status})`,
+                    `${row.team_name} (${workInviteStatusLabel(t, row.status) || row.status})`,
                 )
                 .join(" · ")}
             </p>
@@ -188,12 +197,12 @@ export default function WorkInboxPage() {
           {unread > 0 && (
             <div className="flex justify-end">
               <Button size="sm" variant="secondary" loading={marking} onClick={markAll}>
-                همه را خواندم
+                {t("work.markAllReadAlt")}
               </Button>
             </div>
           )}
           {notes.length === 0 ? (
-            <EmptyState title="اعلانی نیست" description="وقتی کاری واگذار شود، اینجا می‌آید." />
+            <EmptyState title={t("work.noNotes")} description={t("work.noNotesDesc")} />
           ) : (
             <ul className="space-y-2">
               {notes.map((note) => (
@@ -209,7 +218,7 @@ export default function WorkInboxPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-semibold text-ink">{note.title}</p>
-                      {!note.is_read && <Badge tone="amber">جدید</Badge>}
+                      {!note.is_read && <Badge tone="amber">{t("work.newBadge")}</Badge>}
                     </div>
                     <p className="mt-1 text-xs text-gray-600">{note.message}</p>
                   </Link>
@@ -223,7 +232,7 @@ export default function WorkInboxPage() {
       {tab === "activity" && (
         <section>
           {activity.length === 0 ? (
-            <EmptyState title="هنوز فعالیتی نیست" description="ساخت پروژه و کار اینجا ثبت می‌شود." />
+            <EmptyState title={t("work.noActivityYet")} description={t("work.noActivityDesc")} />
           ) : (
             <ul className="space-y-2">
               {activity.map((item) => (

@@ -5,12 +5,13 @@ import Link from "next/link";
 import { Badge } from "@/components/ui";
 import DoneCheck from "@/components/work/DoneCheck";
 import ProgressBar from "@/components/work/ProgressBar";
+import { useI18n } from "@/lib/i18n";
 import {
-  TASK_STATUS_LABELS,
-  formatFaDate,
+  formatWorkDate,
   isOverdue,
   priorityTone,
   taskStatusTone,
+  workStatusLabel,
   type WorkTaskRow,
   type WorkTaskStatus,
 } from "@/lib/work";
@@ -33,6 +34,7 @@ export default function TaskRow({
   busy?: boolean;
   onToggleDone?: (id: number, done: boolean) => void;
 }) {
+  const { t, locale } = useI18n();
   const overdue = isOverdue(task.due_date, task.status);
   const done = task.status === "done";
 
@@ -61,10 +63,10 @@ export default function TaskRow({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <Badge tone={taskStatusTone(task.status)}>
-              {TASK_STATUS_LABELS[task.status]}
+              {workStatusLabel(t, task.status)}
             </Badge>
             <Badge tone={priorityTone(task.priority)}>
-              اولویت {task.priority}
+              {t("work.priorityN", { n: task.priority })}
             </Badge>
           </div>
         </div>
@@ -73,8 +75,8 @@ export default function TaskRow({
           <span
             className={`text-[11px] ${overdue ? "font-medium text-red-600" : "text-gray-500"}`}
           >
-            {overdue ? "گذشته · " : ""}
-            {formatFaDate(task.due_date)}
+            {overdue ? `${t("work.overdueShort")} · ` : ""}
+            {formatWorkDate(task.due_date, locale, t("work.noDue"))}
           </span>
         </div>
       </Link>

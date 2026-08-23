@@ -1,0 +1,88 @@
+{% load i18n %}
+
+<style>
+  .ta-app-fold { margin: 0 0 16px; }
+  .ta-app-fold > summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--hairline-color, #e0e0e0);
+    border-radius: 8px;
+    background: var(--darkened-bg, var(--body-bg));
+    color: var(--body-loud-color, var(--body-fg));
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .ta-app-fold > summary::-webkit-details-marker { display: none; }
+  .ta-app-fold > summary::after {
+    content: "Show";
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--body-quiet-color);
+  }
+  .ta-app-fold[open] > summary {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .ta-app-fold[open] > summary::after { content: "Hide"; }
+  .ta-app-fold .module {
+    margin: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+  .ta-app-fold .module caption { display: none; }
+</style>
+
+{% if app_list %}
+  {% for app in app_list %}
+    <details class="ta-app-fold"{% if app.app_label == 'user_management' or app.app_url in request.path %} open{% endif %}>
+      <summary>{{ app.name }}</summary>
+      <div class="app-{{ app.app_label }} module{% if app.app_url in request.path|urlencode %} current-app{% endif %}">
+        <table>
+          <caption>
+            <a href="{{ app.app_url }}" class="section">{{ app.name }}</a>
+          </caption>
+          <thead class="visually-hidden">
+            <tr>
+              <th scope="col">{% translate 'Model name' %}</th>
+              <th scope="col">{% translate 'Add link' %}</th>
+              <th scope="col">{% translate 'Change or view list link' %}</th>
+            </tr>
+          </thead>
+          {% for model in app.models %}
+            {% with model_name=model.object_name|lower %}
+              <tr class="model-{{ model_name }}{% if model.admin_url in request.path|urlencode %} current-model{% endif %}">
+                <th scope="row" id="{{ app.app_label }}-{{ model_name }}">
+                  {% if model.admin_url %}
+                    <a href="{{ model.admin_url }}"{% if model.admin_url in request.path|urlencode %} aria-current="page"{% endif %}>{{ model.name }}</a>
+                  {% else %}
+                    {{ model.name }}
+                  {% endif %}
+                </th>
+                {% if model.add_url %}
+                  <td><a href="{{ model.add_url }}" class="addlink" aria-describedby="{{ app.app_label }}-{{ model_name }}">{% translate 'Add' %}</a></td>
+                {% else %}
+                  <td></td>
+                {% endif %}
+                {% if model.admin_url and show_changelinks %}
+                  {% if model.view_only %}
+                    <td><a href="{{ model.admin_url }}" class="viewlink" aria-describedby="{{ app.app_label }}-{{ model_name }}">{% translate 'View' %}</a></td>
+                  {% else %}
+                    <td><a href="{{ model.admin_url }}" class="changelink" aria-describedby="{{ app.app_label }}-{{ model_name }}">{% translate 'Change' %}</a></td>
+                  {% endif %}
+                {% elif show_changelinks %}
+                  <td></td>
+                {% endif %}
+              </tr>
+            {% endwith %}
+          {% endfor %}
+        </table>
+      </div>
+    </details>
+  {% endfor %}
+{% else %}
+  <p>{% translate 'You don’t have permission to view or edit anything.' %}</p>
+{% endif %}

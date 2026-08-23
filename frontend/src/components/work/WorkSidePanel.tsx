@@ -20,7 +20,7 @@ function readOpenState(): boolean {
 
 export default function WorkSidePanel() {
   const pathname = usePathname();
-  const { dir } = useI18n();
+  const { t, dir } = useI18n();
   const [open, setOpen] = useState(true);
   const [companies, setCompanies] = useState<WorkCompany[]>([]);
   const [projects, setProjects] = useState<WorkProject[]>([]);
@@ -94,7 +94,7 @@ export default function WorkSidePanel() {
         type="button"
         onClick={toggle}
         className="sticky top-28 z-30 hidden h-[calc(100vh-8rem)] w-10 shrink-0 flex-col items-center gap-3 rounded-xl bg-navy-900 py-4 text-white shadow-md transition hover:bg-navy-800 md:flex"
-        title="نمایش پنل ابزارها"
+        title={t("nav.showTools")}
         dir={dir}
       >
         <span className="text-sm leading-none">‹</span>
@@ -107,7 +107,7 @@ export default function WorkSidePanel() {
           className="text-[11px] font-medium tracking-wide"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
         >
-          ابزارها
+          {t("nav.tools")}
         </span>
       </button>
     );
@@ -120,22 +120,22 @@ export default function WorkSidePanel() {
     >
       <div className="flex items-center justify-between border-b border-navy-700 px-3 py-3">
         <div>
-          <p className="text-sm font-semibold text-white">ابزارها</p>
-          <p className="text-[11px] text-gray-400">تی‌ادیتور</p>
+          <p className="text-sm font-semibold text-white">{t("nav.tools")}</p>
+          <p className="text-[11px] text-gray-400">{t("brand.name")}</p>
         </div>
         <button
           type="button"
           onClick={toggle}
           className="rounded-md px-2 py-1 text-xs text-gray-300 transition hover:bg-navy-700 hover:text-white"
         >
-          پنهان ›
+          {t("nav.hideTools")} ›
         </button>
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-2">
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            سرویس‌ها
+            {t("nav.services")}
           </p>
           <Link
             href="/work"
@@ -147,25 +147,25 @@ export default function WorkSidePanel() {
             )}
           >
             <span className="flex size-6 items-center justify-center rounded-md bg-brand-500 text-[11px] font-bold text-ink">
-              ک
+              {t("work.workLetter")}
             </span>
-            <span className="min-w-0 flex-1">مدیریت کار</span>
+            <span className="min-w-0 flex-1">{t("nav.work")}</span>
           </Link>
           <Link
             href="/explanation"
             className="mt-1 flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-gray-200 transition hover:bg-navy-800"
           >
             <span className="flex size-6 items-center justify-center rounded-md bg-navy-700 text-[11px] font-bold">
-              ت
+              {t("work.expLetter")}
             </span>
-            <span className="min-w-0 flex-1">تشریح سیستم</span>
+            <span className="min-w-0 flex-1">{t("nav.explanation")}</span>
           </Link>
         </section>
 
         <section>
           <div className="mb-1 flex items-center justify-between px-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-              دعوت‌ها
+              {t("work.tab.invites")}
             </p>
             {invites.length > 0 && (
               <span className="rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-ink">
@@ -174,9 +174,9 @@ export default function WorkSidePanel() {
             )}
           </div>
           {loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">در حال بارگذاری...</p>
+            <p className="px-2 py-2 text-xs text-gray-500">{t("common.loading")}</p>
           ) : invites.length === 0 ? (
-            <p className="px-2 py-2 text-xs text-gray-500">دعوت تازه‌ای نیست.</p>
+            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noFreshInvite")}</p>
           ) : (
             <ul className="space-y-2">
               {invites.slice(0, 4).map((invite) => (
@@ -186,7 +186,7 @@ export default function WorkSidePanel() {
                 >
                   <p className="text-xs font-semibold text-white">{invite.team_name}</p>
                   <p className="mt-0.5 text-[10px] text-gray-400">
-                    از {invite.invited_by_name}
+                    {t("work.fromBy", { name: invite.invited_by_name })}
                   </p>
                   <div className="mt-2 flex gap-1">
                     <Button
@@ -195,7 +195,7 @@ export default function WorkSidePanel() {
                       loading={busyId === invite.id}
                       onClick={() => respond(invite.id, true)}
                     >
-                      پذیرش
+                      {t("work.accept")}
                     </Button>
                     <Button
                       size="sm"
@@ -204,7 +204,7 @@ export default function WorkSidePanel() {
                       loading={busyId === invite.id}
                       onClick={() => respond(invite.id, false)}
                     >
-                      رد
+                      {t("work.reject")}
                     </Button>
                   </div>
                 </li>
@@ -220,7 +220,7 @@ export default function WorkSidePanel() {
                 : "text-gray-300 hover:bg-navy-700 hover:text-white",
             )}
           >
-            <span>همه اعلان‌ها</span>
+            <span>{t("work.allInbox")}</span>
             {unread > 0 && (
               <span className="rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-ink">
                 {unread}
@@ -231,10 +231,10 @@ export default function WorkSidePanel() {
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            شرکت‌ها
+            {t("work.companies")}
           </p>
           {companies.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">شرکتی نیست.</p>
+            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noCompanyEmpty")}</p>
           ) : (
             <ul className="space-y-1">
               {companies.map((company) => (
@@ -258,10 +258,10 @@ export default function WorkSidePanel() {
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            تیم‌ها
+            {t("work.teams")}
           </p>
           {teams.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">تیمی نیست.</p>
+            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noTeamEmpty")}</p>
           ) : (
             <ul className="space-y-0.5">
               {teams.slice(0, 10).map((team) => (
@@ -285,7 +285,7 @@ export default function WorkSidePanel() {
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            پروژه‌ها
+            {t("work.projects")}
           </p>
           <Link
             href="/work"
@@ -296,10 +296,10 @@ export default function WorkSidePanel() {
                 : "text-gray-300 hover:bg-navy-700 hover:text-white",
             )}
           >
-            پیشخوان
+            {t("nav.workHomeShort")}
           </Link>
           {projects.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">پروژه‌ای نیست.</p>
+            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noProjectEmpty")}</p>
           ) : (
             <ul className="space-y-0.5">
               {projects.slice(0, 12).map((project) => (

@@ -20,12 +20,12 @@ import JalaliDateField from "@/components/work/JalaliDateField";
 import ProgressBar from "@/components/work/ProgressBar";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { ApiError, apiFetch } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
-  PRIORITY_LABELS,
-  TASK_STATUS_LABELS,
-  formatFaDate,
   isOverdue,
   labelTextColor,
+  workPriorityLabel,
+  workStatusLabel,
   type WorkBoardColumn,
   type WorkLabel,
   type WorkProject,
@@ -36,6 +36,7 @@ import {
 export default function WorkTaskPage() {
   const params = useParams<{ id: string }>();
   const taskId = Number(params.id);
+  const { t, locale } = useI18n();
 
   const [task, setTask] = useState<WorkTaskDetail | null>(null);
   const [project, setProject] = useState<WorkProject | null>(null);
@@ -86,11 +87,11 @@ export default function WorkTaskPage() {
       );
       setLabels(Array.isArray(labelRows) ? labelRows : []);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "بارگذاری کار ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.loadTaskFail"));
     } finally {
       setLoading(false);
     }
-  }, [taskId]);
+  }, [taskId, t]);
 
   useEffect(() => {
     load();
@@ -110,7 +111,7 @@ export default function WorkTaskPage() {
           : updated,
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ذخیره کار ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.saveTaskFail"));
     } finally {
       setSaving(false);
     }
@@ -118,7 +119,7 @@ export default function WorkTaskPage() {
 
   const saveDetails = async () => {
     if (!title.trim()) {
-      setError("عنوان کار الزامی است.");
+      setError(t("work.taskTitleRequired"));
       return;
     }
     const body: Record<string, unknown> = {
@@ -145,7 +146,7 @@ export default function WorkTaskPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "به‌روزرسانی گام ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.updateStepFail"));
     }
   };
 
@@ -161,7 +162,7 @@ export default function WorkTaskPage() {
       setStepTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "افزودن گام ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.addStepFail"));
     } finally {
       setSaving(false);
     }
@@ -179,28 +180,29 @@ export default function WorkTaskPage() {
       setComment("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ثبت نظر ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.addCommentFail"));
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) return <PageLoader />;
-  if (!task) return <Alert>{error || "کار پیدا نشد."}</Alert>;
+  if (!task) return <Alert>{error || t("work.taskNotFound")}</Alert>;
 
   const overdue = isOverdue(task.due_date, task.status);
   const canManage = Boolean(project?.can_manage);
   const canMove = Boolean(task.can_move);
+  const pctLabel = locale === "en" ? `${task.progress_percent}%` : `${task.progress_percent}٪`;
 
   return (
     <div className="space-y-4">
       <WorkBreadcrumb
         fallbackHref={`/work/projects/${task.project}`}
         items={[
-          { href: "/work", label: "کار" },
+          { href: "/work", label: t("work.crumb") },
           {
             href: `/work/companies/${project?.company || ""}`,
-            label: project?.company_name || "شرکت",
+            label: project?.company_name || t("work.company"),
           },
           { href: `/work/projects/${task.project}`, label: task.project_name },
           { label: task.title },
@@ -225,12 +227,12 @@ export default function WorkTaskPage() {
             {task.title}
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-            <span>{TASK_STATUS_LABELS[task.status]}</span>
+            <span>{workStatusLabel(t, task.status)}</span>
             <span>#{task.id}</span>
-            {overdue && <Badge tone="red">گذشته</Badge>}
+            {overdue && <Badge tone="red">{t("work.overdueShort")}</Badge>}
             <span className="flex items-center gap-2">
               <ProgressBar value={task.progress_percent} className="w-20" />
-              {task.progress_percent}٪
+              {pctLabel}
             </span>
           </div>
         </div>
@@ -239,15 +241,15 @@ export default function WorkTaskPage() {
       {error && <Alert>{error}</Alert>}
 
       <Card className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink">جزئیات کار</h2>
-        <Field label="عنوان">
+        <h2 className="text-sm font-semibold text-ink">{t("work.taskDetails")}</h2>
+        <Field label={t("work.taskTitle")}>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={!canManage}
           />
         </Field>
-        <Field label="توضیح">
+        <Field label={t("work.description")}>
           <Textarea
             rows={4}
             value={description}
@@ -256,19 +258,19 @@ export default function WorkTaskPage() {
           />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="شروع کار">
+          <Field label={t("work.startDate")}>
             <JalaliDateField value={startDate} onChange={setStartDate} />
           </Field>
-          <Field label="سررسید">
+          <Field label={t("work.due")}>
             <JalaliDateField value={due} onChange={setDue} />
           </Field>
-          <Field label="مسئول">
+          <Field label={t("work.assignee")}>
             <Select
               value={assignee}
               disabled={!canManage}
               onChange={(e) => setAssignee(e.target.value)}
             >
-              <option value="">بدون مسئول</option>
+              <option value="">{t("work.unassigned")}</option>
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.full_name || member.phone_number}
@@ -276,7 +278,7 @@ export default function WorkTaskPage() {
               ))}
             </Select>
           </Field>
-          <Field label="ستون بورد">
+          <Field label={t("work.boardColumn")}>
             <Select
               value={columnId}
               disabled={!canMove}
@@ -289,21 +291,21 @@ export default function WorkTaskPage() {
               ))}
             </Select>
           </Field>
-          <Field label="اولویت">
+          <Field label={t("work.priority")}>
             <Select
               value={priority}
               disabled={!canManage}
               onChange={(e) => setPriority(e.target.value)}
             >
-              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+              {[1, 2, 3, 4].map((value) => (
                 <option key={value} value={value}>
-                  {label}
+                  {workPriorityLabel(t, value)}
                 </option>
               ))}
             </Select>
           </Field>
           {canManage && (
-            <Field label="سختی">
+            <Field label={t("work.difficulty")}>
               <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
                 {[1, 2, 3, 4, 5].map((value) => (
                   <option key={value} value={value}>
@@ -315,15 +317,15 @@ export default function WorkTaskPage() {
           )}
         </div>
         <div>
-          <p className="mb-1.5 text-sm font-medium text-ink">برچسب‌ها</p>
+          <p className="mb-1.5 text-sm font-medium text-ink">{t("work.labelsTitle")}</p>
           {labels.length === 0 ? (
             <p className="text-xs text-gray-500">
-              برچسب را از تنظیمات پروژه بسازید.
+              {t("work.makeLabelsInSettings")}
               {project && (
                 <>
                   {" "}
                   <Link href={`/work/projects/${project.id}`} className="text-link">
-                    بازگشت به بورد
+                    {t("work.backToBoard")}
                   </Link>
                 </>
               )}
@@ -359,18 +361,18 @@ export default function WorkTaskPage() {
         </div>
         <div className="flex justify-end">
           <Button size="sm" loading={saving} onClick={() => void saveDetails()}>
-            ذخیره
+            {t("common.save")}
           </Button>
         </div>
         {!canMove && (
-          <p className="text-xs text-gray-500">فقط مسئول این کار و مدیر می‌توانند ستون را عوض کنند.</p>
+          <p className="text-xs text-gray-500">{t("work.onlyAssigneeMove")}</p>
         )}
       </Card>
 
       <Card>
-        <h2 className="mb-3 text-sm font-semibold text-ink">گام‌ها</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{t("work.steps")}</h2>
         {(task.steps || []).length === 0 ? (
-          <p className="mb-3 text-sm text-gray-500">بدون گام هم می‌توانید کار را جلو ببرید.</p>
+          <p className="mb-3 text-sm text-gray-500">{t("work.noStepsHint")}</p>
         ) : (
           <ul className="mb-3 space-y-2">
             {task.steps.map((step) => (
@@ -395,17 +397,17 @@ export default function WorkTaskPage() {
             <Input
               value={stepTitle}
               onChange={(e) => setStepTitle(e.target.value)}
-              placeholder="گام بعدی"
+              placeholder={t("work.nextStep")}
             />
             <Button size="sm" loading={saving} onClick={addStep}>
-              افزودن
+              {t("common.add")}
             </Button>
           </div>
         )}
       </Card>
 
       <Card>
-        <h2 className="mb-3 text-sm font-semibold text-ink">نظرها</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink">{t("work.comments")}</h2>
         <ul className="mb-3 space-y-2">
           {(task.comments || []).map((item) => (
             <li
@@ -417,17 +419,17 @@ export default function WorkTaskPage() {
             </li>
           ))}
         </ul>
-        <Field label="نظر جدید">
+        <Field label={t("work.newComment")}>
           <Textarea
             rows={3}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="یک جمله روشن بنویسید..."
+            placeholder={t("work.commentPlaceholder")}
           />
         </Field>
         <div className="mt-2 flex justify-end">
           <Button size="sm" loading={saving} onClick={addComment}>
-            ثبت نظر
+            {t("work.postComment")}
           </Button>
         </div>
       </Card>

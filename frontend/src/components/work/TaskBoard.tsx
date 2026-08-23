@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button, Field, Input } from "@/components/ui";
 import TaskCard from "@/components/work/TaskCard";
+import { useI18n } from "@/lib/i18n";
 import {
   LABEL_COLORS,
   labelTextColor,
@@ -36,6 +37,7 @@ export default function TaskBoard({
   onAddColumn?: (name: string, color: string) => Promise<void> | void;
   onBlockedClose?: () => void;
 }) {
+  const { t } = useI18n();
   const showAddTask = Boolean(canAddTask ?? canManage) && Boolean(onAddTask);
   const [dropId, setDropId] = useState<number | null>(null);
   const [columnName, setColumnName] = useState("");
@@ -103,7 +105,9 @@ export default function TaskBoard({
           >
             <div className="min-w-0">
               <p className="truncate text-[13px] font-bold">{column.name}</p>
-              <p className="text-[11px] opacity-70">{column.tasks.length} کار</p>
+              <p className="text-[11px] opacity-70">
+                {t("work.taskCount", { count: column.tasks.length })}
+              </p>
             </div>
             {showAddTask && (
               <button
@@ -111,13 +115,15 @@ export default function TaskBoard({
                 onClick={() => onAddTask?.(column)}
                 className="shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold hover:bg-white/25"
               >
-                افزودن کار
+                {t("work.addTask")}
               </button>
             )}
           </header>
           <div className="flex h-[calc(100vh-14rem)] min-h-[280px] flex-col gap-1.5 overflow-y-auto bg-[#F4F5F7] p-1.5">
             {column.tasks.length === 0 ? (
-              <p className="px-1 py-8 text-center text-xs text-navy-800/35">خالی</p>
+              <p className="px-1 py-8 text-center text-xs text-navy-800/35">
+                {t("work.emptyColumn")}
+              </p>
             ) : (
               column.tasks.map((task) => (
                 <TaskCard
@@ -135,12 +141,12 @@ export default function TaskBoard({
       ))}
       {canManage && onAddColumn && (
         <section className="w-[240px] shrink-0 rounded-2xl border border-dashed border-black/10 bg-white/80 p-3">
-          <p className="mb-2 text-sm font-semibold text-ink">ستون جدید</p>
-          <Field label="نام">
+          <p className="mb-2 text-sm font-semibold text-ink">{t("work.newColumn")}</p>
+          <Field label={t("work.columnName")}>
             <Input
               value={columnName}
               onChange={(event) => setColumnName(event.target.value)}
-              placeholder="مثلاً بازبینی"
+              placeholder={t("work.columnExample")}
             />
           </Field>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -158,7 +164,7 @@ export default function TaskBoard({
             ))}
           </div>
           <Button className="mt-3 w-full" size="sm" loading={adding} onClick={() => void addColumn()}>
-            افزودن
+            {t("common.add")}
           </Button>
         </section>
       )}

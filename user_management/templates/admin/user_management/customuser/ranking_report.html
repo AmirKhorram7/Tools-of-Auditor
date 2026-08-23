@@ -1,0 +1,164 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+  .ta-report { max-width: 1180px; color: var(--body-fg); }
+  .ta-hero, .ta-stat, .ta-card {
+    background: var(--darkened-bg, var(--body-bg));
+    border: 1px solid var(--hairline-color);
+    color: var(--body-fg);
+  }
+  .ta-hero {
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 18px;
+  }
+  .ta-hero h1 { margin: 0 0 4px; font-size: 1.45rem; color: var(--body-loud-color, var(--body-fg)); }
+  .ta-muted { color: var(--body-quiet-color); font-size: 13px; }
+  .ta-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .ta-stats {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px; margin-bottom: 20px;
+  }
+  .ta-stat { border-radius: 10px; padding: 12px 14px; }
+  .ta-stat .n { font-size: 1.5rem; font-weight: 700; line-height: 1.2; color: var(--body-loud-color, var(--body-fg)); }
+  .ta-stat .l { font-size: 12px; font-weight: 600; margin-top: 2px; }
+  .ta-spread { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--body-quiet-color); }
+  .ta-bar {
+    display: block; width: 100%; height: 6px; margin-top: 8px;
+    border: 0; border-radius: 99px; overflow: hidden;
+    background: var(--hairline-color);
+    accent-color: var(--link-fg, var(--primary));
+  }
+  .ta-bar::-webkit-progress-bar { background: var(--hairline-color); border-radius: 99px; }
+  .ta-bar::-webkit-progress-value, .ta-bar::-moz-progress-bar {
+    background: var(--link-fg, var(--primary)); border-radius: 99px;
+  }
+  .ta-top { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .ta-top-card { border-radius: 10px; padding: 12px 14px; }
+  .ta-rank { font-size: 12px; font-weight: 700; color: var(--body-quiet-color); }
+  .ta-top-card h3 { margin: 4px 0 2px; font-size: 15px; }
+  .ta-score { font-size: 1.4rem; font-weight: 700; }
+  .ta-card { border-radius: 10px; overflow: hidden; }
+  .ta-card h2 {
+    margin: 0; padding: 10px 14px; font-size: 14px;
+    background: var(--selected-bg, var(--body-bg));
+    color: var(--body-loud-color, var(--body-fg));
+    border-bottom: 1px solid var(--hairline-color);
+  }
+  .ta-card table { width: 100%; border-collapse: collapse; }
+  .ta-card th, .ta-card td {
+    text-align: start; padding: 8px 12px; font-size: 13px;
+    border-bottom: 1px solid var(--hairline-color);
+    vertical-align: middle; color: var(--body-fg);
+  }
+  .ta-card th { color: var(--body-quiet-color); font-weight: 600; }
+  .ta-card a { color: var(--link-fg); }
+  .ta-empty { padding: 14px; color: var(--body-quiet-color); font-size: 13px; }
+  .ta-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ta-mini { width: 72px; height: 6px; margin: 0; }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Home" %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='user_management' %}">User management</a>
+  &rsaquo; <a href="{% url 'admin:user_management_customuser_changelist' %}">{% trans "Users" %}</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="ta-report">
+  <div class="ta-hero">
+    <div style="flex:1; min-width: 240px;">
+      <p class="ta-muted">Activity ranking</p>
+      <h1>{{ title }}</h1>
+      <p class="ta-muted">{{ subtitle }}</p>
+      <p class="ta-muted">{{ active_count }} user{{ active_count|pluralize }} with at least one action. Min / max / average are among these users.</p>
+      <div class="ta-actions">
+        {% if kind == "explanation" %}
+          <a class="button" href="{% url 'admin:user_work_ranking' %}">Open work ranking</a>
+        {% else %}
+          <a class="button" href="{% url 'admin:user_explanation_ranking' %}">Open explanation ranking</a>
+        {% endif %}
+        <a class="button" href="{% url 'admin:user_management_customuser_changelist' %}">Back to users</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="ta-stats">
+    {% for s in metrics %}
+      <div class="ta-stat">
+        <div class="n">{{ s.avg }}</div>
+        <div class="l">{{ s.label }} — average</div>
+        <div class="ta-muted">{{ s.hint }}</div>
+        <div class="ta-spread">
+          <span>Min {{ s.min }}</span>
+          <span>Max {{ s.max }}</span>
+        </div>
+        <progress class="ta-bar" value="{{ s.pct }}" max="100" title="Average vs max"></progress>
+      </div>
+    {% endfor %}
+  </div>
+
+  <section class="ta-card" style="margin-bottom: 20px;">
+    <h2>Top 5</h2>
+    {% if top5 %}
+      <div class="ta-top" style="padding: 12px;">
+        {% for row in top5 %}
+          <div class="ta-stat ta-top-card">
+            <div class="ta-rank">#{{ row.rank }}</div>
+            <h3><a href="{{ row.report_href }}">{{ row.name }}</a></h3>
+            <p class="ta-muted" dir="ltr">{{ row.phone }}</p>
+            <div class="ta-score">{{ row.score }}</div>
+            <progress class="ta-bar" value="{{ row.score_pct }}" max="100"></progress>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="ta-empty">No activity yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="ta-card">
+    <h2>All active users</h2>
+    {% if rows %}
+    <table>
+      <tr>
+        <th>#</th>
+        <th>User</th>
+        <th>Phone</th>
+        {% for col in columns %}<th>{{ col.label }}</th>{% endfor %}
+        <th>Score</th>
+        <th></th>
+      </tr>
+      {% for row in rows %}
+      <tr>
+        <td class="ta-num">{{ row.rank }}</td>
+        <td>
+          <a href="{{ row.change_href }}">{{ row.name }}</a>
+          {% if not row.active %}<span class="ta-muted"> · inactive</span>{% endif %}
+        </td>
+        <td dir="ltr">{{ row.phone }}</td>
+        {% for value in row.cells %}
+          <td class="ta-num">{{ value }}</td>
+        {% endfor %}
+        <td class="ta-num">
+          <div>{{ row.score }}</div>
+          <progress class="ta-bar ta-mini" value="{{ row.score_pct }}" max="100"></progress>
+        </td>
+        <td><a href="{{ row.report_href }}">Report</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+      <p class="ta-empty">No users have created anything in this tool yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

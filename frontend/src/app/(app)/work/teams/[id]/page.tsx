@@ -19,11 +19,12 @@ import PhoneSuggest from "@/components/work/PhoneSuggest";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
   ASSIGNABLE_TEAM_ROLES,
-  TEAM_ROLE_LABELS,
   labelTextColor,
   teamColor,
+  workRoleLabel,
   type WorkTeam,
   type WorkTeamMember,
 } from "@/lib/work";
@@ -31,6 +32,7 @@ import {
 export default function WorkTeamPage() {
   const params = useParams<{ id: string }>();
   const teamId = Number(params.id);
+  const { t } = useI18n();
 
   const [team, setTeam] = useState<WorkTeam | null>(null);
   const [members, setMembers] = useState<WorkTeamMember[]>([]);
@@ -64,11 +66,11 @@ export default function WorkTeamPage() {
       setStatus(row.status);
       setMembers(Array.isArray(memberRows) ? memberRows : []);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "بارگذاری تیم ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.loadTeamFail"));
     } finally {
       setLoading(false);
     }
-  }, [teamId]);
+  }, [teamId, t]);
 
   useEffect(() => {
     load();
@@ -78,7 +80,7 @@ export default function WorkTeamPage() {
 
   const saveTeam = async () => {
     if (!name.trim()) {
-      setFormError("نام تیم الزامی است.");
+      setFormError(t("work.teamRequired"));
       return;
     }
     setSaving(true);
@@ -90,7 +92,7 @@ export default function WorkTeamPage() {
       });
       setTeam(updated);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ذخیره تیم ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.saveTeamFail"));
     } finally {
       setSaving(false);
     }
@@ -98,7 +100,7 @@ export default function WorkTeamPage() {
 
   const sendInvite = async () => {
     if (!invitePhone.trim()) {
-      setFormError("شماره موبایل الزامی است.");
+      setFormError(t("work.phoneRequired"));
       return;
     }
     setSaving(true);
@@ -118,7 +120,7 @@ export default function WorkTeamPage() {
       setInviteRole("developer");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ارسال دعوت ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.sendInviteFail"));
     } finally {
       setSaving(false);
     }
@@ -136,7 +138,7 @@ export default function WorkTeamPage() {
       setEditMember(null);
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ذخیره عضو ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.saveMemberFail"));
     } finally {
       setSaving(false);
     }
@@ -152,24 +154,24 @@ export default function WorkTeamPage() {
       });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "حذف عضو ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.deleteMemberFail"));
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) return <PageLoader />;
-  if (!team) return <Alert>{error || "تیم پیدا نشد."}</Alert>;
+  if (!team) return <Alert>{error || t("work.teamMissing")}</Alert>;
 
   return (
     <div className="space-y-4">
       <WorkBreadcrumb
         fallbackHref={`/work/companies/${team.company}`}
         items={[
-          { href: "/work", label: "کار" },
+          { href: "/work", label: t("work.crumb") },
           {
             href: `/work/companies/${team.company}`,
-            label: team.company_name || "شرکت",
+            label: team.company_name || t("work.company"),
           },
           { label: team.name },
         ]}
@@ -191,16 +193,16 @@ export default function WorkTeamPage() {
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold text-ink">{team.name}</h1>
               <p className="mt-0.5 text-[11px] text-gray-500">
-                {team.company_name || "شرکت"} · {members.length} عضو
+                {team.company_name || t("work.company")} · {t("work.membersCount", { count: members.length })}
               </p>
             </div>
             <Badge tone={team.status === "active" ? "green" : "gray"}>
-              {team.status === "active" ? "فعال" : "بایگانی"}
+              {team.status === "active" ? t("work.active") : t("work.archived")}
             </Badge>
           </div>
           {canManage && (
             <Button size="sm" onClick={() => { setFormError(null); setInviteOpen(true); }}>
-              دعوت همکار
+              {t("work.inviteColleague")}
             </Button>
           )}
         </div>
@@ -209,7 +211,7 @@ export default function WorkTeamPage() {
             {formError && !inviteOpen && !editMember && <Alert>{formError}</Alert>}
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-[220px] flex-1">
-                <Field label="نام تیم">
+                <Field label={t("work.teamName")}>
                   <Input value={name} onChange={(e) => setName(e.target.value)} />
                 </Field>
               </div>
@@ -221,7 +223,7 @@ export default function WorkTeamPage() {
                     status === "active" ? "bg-navy-900 text-white" : "text-gray-600"
                   }`}
                 >
-                  فعال
+                  {t("work.active")}
                 </button>
                 <button
                   type="button"
@@ -230,38 +232,38 @@ export default function WorkTeamPage() {
                     status === "archived" ? "bg-navy-900 text-white" : "text-gray-600"
                   }`}
                 >
-                  بایگانی
+                  {t("work.archived")}
                 </button>
               </div>
               <Button size="sm" loading={saving} onClick={saveTeam}>
-                ذخیره
+                {t("common.save")}
               </Button>
             </div>
           </div>
         ) : (
           <p className="border-t border-black/[0.05] px-3 py-2 text-xs text-gray-500">
-            اعضای تیم را می‌بینید؛ تغییر فقط با مدیر است.
+            {t("work.teamViewOnly")}
           </p>
         )}
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink">اعضای تیم</h2>
+        <h2 className="text-sm font-semibold text-ink">{t("work.members")}</h2>
         {members.length === 0 ? (
           <EmptyState
-            title="هنوز عضوی نیست"
+            title={t("work.noMemberTitle")}
             description={
               canManage
-                ? "همکار را با شماره موبایل دعوت کنید."
-                : "وقتی مدیر کسی را دعوت کند، اینجا دیده می‌شود."
+                ? t("work.noMemberManage")
+                : t("work.noMemberOther")
             }
           />
         ) : (
           <WorkTable
             columns={
               canManage
-                ? ["نام", "نقش", "موبایل", "سمت", "وضعیت", ""]
-                : ["نام", "نقش", "موبایل", "سمت", "وضعیت"]
+                ? [t("work.colName"), t("work.colRole"), t("work.colPhone"), t("work.colTitle"), t("common.status"), ""]
+                : [t("work.colName"), t("work.colRole"), t("work.colPhone"), t("work.colTitle"), t("common.status")]
             }
           >
             {members.map((member) => (
@@ -279,15 +281,15 @@ export default function WorkTeamPage() {
                   </div>
                 </WorkTd>
                 <WorkTd>
-                  {TEAM_ROLE_LABELS[member.role] || member.role || "توسعه‌دهنده"}
+                  {workRoleLabel(t, member.role) || member.role || t("work.role.developer")}
                 </WorkTd>
                 <WorkTd>
                   <span dir="ltr">{member.phone_number}</span>
                 </WorkTd>
-                <WorkTd>{member.position_title || "—"}</WorkTd>
+                <WorkTd>{member.position_title || t("work.none")}</WorkTd>
                 <WorkTd>
                   <Badge tone={member.status === "active" ? "green" : "gray"}>
-                    {member.status === "active" ? "فعال" : "غیرفعال"}
+                    {member.status === "active" ? t("work.active") : t("work.inactive")}
                   </Badge>
                 </WorkTd>
                 {canManage && (
@@ -304,7 +306,7 @@ export default function WorkTeamPage() {
                           setFormError(null);
                         }}
                       >
-                        ویرایش
+                        {t("common.edit")}
                       </Button>
                       {member.status === "active" && (
                         <Button
@@ -312,7 +314,7 @@ export default function WorkTeamPage() {
                           variant="ghost"
                           onClick={() => void removeMember(member)}
                         >
-                          حذف
+                          {t("common.delete")}
                         </Button>
                       )}
                     </div>
@@ -326,36 +328,36 @@ export default function WorkTeamPage() {
 
       <Modal
         open={inviteOpen}
-        title="دعوت به تیم"
+        title={t("work.inviteTeam")}
         onClose={() => setInviteOpen(false)}
       >
         <div className="space-y-3">
           {formError && <Alert>{formError}</Alert>}
-          <Field label="شماره موبایل">
+          <Field label={t("work.phone")}>
             <PhoneSuggest value={invitePhone} onChange={setInvitePhone} />
           </Field>
-          <Field label="نقش">
+          <Field label={t("work.role")}>
             <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
               {ASSIGNABLE_TEAM_ROLES.map((role) => (
                 <option key={role} value={role}>
-                  {TEAM_ROLE_LABELS[role]}
+                  {workRoleLabel(t, role)}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="سمت (اختیاری)">
+          <Field label={t("work.positionOptional")}>
             <Input
               value={inviteTitle}
               onChange={(e) => setInviteTitle(e.target.value)}
-              placeholder="مثلاً حسابدار"
+              placeholder={t("work.positionExample")}
             />
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setInviteOpen(false)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button loading={saving} onClick={sendInvite}>
-              ارسال دعوت
+              {t("work.sendInvite")}
             </Button>
           </div>
         </div>
@@ -363,7 +365,7 @@ export default function WorkTeamPage() {
 
       <Modal
         open={Boolean(editMember)}
-        title="ویرایش عضو"
+        title={t("work.editMember")}
         onClose={() => setEditMember(null)}
       >
         <div className="space-y-3">
@@ -371,44 +373,44 @@ export default function WorkTeamPage() {
           <div className="flex items-center gap-3">
             <Avatar
               src={editMember?.profile_image}
-              name={editMember?.full_name || editMember?.phone_number || "کاربر"}
+              name={editMember?.full_name || editMember?.phone_number || t("common.user")}
               size={40}
             />
             <p className="text-sm font-medium text-ink">
               {editMember?.full_name || editMember?.phone_number}
             </p>
           </div>
-          <Field label="نقش">
+          <Field label={t("work.role")}>
             <Select value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
-              {memberRole === "owner" && <option value="owner">{TEAM_ROLE_LABELS.owner}</option>}
+              {memberRole === "owner" && <option value="owner">{workRoleLabel(t, "owner")}</option>}
               {ASSIGNABLE_TEAM_ROLES.map((role) => (
                 <option key={role} value={role}>
-                  {TEAM_ROLE_LABELS[role]}
+                  {workRoleLabel(t, role)}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="سمت">
+          <Field label={t("work.colTitle")}>
             <Input
               value={memberTitle}
               onChange={(e) => setMemberTitle(e.target.value)}
             />
           </Field>
-          <Field label="وضعیت">
+          <Field label={t("common.status")}>
             <Select
               value={memberStatus}
               onChange={(e) => setMemberStatus(e.target.value)}
             >
-              <option value="active">فعال</option>
-              <option value="inactive">غیرفعال</option>
+              <option value="active">{t("work.active")}</option>
+              <option value="inactive">{t("work.inactive")}</option>
             </Select>
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setEditMember(null)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button loading={saving} onClick={saveMember}>
-              ذخیره
+              {t("common.save")}
             </Button>
           </div>
         </div>

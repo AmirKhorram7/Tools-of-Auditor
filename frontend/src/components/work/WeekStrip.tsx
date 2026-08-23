@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
 import { currentWeek, type WorkTaskRow } from "@/lib/work";
 
 export default function WeekStrip({
@@ -7,7 +8,8 @@ export default function WeekStrip({
 }: {
   tasks: Array<Pick<WorkTaskRow, "due_date" | "status">>;
 }) {
-  const days = currentWeek();
+  const { t } = useI18n();
+  const days = currentWeek([0, 1, 2, 3, 4, 5, 6].map((i) => t(`work.wd.${i}`)));
   const open = tasks.filter(
     (task) => task.status !== "done" && task.status !== "cancelled",
   );
@@ -34,7 +36,11 @@ export default function WeekStrip({
                 working ? "text-navy-900" : "text-gray-400"
               }`}
             >
-              {working ? `${count} کار` : day.isWeekend ? "تعطیل" : "استراحت"}
+              {working
+                ? t("work.taskCount", { count })
+                : day.isWeekend
+                  ? t("work.weekend")
+                  : t("work.rest")}
             </p>
           </div>
         );

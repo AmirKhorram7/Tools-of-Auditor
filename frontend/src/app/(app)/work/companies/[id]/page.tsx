@@ -22,12 +22,13 @@ import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkGuide from "@/components/work/WorkGuide";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
-  PRIORITY_LABELS,
-  PROJECT_STATUS_LABELS,
-  formatFaDate,
+  formatWorkDate,
   labelTextColor,
   teamColor,
+  workPriorityLabel,
+  workProjectStatusLabel,
   type WorkBoardTemplate,
   type WorkCompany,
   type WorkProject,
@@ -37,6 +38,7 @@ import {
 export default function WorkCompanyPage() {
   const params = useParams<{ id: string }>();
   const companyId = Number(params.id);
+  const { t, locale } = useI18n();
 
   const [company, setCompany] = useState<WorkCompany | null>(null);
   const [teams, setTeams] = useState<WorkTeam[]>([]);
@@ -74,11 +76,11 @@ export default function WorkCompanyPage() {
       const platform = templateRows.find((item) => item.is_platform);
       setBoardTemplateId((current) => current || (platform ? String(platform.id) : current));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "بارگذاری شرکت ناموفق بود.");
+      setError(err instanceof ApiError ? err.message : t("work.loadCompanyFail"));
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, t]);
 
   useEffect(() => {
     load();
@@ -86,7 +88,7 @@ export default function WorkCompanyPage() {
 
   const createTeam = async () => {
     if (!teamName.trim()) {
-      setFormError("نام تیم الزامی است.");
+      setFormError(t("work.teamRequired"));
       return;
     }
     setSaving(true);
@@ -100,7 +102,7 @@ export default function WorkCompanyPage() {
       setTeamName("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت تیم ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.createTeamFail"));
     } finally {
       setSaving(false);
     }
@@ -108,7 +110,7 @@ export default function WorkCompanyPage() {
 
   const createProject = async () => {
     if (!projectName.trim()) {
-      setFormError("نام پروژه الزامی است.");
+      setFormError(t("work.projectRequired"));
       return;
     }
     setSaving(true);
@@ -131,7 +133,7 @@ export default function WorkCompanyPage() {
       setProjectDue("");
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "ساخت پروژه ناموفق بود.");
+      setFormError(err instanceof ApiError ? err.message : t("work.createProjectFail"));
     } finally {
       setSaving(false);
     }
@@ -139,8 +141,10 @@ export default function WorkCompanyPage() {
 
   if (loading) return <PageLoader />;
   if (!company) {
-    return <Alert>{error || "شرکت پیدا نشد."}</Alert>;
+    return <Alert>{error || t("work.companyMissing")}</Alert>;
   }
+
+  const pct = (value: number) => (locale === "en" ? `${value}%` : `${value}٪`);
 
   return (
     <div className="space-y-4">
@@ -149,7 +153,7 @@ export default function WorkCompanyPage() {
           <WorkBreadcrumb
             fallbackHref="/work"
             items={[
-              { href: "/work", label: "کار" },
+              { href: "/work", label: t("work.crumb") },
               { label: company.name },
             ]}
           />
@@ -157,10 +161,10 @@ export default function WorkCompanyPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => { setFormError(null); setTeamOpen(true); }}>
-            تیم جدید
+            {t("work.newTeam")}
           </Button>
           <Button size="sm" onClick={() => { setFormError(null); setProjectOpen(true); }}>
-            پروژه جدید
+            {t("work.newProject")}
           </Button>
           <WorkGuide compact />
         </div>
@@ -171,9 +175,9 @@ export default function WorkCompanyPage() {
       <section className="rounded-xl border border-black/[0.06] bg-white px-3 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-sm font-semibold text-ink">سیاست تأیید شرکت</p>
+            <p className="text-sm font-semibold text-ink">{t("work.companyPolicy")}</p>
             <p className="text-xs text-gray-500">
-              اگر روشن باشد، پروژه‌های تازه بدون تنظیم جدا، تأیید مدیر برای بستن کار می‌خواهند.
+              {t("work.companyPolicyHint")}
             </p>
           </div>
           <button
@@ -188,7 +192,7 @@ export default function WorkCompanyPage() {
                 });
                 setCompany(updated);
               } catch (err) {
-                setError(err instanceof ApiError ? err.message : "ذخیره سیاست ناموفق بود.");
+                setError(err instanceof ApiError ? err.message : t("work.savePolicyFail"));
               }
             }}
             className={`rounded-md px-3 py-1.5 text-xs font-bold ${
@@ -197,20 +201,20 @@ export default function WorkCompanyPage() {
                 : "border border-gray-200 text-gray-600"
             }`}
           >
-            {company.require_approval_before_close ? "روشن است" : "خاموش است"}
+            {company.require_approval_before_close ? t("work.policyIsOn") : t("work.policyIsOff")}
           </button>
         </div>
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink">تیم‌ها</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink">{t("work.teams")}</h2>
         {teams.length === 0 ? (
           <EmptyState
-            title="هنوز تیمی نیست"
-            description="یک تیم بسازید و همکاران را با شماره موبایل دعوت کنید."
+            title={t("work.noTeamTitle")}
+            description={t("work.noTeamDesc")}
             action={
               <Button size="sm" onClick={() => setTeamOpen(true)}>
-                ساخت تیم
+                {t("work.createTeam")}
               </Button>
             }
           />
@@ -234,19 +238,27 @@ export default function WorkCompanyPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink">پروژه‌های کار</h2>
+        <h2 className="text-sm font-semibold text-ink">{t("work.workProjects")}</h2>
         {projects.length === 0 ? (
           <EmptyState
-            title="پروژه‌ای نیست"
-            description="پروژه بسازید، تیم را به آن وصل کنید، بعد کار تعریف کنید."
+            title={t("work.noProjectTitle")}
+            description={t("work.noProjectDesc")}
             action={
               <Button size="sm" onClick={() => setProjectOpen(true)}>
-                ساخت پروژه
+                {t("work.createProject")}
               </Button>
             }
           />
         ) : (
-          <WorkTable columns={["پروژه", "وضعیت", "پیشرفت", "اولویت", "سررسید"]}>
+          <WorkTable
+            columns={[
+              t("work.colProject"),
+              t("common.status"),
+              t("work.colProgress"),
+              t("work.priority"),
+              t("work.due"),
+            ]}
+          >
             {projects.map((project) => (
               <tr key={project.id} className="hover:bg-surface">
                 <WorkTd>
@@ -254,101 +266,101 @@ export default function WorkCompanyPage() {
                     href={`/work/projects/${project.id}`}
                     className="font-bold text-navy-900 hover:text-link"
                   >
-                    {project.name} — بورد
+                    {project.name} — {t("work.boardLink")}
                   </Link>
                 </WorkTd>
                 <WorkTd>
                   <Badge tone="blue">
-                    {PROJECT_STATUS_LABELS[project.status] || project.status}
+                    {workProjectStatusLabel(t, project.status) || project.status}
                   </Badge>
                 </WorkTd>
                 <WorkTd>
                   <div className="flex items-center gap-2">
                     <ProgressBar value={project.progress_percent} className="w-20" />
-                    <span>{project.progress_percent}٪</span>
+                    <span>{pct(project.progress_percent)}</span>
                   </div>
                 </WorkTd>
-                <WorkTd>{PRIORITY_LABELS[project.priority] || project.priority}</WorkTd>
-                <WorkTd>{formatFaDate(project.due_date)}</WorkTd>
+                <WorkTd>{workPriorityLabel(t, project.priority)}</WorkTd>
+                <WorkTd>{formatWorkDate(project.due_date, locale, t("work.noDue"))}</WorkTd>
               </tr>
             ))}
           </WorkTable>
         )}
       </section>
 
-      <Modal open={teamOpen} title="تیم جدید" onClose={() => setTeamOpen(false)}>
+      <Modal open={teamOpen} title={t("work.newTeam")} onClose={() => setTeamOpen(false)}>
         <div className="space-y-3">
           {formError && <Alert>{formError}</Alert>}
-          <Field label="نام تیم">
+          <Field label={t("work.teamName")}>
             <Input
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              placeholder="مثلاً تیم مالی"
+              placeholder={t("work.teamExample")}
             />
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setTeamOpen(false)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button loading={saving} onClick={createTeam}>
-              ساخت
+              {t("common.create")}
             </Button>
           </div>
         </div>
       </Modal>
 
-      <Modal open={projectOpen} title="پروژه جدید" onClose={() => setProjectOpen(false)}>
+      <Modal open={projectOpen} title={t("work.newProject")} onClose={() => setProjectOpen(false)}>
         <div className="space-y-3">
           {formError && <Alert>{formError}</Alert>}
-          <Field label="نام پروژه">
+          <Field label={t("work.projectName")}>
             <Input
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              placeholder="مثلاً بستن حساب‌های سال"
+              placeholder={t("work.projectExample")}
             />
           </Field>
-          <Field label="توضیح">
+          <Field label={t("work.description")}>
             <Textarea
               rows={3}
               value={projectDesc}
               onChange={(e) => setProjectDesc(e.target.value)}
             />
           </Field>
-          <Field label="سررسید">
+          <Field label={t("work.due")}>
             <JalaliDateField value={projectDue} onChange={setProjectDue} />
           </Field>
-          <Field label="اولویت">
+          <Field label={t("work.priority")}>
             <Select
               value={projectPriority}
               onChange={(e) => setProjectPriority(e.target.value)}
             >
-              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+              {[1, 2, 3, 4].map((value) => (
                 <option key={value} value={value}>
-                  {label}
+                  {workPriorityLabel(t, value)}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="بورد">
+          <Field label={t("work.board")}>
             <Select
               value={boardTemplateId}
               onChange={(e) => setBoardTemplateId(e.target.value)}
             >
-              <option value="">ساده — برای انجام / در حال انجام / بسته</option>
+              <option value="">{t("work.simpleBoard")}</option>
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.name}
-                  {template.is_platform ? " (پلتفرم)" : ""}
+                  {template.is_platform ? t("work.platformSuffix") : ""}
                 </option>
               ))}
             </Select>
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setProjectOpen(false)}>
-              انصراف
+              {t("common.cancel")}
             </Button>
             <Button loading={saving} onClick={createProject}>
-              ساخت
+              {t("common.create")}
             </Button>
           </div>
         </div>

@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Avatar, Input } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import type { WorkUserLookup } from "@/lib/work";
 
-function displayName(user: WorkUserLookup) {
-  return `${user.first_name} ${user.last_name}`.trim() || "کاربر";
+function displayName(user: WorkUserLookup, fallback: string) {
+  return `${user.first_name} ${user.last_name}`.trim() || fallback;
 }
 
 export default function PhoneSuggest({
@@ -17,6 +18,8 @@ export default function PhoneSuggest({
   value: string;
   onChange: (phone: string) => void;
 }) {
+  const { t } = useI18n();
+  const fallbackName = t("common.user");
   const [hits, setHits] = useState<WorkUserLookup[]>([]);
   const [picked, setPicked] = useState<WorkUserLookup | null>(null);
 
@@ -72,10 +75,10 @@ export default function PhoneSuggest({
                   setHits([]);
                 }}
               >
-                <Avatar src={user.profile_image} name={displayName(user)} size={32} />
+                <Avatar src={user.profile_image} name={displayName(user, fallbackName)} size={32} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-ink">
-                    {displayName(user)}
+                    {displayName(user, fallbackName)}
                   </span>
                   <span dir="ltr" className="block text-xs text-gray-500">
                     {user.phone_number}
@@ -88,9 +91,11 @@ export default function PhoneSuggest({
       )}
       {picked && (
         <div className="flex items-center gap-2.5 rounded-xl border border-black/[0.06] bg-[#F7F8FA] px-2.5 py-2">
-          <Avatar src={picked.profile_image} name={displayName(picked)} size={36} />
+          <Avatar src={picked.profile_image} name={displayName(picked, fallbackName)} size={36} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink">{displayName(picked)}</p>
+            <p className="truncate text-sm font-semibold text-ink">
+              {displayName(picked, fallbackName)}
+            </p>
             <p dir="ltr" className="text-xs text-gray-500">
               {picked.phone_number}
             </p>

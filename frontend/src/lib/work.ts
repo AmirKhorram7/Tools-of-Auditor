@@ -323,14 +323,46 @@ export function localIsoDate(value?: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function formatFaDate(value: string | null | undefined): string {
-  if (!value) return "بدون سررسید";
+export type TranslateFn = (key: string, vars?: Record<string, string | number>) => string;
+
+export function workStatusLabel(t: TranslateFn, status: string): string {
+  return t(`work.status.${status}`);
+}
+
+export function workPriorityLabel(t: TranslateFn, priority: number): string {
+  return t(`work.priority.${priority}`);
+}
+
+export function workRoleLabel(t: TranslateFn, role: string): string {
+  return t(`work.role.${role}`);
+}
+
+export function workProjectStatusLabel(t: TranslateFn, status: string): string {
+  return t(`work.projectStatus.${status}`);
+}
+
+export function workInviteStatusLabel(t: TranslateFn, status: string): string {
+  return t(`invite.${status}`);
+}
+
+export function formatWorkDate(
+  value: string | null | undefined,
+  locale: "fa" | "en" = "fa",
+  empty = "",
+): string {
+  if (!value) return empty;
   const day = value.slice(0, 10);
   try {
-    return new Date(`${day}T00:00:00`).toLocaleDateString("fa-IR");
+    return new Date(`${day}T00:00:00`).toLocaleDateString(
+      locale === "fa" ? "fa-IR" : "en-GB",
+    );
   } catch {
     return day;
   }
+}
+
+export function formatFaDate(value: string | null | undefined): string {
+  return formatWorkDate(value, "fa", "بدون سررسید");
 }
 
 /** Saturday → Friday week, matching the Persian calendar. */
@@ -344,7 +376,7 @@ export const WEEKDAY_FA = [
   "جمعه",
 ];
 
-export function currentWeek(): Array<{
+export function currentWeek(weekdays: string[] = WEEKDAY_FA): Array<{
   iso: string;
   weekday: string;
   isToday: boolean;
@@ -357,7 +389,7 @@ export function currentWeek(): Array<{
   const saturday = new Date(today);
   saturday.setDate(today.getDate() - offsetFromSaturday);
 
-  return WEEKDAY_FA.map((weekday, index) => {
+  return weekdays.map((weekday, index) => {
     const date = new Date(saturday);
     date.setDate(saturday.getDate() + index);
     const iso = localIsoDate(date);
@@ -453,15 +485,22 @@ export function teamColor(id: number): string {
   return LABEL_COLORS[Math.abs(id) % LABEL_COLORS.length];
 }
 
-export function shortFaDate(value: string | null | undefined): string {
+export function shortWorkDate(
+  value: string | null | undefined,
+  locale: "fa" | "en" = "fa",
+): string {
   if (!value) return "";
   const day = value.slice(0, 10);
   try {
-    return new Date(`${day}T00:00:00`).toLocaleDateString("fa-IR", {
-      month: "short",
-      day: "numeric",
-    });
+    return new Date(`${day}T00:00:00`).toLocaleDateString(
+      locale === "fa" ? "fa-IR" : "en-GB",
+      { month: "short", day: "numeric" },
+    );
   } catch {
     return day;
   }
+}
+
+export function shortFaDate(value: string | null | undefined): string {
+  return shortWorkDate(value, "fa");
 }

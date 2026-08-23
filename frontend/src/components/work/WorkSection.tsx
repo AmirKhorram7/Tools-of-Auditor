@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
+import { useI18n } from "@/lib/i18n";
+
 const KEY = "ta-work-fold-";
 
 export default function WorkSection({
@@ -19,6 +21,7 @@ export default function WorkSection({
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function WorkSection({
           ) : null}
         </span>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-gray-500">
-          {open ? "پنهان" : "نمایش"}
+          {open ? t("work.hide") : t("work.show")}
           <svg
             viewBox="0 0 20 20"
             className={`size-4 transition ${open ? "rotate-180" : ""}`}

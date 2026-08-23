@@ -3,10 +3,11 @@
 import Link from "next/link";
 
 import { Avatar, cx } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
 import {
   isOverdue,
   labelTextColor,
-  shortFaDate,
+  shortWorkDate,
   type WorkLabel,
   type WorkTaskStatus,
 } from "@/lib/work";
@@ -41,6 +42,7 @@ export default function TaskCard({
   draggable?: boolean;
   onDragStart?: () => void;
 }) {
+  const { t, locale } = useI18n();
   const overdue = isOverdue(task.due_date, task.status);
   const closed = task.status === "done" || task.status === "cancelled";
   const labels = task.labels || [];
@@ -111,7 +113,7 @@ export default function TaskCard({
           <span dir="ltr">#{task.id}</span>
           {task.due_date && (
             <span className={overdue ? "font-medium text-red-600" : ""}>
-              {shortFaDate(task.due_date)}
+              {shortWorkDate(task.due_date, locale)}
             </span>
           )}
         </span>
@@ -123,7 +125,7 @@ export default function TaskCard({
             </span>
           </span>
         ) : (
-          <span className="text-gray-400">بدون مسئول</span>
+          <span className="text-gray-400">{t("work.unassignedCard")}</span>
         )}
       </div>
     </Link>

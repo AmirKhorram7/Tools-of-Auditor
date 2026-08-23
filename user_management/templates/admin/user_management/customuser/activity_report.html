@@ -146,6 +146,8 @@
       <div>Last login: {% if user.last_login %}{{ user.last_login|date:"Y-m-d H:i" }}{% else %}Never{% endif %}</div>
       <p style="margin-top: 12px;">
         <a class="button" href="{% url 'admin:user_management_customuser_change' user.pk %}">Edit user</a>
+        <a class="button" href="{% url 'admin:user_explanation_ranking' %}">Explanation ranking</a>
+        <a class="button" href="{% url 'admin:user_work_ranking' %}">Work ranking</a>
       </p>
     </div>
   </div>

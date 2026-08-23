@@ -1,6 +1,7 @@
 "use client";
 
 import { cx } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
 
 export default function DoneCheck({
   done,
@@ -11,10 +12,11 @@ export default function DoneCheck({
   busy?: boolean;
   onToggle: (next: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
-      title={done ? "بازگشت به کار باز" : "علامت تمام شدن"}
+      title={done ? t("work.reopen") : t("work.markDone")}
       disabled={busy}
       onClick={(event) => {
         event.preventDefault();
@@ -29,7 +31,7 @@ export default function DoneCheck({
         busy && "opacity-50",
       )}
       aria-pressed={done}
-      aria-label={done ? "کار تمام شده" : "تمام کردن کار"}
+      aria-label={done ? t("work.doneLabel") : t("work.colDone")}
     >
       ✓
     </button>

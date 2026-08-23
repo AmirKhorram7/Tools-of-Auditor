@@ -3,49 +3,26 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
 
-const COLUMNS = [
-  { name: "برای انجام", color: "#14233A" },
-  { name: "در حال انجام", color: "#1A2B49" },
-  { name: "تست", color: "#243656" },
-  { name: "در انتظار تأیید", color: "#C2940A" },
-  { name: "بسته", color: "#1E3328" },
-];
+const COLUMN_KEYS = [
+  { key: "work.col.todo", color: "#14233A" },
+  { key: "work.col.doing", color: "#1A2B49" },
+  { key: "work.col.test", color: "#243656" },
+  { key: "work.col.wait", color: "#C2940A" },
+  { key: "work.col.done", color: "#1E3328" },
+] as const;
 
-const SECTIONS = [
-  {
-    title: "بورد چیست؟",
-    tone: "bg-[#EEF3FA] text-[#14233A] border-[#C5D3E8]",
-    mark: "۱",
-    body: "هر پروژه یک بورد دارد. کارها کارت هستند و ستون‌ها مرحله کار را نشان می‌دهند. کارت را بکشید و در ستون بعدی رها کنید.",
-  },
-  {
-    title: "تنظیمات پروژه",
-    tone: "bg-[#F3F0FA] text-[#3A2430] border-[#D8CDE6]",
-    mark: "۲",
-    body: "از تنظیمات می‌توانید برچسب رنگی بسازید، نام و رنگ ستون‌ها را عوض کنید، تیم را وصل کنید و بورد پیش‌فرض را انتخاب کنید.",
-  },
-  {
-    title: "بورد استاندارد",
-    tone: "bg-[#EEF6F1] text-[#1E3328] border-[#C5DCCE]",
-    mark: "۳",
-    body: "یک بورد آماده برای همه نوع کار: برای انجام، در حال انجام، تست، در انتظار تأیید، بسته. مدیر هنگام ساخت پروژه همین بورد را انتخاب می‌کند.",
-  },
-  {
-    title: "سیاست تأیید",
-    tone: "bg-[#FFF6E6] text-[#5C4308] border-[#E8D19A]",
-    mark: "۴",
-    body: "اگر روشن باشد، کارشناس کارت را فقط تا «در انتظار تأیید» می‌برد. مدیر اگر کار درست بود آن را به «بسته» می‌برد و کار تمام می‌شود. اگر کامل نبود، کارت را برمی‌گرداند. این سیاست را از تنظیمات روشن یا خاموش کنید.",
-  },
-  {
-    title: "نقش‌ها",
-    tone: "bg-[#FDECEC] text-[#6B1C1C] border-[#E8B4B4]",
-    mark: "۵",
-    body: "مالک و نگهدارنده مثل مدیر بورد هستند. توسعه‌دهنده و برنامه‌ریز کار می‌سازند و کارت جابه‌جا می‌کنند. مهمان فقط می‌بیند.",
-  },
-];
+const SECTION_KEYS = [
+  { title: "work.guide.boardTitle", body: "work.guide.boardBody", tone: "bg-[#EEF3FA] text-[#14233A] border-[#C5D3E8]", mark: "1" },
+  { title: "work.guide.settingsTitle", body: "work.guide.settingsBody", tone: "bg-[#F3F0FA] text-[#3A2430] border-[#D8CDE6]", mark: "2" },
+  { title: "work.guide.standardTitle", body: "work.guide.standardBody", tone: "bg-[#EEF6F1] text-[#1E3328] border-[#C5DCCE]", mark: "3" },
+  { title: "work.guide.policyTitle", body: "work.guide.policyBody", tone: "bg-[#FFF6E6] text-[#5C4308] border-[#E8D19A]", mark: "4" },
+  { title: "work.guide.rolesTitle", body: "work.guide.rolesBody", tone: "bg-[#FDECEC] text-[#6B1C1C] border-[#E8B4B4]", mark: "5" },
+] as const;
 
 export default function WorkGuide({ compact = false }: { compact?: boolean }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   return (
@@ -55,14 +32,14 @@ export default function WorkGuide({ compact = false }: { compact?: boolean }) {
         variant={compact ? "secondary" : "primary"}
         onClick={() => setOpen(true)}
       >
-        راهنما
+        {t("work.guide")}
       </Button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center">
           <button
             type="button"
             className="absolute inset-0 bg-[#14233A]/55"
-            aria-label="بستن"
+            aria-label={t("common.close")}
             onClick={() => setOpen(false)}
           />
           <div className="relative z-10 flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_50px_rgba(20,35,58,0.28)]">
@@ -70,37 +47,35 @@ export default function WorkGuide({ compact = false }: { compact?: boolean }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-bold tracking-wide text-white/70">
-                    آموزش کوتاه
+                    {t("work.guideKicker")}
                   </p>
-                  <h2 className="mt-0.5 text-lg font-bold">راهنمای کار</h2>
+                  <h2 className="mt-0.5 text-lg font-bold">{t("work.guideTitle")}</h2>
                 </div>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
                   className="rounded-lg bg-white/10 px-2 py-1 text-sm text-white/80 hover:bg-white/20"
-                  aria-label="بستن"
+                  aria-label={t("common.close")}
                 >
                   ✕
                 </button>
               </div>
-              <p className="mt-2 text-sm leading-6 text-white/85">
-                شرکت بسازید، تیم دعوت کنید، پروژه باز کنید و کارها را روی بورد جلو ببرید.
-              </p>
+              <p className="mt-2 text-sm leading-6 text-white/85">{t("work.guideIntro")}</p>
               <div className="mt-3 flex gap-1 overflow-x-auto pb-0.5">
-                {COLUMNS.map((column) => (
+                {COLUMN_KEYS.map((column) => (
                   <span
-                    key={column.name}
+                    key={column.key}
                     className="shrink-0 rounded-md px-2 py-1 text-[10px] font-bold text-white"
                     style={{ backgroundColor: column.color }}
                   >
-                    {column.name}
+                    {t(column.key)}
                   </span>
                 ))}
               </div>
             </header>
 
             <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
-              {SECTIONS.map((section) => (
+              {SECTION_KEYS.map((section) => (
                 <section
                   key={section.title}
                   className={`rounded-xl border px-3 py-3 ${section.tone}`}
@@ -109,16 +84,16 @@ export default function WorkGuide({ compact = false }: { compact?: boolean }) {
                     <span className="flex size-6 items-center justify-center rounded-full bg-white/80 text-[11px] font-bold">
                       {section.mark}
                     </span>
-                    <h3 className="text-sm font-bold">{section.title}</h3>
+                    <h3 className="text-sm font-bold">{t(section.title)}</h3>
                   </div>
-                  <p className="text-[13px] leading-7">{section.body}</p>
+                  <p className="text-[13px] leading-7">{t(section.body)}</p>
                 </section>
               ))}
             </div>
 
             <footer className="shrink-0 border-t border-black/[0.06] bg-[#F7F8FA] px-4 py-3">
               <Button className="w-full" onClick={() => setOpen(false)}>
-                متوجه شدم
+                {t("work.guideGotIt")}
               </Button>
             </footer>
           </div>
