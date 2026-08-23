@@ -607,6 +607,13 @@ class Task(BaseModel):
         related_name="tasks",
         blank=True,
     )
+    prerequisites = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="dependents",
+        blank=True,
+        help_text=_("Up to two earlier tasks. Shown on the flow view only — does not block work."),
+    )
 
     class Meta:
         ordering = ["due_date", "-created_at"]

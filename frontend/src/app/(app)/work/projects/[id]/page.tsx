@@ -20,8 +20,10 @@ import JalaliDateField from "@/components/work/JalaliDateField";
 import PhoneSuggest from "@/components/work/PhoneSuggest";
 import ProgressGauge from "@/components/work/ProgressGauge";
 import DoneCheck from "@/components/work/DoneCheck";
+import PrerequisitePicker from "@/components/work/PrerequisitePicker";
 import TaskBoard from "@/components/work/TaskBoard";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
+import WorkFlowView from "@/components/work/WorkFlowView";
 import WorkGuide from "@/components/work/WorkGuide";
 import {
   WorkMeetButton,
@@ -71,7 +73,8 @@ export default function WorkProjectPage() {
   const [teams, setTeams] = useState<WorkTeam[]>([]);
   const [projectTeams, setProjectTeams] = useState<WorkTeam[]>([]);
   const [labels, setLabels] = useState<WorkLabel[]>([]);
-  const [view, setView] = useState<"board" | "list">("board");
+  const [view, setView] = useState<"board" | "list" | "flow">("board");
+  const [selectedPrereqs, setSelectedPrereqs] = useState<number[]>([]);
   const [mineOnly, setMineOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +112,7 @@ export default function WorkProjectPage() {
 
   useEffect(() => {
     const stored = window.localStorage.getItem(VIEW_KEY);
-    if (stored === "list" || stored === "board") setView(stored);
+    if (stored === "list" || stored === "board" || stored === "flow") setView(stored);
   }, []);
 
   useEffect(() => {
@@ -120,7 +123,7 @@ export default function WorkProjectPage() {
     ]);
   }, [locale, t]);
 
-  const setSavedView = (next: "board" | "list") => {
+  const setSavedView = (next: "board" | "list" | "flow") => {
     setView(next);
     window.localStorage.setItem(VIEW_KEY, next);
   };
@@ -185,6 +188,7 @@ export default function WorkProjectPage() {
 
   const openTaskModal = (column?: WorkBoardColumn) => {
     setFormError(null);
+    setSelectedPrereqs([]);
     setColumnId(column?.id || columns[0]?.id || "");
     setTaskOpen(true);
   };
@@ -210,6 +214,7 @@ export default function WorkProjectPage() {
           assigned_to: assignee ? Number(assignee) : null,
           column: columnId || null,
           label_ids: selectedLabels,
+          prerequisite_ids: selectedPrereqs,
         },
       });
       setTaskOpen(false);
@@ -219,6 +224,7 @@ export default function WorkProjectPage() {
       setDue("");
       setAssignee("");
       setSelectedLabels([]);
+      setSelectedPrereqs([]);
       await load(true);
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t("work.createTaskFail"));
@@ -576,6 +582,13 @@ export default function WorkProjectPage() {
           >
             {t("work.list")}
           </button>
+          <button
+            type="button"
+            onClick={() => setSavedView("flow")}
+            className={`rounded-md px-3 py-1.5 ${view === "flow" ? "bg-navy-900 text-white" : "text-gray-600"}`}
+          >
+            {t("work.flow")}
+          </button>
         </div>
         <button
           type="button"
@@ -600,6 +613,17 @@ export default function WorkProjectPage() {
           onMove={moveTask}
           onAddTask={canAddTask ? openTaskModal : undefined}
           onAddColumn={project.can_manage ? addColumn : undefined}
+        />
+      ) : view === "flow" ? (
+        <WorkFlowView
+          tasks={tasks}
+          emptyAction={
+            canAddTask ? (
+              <Button size="sm" onClick={() => openTaskModal()}>
+                {t("work.newTask")}
+              </Button>
+            ) : undefined
+          }
         />
       ) : visibleTasks.length === 0 ? (
         <EmptyState
@@ -742,6 +766,14 @@ export default function WorkProjectPage() {
                 ))}
               </Select>
             </Field>
+          </div>
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-ink">{t("work.prereq")}</p>
+            <PrerequisitePicker
+              tasks={tasks}
+              selected={selectedPrereqs}
+              onChange={setSelectedPrereqs}
+            />
           </div>
           <div>
             <p className="mb-1.5 text-sm font-medium text-ink">{t("work.labelsTitle")}</p>

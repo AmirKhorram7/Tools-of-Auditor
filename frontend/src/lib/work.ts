@@ -127,6 +127,24 @@ export type WorkBoard = {
   columns: WorkBoardColumn[];
 };
 
+export type WorkTaskPrereq = {
+  id: number;
+  title: string;
+  status: WorkTaskStatus;
+};
+
+export const MAX_TASK_PREREQUISITES = 2;
+
+export function togglePrerequisiteIds(
+  current: number[],
+  id: number,
+  max = MAX_TASK_PREREQUISITES,
+): number[] {
+  if (current.includes(id)) return current.filter((item) => item !== id);
+  if (current.length >= max) return current;
+  return [...current, id];
+}
+
 export type WorkTask = {
   id: number;
   project: number;
@@ -142,6 +160,7 @@ export type WorkTask = {
   column_name?: string | null;
   column_color?: string | null;
   labels?: WorkLabel[];
+  prerequisites?: WorkTaskPrereq[];
   priority: number;
   difficulty: number;
   start_date: string | null;

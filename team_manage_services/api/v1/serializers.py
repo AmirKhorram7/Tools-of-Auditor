@@ -402,6 +402,14 @@ class TaskSerializer(serializers.ModelSerializer):
         write_only=True,
         source="labels",
     )
+    prerequisites = serializers.SerializerMethodField()
+    prerequisite_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Task.objects.all(),
+        required=False,
+        write_only=True,
+        source="prerequisites",
+    )
     can_move = serializers.SerializerMethodField()
 
     class Meta:
@@ -423,6 +431,8 @@ class TaskSerializer(serializers.ModelSerializer):
             "column_color",
             "labels",
             "label_ids",
+            "prerequisites",
+            "prerequisite_ids",
             "priority",
             "difficulty",
             "start_date",
@@ -455,6 +465,12 @@ class TaskSerializer(serializers.ModelSerializer):
             return image.url
         except (AttributeError, ValueError):
             return None
+
+    def get_prerequisites(self, obj):
+        return [
+            {"id": row.id, "title": row.title, "status": row.status}
+            for row in obj.prerequisites.all()
+        ]
 
     def get_can_move(self, obj):
         request = self.context.get("request")

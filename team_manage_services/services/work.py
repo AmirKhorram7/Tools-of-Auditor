@@ -161,14 +161,18 @@ def add_project_member(*, user, project: Project, member_user, role=None) -> Pro
     return member
 
 
+MAX_TASK_PREREQUISITES = 2
+
+
 @transaction.atomic
-def create_task(*, user, project: Project, labels=None, **fields) -> Task:
+def create_task(*, user, project: Project, labels=None, prerequisites=None, **fields) -> Task:
     if not can_add_task(user, project):
         raise PermissionDenied("Guests can view the board but cannot add work.")
     assigned = fields.get("assigned_to")
     if assigned and assigned.project_id != project.id:
         raise ValidationError({"assigned_to": "Assignee must be a member of this project."})
     column = fields.pop("column", None)
+    fields.pop("prerequisites", None)
     ensure_project_columns(project)
     if column is None:
         columns = list(project.board_columns.order_by("position", "id"))
@@ -189,6 +193,8 @@ def create_task(*, user, project: Project, labels=None, **fields) -> Task:
     task.save()
     if labels:
         _set_task_labels(task, labels)
+    if prerequisites is not None:
+        _set_task_prerequisites(task, prerequisites)
     log_activity(
         actor=user,
         action=ActivityLog.Action.CREATED,
@@ -208,6 +214,48 @@ def _set_task_labels(task: Task, labels) -> None:
         if label.company_id != task.project.company_id:
             raise ValidationError({"labels": "Labels must belong to the same company."})
     task.labels.set(label_list)
+
+
+def _task_depends_on(start: Task, target_id: int) -> bool:
+    seen = {start.id}
+    stack = [start]
+    while stack:
+        node = stack.pop()
+        for other in node.prerequisites.all():
+            if other.id == target_id:
+                return True
+            if other.id in seen:
+                continue
+            seen.add(other.id)
+            stack.append(other)
+    return False
+
+
+def _set_task_prerequisites(task: Task, prerequisites) -> None:
+    items = list(prerequisites or [])
+    if len(items) > MAX_TASK_PREREQUISITES:
+        raise ValidationError(
+            {"prerequisite_ids": "A task can have at most two prerequisite tasks."}
+        )
+    seen_ids = set()
+    for other in items:
+        if other.pk == task.pk:
+            raise ValidationError({"prerequisite_ids": "A task cannot depend on itself."})
+        if other.project_id != task.project_id:
+            raise ValidationError(
+                {"prerequisite_ids": "Prerequisites must belong to the same project."}
+            )
+        if other.pk in seen_ids:
+            continue
+        if _task_depends_on(other, task.id):
+            raise ValidationError(
+                {"prerequisite_ids": "That would create a loop in the work flow."}
+            )
+        seen_ids.add(other.pk)
+    task.prerequisites.set(items)
+    cache = getattr(task, "_prefetched_objects_cache", None)
+    if cache is not None:
+        cache.pop("prerequisites", None)
 
 
 def _notify_assignment(actor, task: Task):
@@ -246,6 +294,7 @@ def update_task(*, user, task: Task, **fields) -> Task:
         raise PermissionDenied("You cannot update this task.")
     fields.pop("project", None)
     labels = fields.pop("labels", None)
+    prerequisites = fields.pop("prerequisites", None)
     moving = "status" in fields or "column" in fields
     if moving and not can_move_task(user, task):
         raise PermissionDenied("You cannot move this task.")
@@ -290,6 +339,8 @@ def update_task(*, user, task: Task, **fields) -> Task:
     task.save()
     if labels is not None:
         _set_task_labels(task, labels)
+    if prerequisites is not None:
+        _set_task_prerequisites(task, prerequisites)
 
     if fields.get("assigned_to") and task.assigned_to_id != old_assignee_id:
         _notify_assignment(user, task)

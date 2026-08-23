@@ -17,9 +17,10 @@ import {
 } from "@/components/ui";
 import DoneCheck from "@/components/work/DoneCheck";
 import JalaliDateField from "@/components/work/JalaliDateField";
+import PrerequisitePicker from "@/components/work/PrerequisitePicker";
 import ProgressBar from "@/components/work/ProgressBar";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
   isOverdue,
@@ -30,6 +31,7 @@ import {
   type WorkLabel,
   type WorkProject,
   type WorkProjectMember,
+  type WorkTask,
   type WorkTaskDetail,
 } from "@/lib/work";
 
@@ -57,6 +59,8 @@ export default function WorkTaskPage() {
   const [priority, setPriority] = useState("2");
   const [difficulty, setDifficulty] = useState("3");
   const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
+  const [siblings, setSiblings] = useState<WorkTask[]>([]);
+  const [selectedPrereqs, setSelectedPrereqs] = useState<number[]>([]);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(taskId)) return;
@@ -74,14 +78,17 @@ export default function WorkTaskPage() {
       setPriority(String(row.priority || 2));
       setDifficulty(String(row.difficulty || 3));
       setSelectedLabels((row.labels || []).map((label) => label.id));
-      const [projectRow, memberRows, columnRows] = await Promise.all([
+      setSelectedPrereqs((row.prerequisites || []).map((item) => item.id));
+      const [projectRow, memberRows, columnRows, siblingRows] = await Promise.all([
         apiFetch<WorkProject>(`/work/projects/${row.project}/`),
         apiFetch<WorkProjectMember[]>(`/work/projects/${row.project}/members/`),
         apiFetch<WorkBoardColumn[]>(`/work/projects/${row.project}/columns/`),
+        apiList<WorkTask>(`/work/tasks/?project=${row.project}`),
       ]);
       setProject(projectRow);
       setMembers(Array.isArray(memberRows) ? memberRows : []);
       setColumns(Array.isArray(columnRows) ? columnRows : []);
+      setSiblings(siblingRows.filter((item) => item.id !== row.id));
       const labelRows = await apiFetch<WorkLabel[]>(
         `/work/companies/${projectRow.company}/labels/`,
       );
@@ -135,6 +142,7 @@ export default function WorkTaskPage() {
       body.difficulty = Number(difficulty);
       body.label_ids = selectedLabels;
     }
+    body.prerequisite_ids = selectedPrereqs;
     await patchTask(body);
   };
 
@@ -315,6 +323,15 @@ export default function WorkTaskPage() {
               </Select>
             </Field>
           )}
+        </div>
+        <div>
+          <p className="mb-1.5 text-sm font-medium text-ink">{t("work.prereq")}</p>
+          <PrerequisitePicker
+            tasks={siblings}
+            selected={selectedPrereqs}
+            onChange={setSelectedPrereqs}
+            disabled={!canManage && !canMove}
+          />
         </div>
         <div>
           <p className="mb-1.5 text-sm font-medium text-ink">{t("work.labelsTitle")}</p>

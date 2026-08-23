@@ -613,3 +613,75 @@ class WorkMeetingTests(APITestCase):
         )
         self.assertEqual(ended.status_code, status.HTTP_200_OK)
         self.assertEqual(ended.data["status"], "ended")
+
+
+class WorkPrerequisiteTests(APITestCase):
+    """Prerequisites record order only — they do not lock the board."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(
+            phone_number="09120000021",
+            password="pass-manager",
+            first_name="Amir",
+            is_phone_verified=True,
+        )
+        self.client_auth = self.client_class()
+        token = str(RefreshToken.for_user(self.manager).access_token)
+        self.client_auth.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        company = self.client_auth.post(
+            f"{WORK}/companies/", {"name": "Flow Co"}, format="json"
+        ).data
+        project = self.client_auth.post(
+            f"{WORK}/projects/",
+            {"company": company["id"], "name": "Login flow"},
+            format="json",
+        ).data
+        self.project_id = project["id"]
+
+    def _task(self, title, **extra):
+        payload = {"project": self.project_id, "title": title}
+        payload.update(extra)
+        response = self.client_auth.post(f"{WORK}/tasks/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        return response.data
+
+    def test_chain_and_max_two_without_blocking_done(self):
+        task_z = self._task("Approve style")
+        task_y = self._task("Figma login", prerequisite_ids=[task_z["id"]])
+        task_x = self._task("Frontend login", prerequisite_ids=[task_y["id"]])
+
+        self.assertEqual(task_y["prerequisites"][0]["id"], task_z["id"])
+        self.assertEqual(task_x["prerequisites"][0]["id"], task_y["id"])
+
+        extra = self._task("Extra")
+        too_many = self.client_auth.patch(
+            f"{WORK}/tasks/{task_x['id']}/",
+            {"prerequisite_ids": [task_z["id"], task_y["id"], extra["id"]]},
+            format="json",
+        )
+        self.assertEqual(too_many.status_code, status.HTTP_400_BAD_REQUEST)
+
+        loop = self.client_auth.patch(
+            f"{WORK}/tasks/{task_z['id']}/",
+            {"prerequisite_ids": [task_x["id"]]},
+            format="json",
+        )
+        self.assertEqual(loop.status_code, status.HTTP_400_BAD_REQUEST)
+
+        done = self.client_auth.patch(
+            f"{WORK}/tasks/{task_x['id']}/",
+            {"status": "done"},
+            format="json",
+        )
+        self.assertEqual(done.status_code, status.HTTP_200_OK, done.data)
+        self.assertEqual(done.data["status"], "done")
+        self.assertEqual(len(done.data["prerequisites"]), 1)
+
+        board = self.client_auth.get(f"{WORK}/projects/{self.project_id}/board/")
+        self.assertEqual(board.status_code, status.HTTP_200_OK)
+        titles = [
+            card["title"]
+            for column in board.data["columns"]
+            for card in column["tasks"]
+        ]
+        self.assertIn("Frontend login", titles)
