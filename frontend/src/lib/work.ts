@@ -5,6 +5,7 @@ export type WorkCompany = {
   owner: number;
   status: string;
   require_approval_before_close?: boolean;
+  can_manage?: boolean;
   created_at: string;
 };
 

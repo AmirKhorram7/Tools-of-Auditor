@@ -56,6 +56,7 @@ export default function WorkCompanyPage() {
   const [boardTemplateId, setBoardTemplateId] = useState("");
   const [templates, setTemplates] = useState<WorkBoardTemplate[]>([]);
   const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -105,6 +106,20 @@ export default function WorkCompanyPage() {
       setFormError(err instanceof ApiError ? err.message : t("work.createTeamFail"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const removeProject = async (project: WorkProject) => {
+    if (!window.confirm(t("work.deleteProjectConfirm"))) return;
+    setBusyId(project.id);
+    setError(null);
+    try {
+      await apiFetch(`/work/projects/${project.id}/`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("work.deleteProjectFail"));
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -257,6 +272,7 @@ export default function WorkCompanyPage() {
               t("work.colProgress"),
               t("work.priority"),
               t("work.due"),
+              ...(projects.some((row) => row.can_manage) ? [t("work.colActions")] : []),
             ]}
           >
             {projects.map((project) => (
@@ -282,6 +298,20 @@ export default function WorkCompanyPage() {
                 </WorkTd>
                 <WorkTd>{workPriorityLabel(t, project.priority)}</WorkTd>
                 <WorkTd>{formatWorkDate(project.due_date, locale, t("work.noDue"))}</WorkTd>
+                {projects.some((row) => row.can_manage) && (
+                  <WorkTd>
+                    {project.can_manage ? (
+                      <button
+                        type="button"
+                        disabled={busyId === project.id}
+                        onClick={() => void removeProject(project)}
+                        className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        {t("work.deleteProject")}
+                      </button>
+                    ) : null}
+                  </WorkTd>
+                )}
               </tr>
             ))}
           </WorkTable>

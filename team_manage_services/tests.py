@@ -685,3 +685,117 @@ class WorkPrerequisiteTests(APITestCase):
             for card in column["tasks"]
         ]
         self.assertIn("Frontend login", titles)
+
+        removed = self.client_auth.delete(f"{WORK}/tasks/{extra['id']}/")
+        self.assertEqual(removed.status_code, status.HTTP_204_NO_CONTENT)
+        gone = self.client_auth.get(f"{WORK}/tasks/{extra['id']}/")
+        self.assertEqual(gone.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class WorkProjectVisibilityTests(APITestCase):
+    """A team member only sees projects that team was added to."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(
+            phone_number="09120000031",
+            password="pass-manager",
+            first_name="Mgr",
+            is_phone_verified=True,
+        )
+        self.member = User.objects.create_user(
+            phone_number="09120000032",
+            password="pass-member",
+            first_name="Ali",
+            is_phone_verified=True,
+        )
+        self.manager_client = self._client_for(self.manager)
+        self.member_client = self._client_for(self.member)
+        company = self.manager_client.post(
+            f"{WORK}/companies/", {"name": "Vis Co"}, format="json"
+        ).data
+        self.company_id = company["id"]
+        team_one = self.manager_client.post(
+            f"{WORK}/teams/",
+            {"company": self.company_id, "name": "Team 1"},
+            format="json",
+        ).data
+        team_two = self.manager_client.post(
+            f"{WORK}/teams/",
+            {"company": self.company_id, "name": "Team 2"},
+            format="json",
+        ).data
+        invite = self.manager_client.post(
+            f"{WORK}/teams/{team_two['id']}/invite/",
+            {"phone_number": self.member.phone_number},
+            format="json",
+        ).data
+        self.member_client.post(f"{WORK}/invitations/{invite['id']}/accept/")
+        project_one = self.manager_client.post(
+            f"{WORK}/projects/",
+            {"company": self.company_id, "name": "Project 1"},
+            format="json",
+        ).data
+        project_two = self.manager_client.post(
+            f"{WORK}/projects/",
+            {"company": self.company_id, "name": "Project 2"},
+            format="json",
+        ).data
+        self.project_one_id = project_one["id"]
+        self.project_two_id = project_two["id"]
+        self.manager_client.post(
+            f"{WORK}/projects/{self.project_one_id}/add-team/",
+            {"team_id": team_one["id"]},
+            format="json",
+        )
+        self.team_two_id = team_two["id"]
+
+    def _client_for(self, user):
+        client = self.client_class()
+        token = str(RefreshToken.for_user(user).access_token)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        return client
+
+    def test_member_cannot_see_unrelated_project(self):
+        hidden = self.member_client.get(f"{WORK}/projects/{self.project_one_id}/")
+        self.assertEqual(hidden.status_code, status.HTTP_404_NOT_FOUND)
+
+        listed = self.member_client.get(f"{WORK}/projects/?company={self.company_id}")
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        ids = [row["id"] for row in _results(listed.data)]
+        self.assertNotIn(self.project_one_id, ids)
+        self.assertNotIn(self.project_two_id, ids)
+
+        manager_list = self.manager_client.get(
+            f"{WORK}/projects/?company={self.company_id}"
+        )
+        manager_ids = [row["id"] for row in _results(manager_list.data)]
+        self.assertIn(self.project_one_id, manager_ids)
+
+        self.manager_client.post(
+            f"{WORK}/projects/{self.project_one_id}/add-team/",
+            {"team_id": self.team_two_id},
+            format="json",
+        )
+        visible = self.member_client.get(f"{WORK}/projects/{self.project_one_id}/")
+        self.assertEqual(visible.status_code, status.HTTP_200_OK)
+
+        task = self.manager_client.post(
+            f"{WORK}/tasks/",
+            {"project": self.project_one_id, "title": "Keep"},
+            format="json",
+        ).data
+        blocked = self.member_client.delete(f"{WORK}/tasks/{task['id']}/")
+        self.assertEqual(blocked.status_code, status.HTTP_403_FORBIDDEN)
+        kept = self.manager_client.delete(f"{WORK}/tasks/{task['id']}/")
+        self.assertEqual(kept.status_code, status.HTTP_204_NO_CONTENT)
+
+        blocked_project = self.member_client.delete(
+            f"{WORK}/projects/{self.project_one_id}/"
+        )
+        self.assertEqual(blocked_project.status_code, status.HTTP_403_FORBIDDEN)
+        removed_project = self.manager_client.delete(
+            f"{WORK}/projects/{self.project_two_id}/"
+        )
+        self.assertEqual(removed_project.status_code, status.HTTP_204_NO_CONTENT)
+        gone = self.manager_client.get(f"{WORK}/projects/{self.project_two_id}/")
+        self.assertEqual(gone.status_code, status.HTTP_404_NOT_FOUND)

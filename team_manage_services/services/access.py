@@ -76,12 +76,18 @@ def is_company_manager(user, company: Company) -> bool:
 
 
 def projects_for_user(user):
-    return Project.objects.filter(
-        Q(company__owner=user)
+    """Company managers see every company project. Everyone else only sees
+    projects they own or were added to (team membership alone is not enough)."""
+    managed_company_ids = Company.objects.filter(
+        Q(owner=user)
         | Q(
-            company__members__user=user,
-            company__members__status=CompanyMember.Status.ACTIVE,
+            members__user=user,
+            members__status=CompanyMember.Status.ACTIVE,
+            members__role__in=COMPANY_MANAGE_ROLES,
         )
+    ).values("id")
+    return Project.objects.filter(
+        Q(company_id__in=managed_company_ids)
         | Q(owner=user)
         | Q(members__user=user, members__status=ProjectMember.Status.ACTIVE)
     ).distinct()

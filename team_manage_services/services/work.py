@@ -94,6 +94,24 @@ def create_project(*, user, company, board_template=None, **fields) -> Project:
 
 
 @transaction.atomic
+def delete_project(*, user, project: Project) -> None:
+    if not is_project_manager(user, project) and project.owner_id != user.id:
+        raise PermissionDenied("Only the project creator or a manager can remove this project.")
+    name = project.name
+    company = project.company
+    log_activity(
+        actor=user,
+        action=ActivityLog.Action.DELETED,
+        entity_type="project",
+        entity_id=project.id,
+        description=f"پروژه «{name}» حذف شد.",
+        company=company,
+        project=None,
+    )
+    project.delete()
+
+
+@transaction.atomic
 def add_team_to_project(*, user, project: Project, team: Team) -> ProjectTeam:
     if not is_project_manager(user, project):
         raise PermissionDenied("Only a project manager can add a team.")
@@ -373,6 +391,24 @@ def update_task(*, user, task: Task, **fields) -> Task:
                         reference_id=task.id,
                     )
     return task
+
+
+@transaction.atomic
+def delete_task(*, user, task: Task) -> None:
+    if not is_project_manager(user, task.project):
+        raise PermissionDenied("Only a manager or maintainer can remove a task.")
+    title = task.title
+    project = task.project
+    log_activity(
+        actor=user,
+        action=ActivityLog.Action.DELETED,
+        entity_type="task",
+        entity_id=task.id,
+        description=f"کار «{title}» حذف شد.",
+        company=project.company,
+        project=project,
+    )
+    task.delete()
 
 
 @transaction.atomic

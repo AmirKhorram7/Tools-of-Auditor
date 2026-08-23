@@ -13,9 +13,11 @@ import {
 
 const CARD_W = 220;
 const CARD_H = 112;
-const GAP_X = 72;
-const GAP_Y = 28;
-const PAD = 28;
+const GAP_X = 88;
+const GAP_Y = 36;
+const PAD = 36;
+const ACCENT_BLUE = "#1A2B49";
+const ACCENT_ORANGE = "#F97316";
 
 type Placed = {
   task: WorkTask;
@@ -63,6 +65,24 @@ function rankTasks(tasks: WorkTask[]) {
   return columns;
 }
 
+function cardAccent(task: WorkTask) {
+  if (task.status === "in_progress" || task.status === "blocked") return ACCENT_ORANGE;
+  return ACCENT_BLUE;
+}
+
+/** Join the facing edges of two cards so the line actually touches both. */
+function connector(from: Placed, to: Placed) {
+  const fromCenterX = from.x + CARD_W / 2;
+  const toCenterX = to.x + CARD_W / 2;
+  const fromOnRight = fromCenterX >= toCenterX;
+  return {
+    x1: fromOnRight ? from.x : from.x + CARD_W,
+    y1: from.y + CARD_H / 2,
+    x2: fromOnRight ? to.x + CARD_W : to.x,
+    y2: to.y + CARD_H / 2,
+  };
+}
+
 export default function WorkFlowView({
   tasks,
   emptyAction,
@@ -74,20 +94,10 @@ export default function WorkFlowView({
   const linked = tasks.filter((task) => isLinked(task, tasks));
   const unlinked = tasks.filter((task) => !isLinked(task, tasks));
   const columns = rankTasks(linked);
-  const placed: Placed[] = [];
-  columns.forEach((column, col) => {
-    column.forEach((task, row) => {
-      placed.push({
-        task,
-        x: PAD + col * (CARD_W + GAP_X),
-        y: PAD + row * (CARD_H + GAP_Y),
-      });
-    });
-  });
-  const byId = new Map(placed.map((item) => [item.task.id, item]));
+  const colCount = Math.max(columns.length, 1);
   const width = Math.max(
     PAD * 2 + CARD_W,
-    PAD * 2 + Math.max(columns.length, 1) * CARD_W + Math.max(columns.length - 1, 0) * GAP_X,
+    PAD * 2 + colCount * CARD_W + Math.max(colCount - 1, 0) * GAP_X,
   );
   const height = Math.max(
     PAD * 2 + CARD_H,
@@ -95,6 +105,17 @@ export default function WorkFlowView({
       Math.max(...columns.map((column) => column.length), 1) * CARD_H +
       Math.max(Math.max(...columns.map((column) => column.length), 1) - 1, 0) * GAP_Y,
   );
+  const placed: Placed[] = [];
+  columns.forEach((column, col) => {
+    column.forEach((task, row) => {
+      placed.push({
+        task,
+        x: PAD + (colCount - 1 - col) * (CARD_W + GAP_X),
+        y: PAD + row * (CARD_H + GAP_Y),
+      });
+    });
+  });
+  const byId = new Map(placed.map((item) => [item.task.id, item]));
 
   if (tasks.length === 0) {
     return (
@@ -113,26 +134,34 @@ export default function WorkFlowView({
             backgroundImage:
               "linear-gradient(#f3f4f6 1px, transparent 1px), linear-gradient(90deg, #f3f4f6 1px, transparent 1px)",
             backgroundSize: "22px 22px",
-            maxHeight: "72vh",
+            minHeight: "78vh",
+            maxHeight: "92vh",
           }}
         >
-          <div dir="ltr" className="relative" style={{ width, height, minWidth: "100%" }}>
+          <div className="relative" dir="ltr" style={{ width, height }}>
+            {placed.map(({ task, x, y }) => (
+              <FlowCard key={task.id} task={task} x={x} y={y} />
+            ))}
             <svg
               width={width}
               height={height}
-              className="pointer-events-none absolute inset-0"
+              viewBox={`0 0 ${width} ${height}`}
+              preserveAspectRatio="xMinYMin meet"
+              className="pointer-events-none absolute left-0 top-0 z-10"
+              overflow="visible"
               aria-hidden
             >
               <defs>
                 <marker
                   id="work-flow-arrow"
-                  markerWidth="8"
-                  markerHeight="8"
-                  refX="7"
-                  refY="4"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="9"
+                  refY="5"
                   orient="auto"
+                  markerUnits="userSpaceOnUse"
                 >
-                  <path d="M0,0 L8,4 L0,8 Z" fill="#1A2B49" fillOpacity="0.55" />
+                  <path d="M0,0 L10,5 L0,10 Z" fill={ACCENT_ORANGE} />
                 </marker>
               </defs>
               {placed.flatMap(({ task }) =>
@@ -140,29 +169,24 @@ export default function WorkFlowView({
                   const from = byId.get(prereq.id);
                   const to = byId.get(task.id);
                   if (!from || !to) return null;
-                  const x1 = from.x + CARD_W;
-                  const y1 = from.y + CARD_H / 2;
-                  const x2 = to.x;
-                  const y2 = to.y + CARD_H / 2;
+                  const { x1, y1, x2, y2 } = connector(from, to);
                   const mid = (x1 + x2) / 2;
                   return (
-                    <path
-                      key={`${prereq.id}-${task.id}`}
-                      d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`}
-                      fill="none"
-                      stroke="#1A2B49"
-                      strokeOpacity={0.45}
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      markerEnd="url(#work-flow-arrow)"
-                    />
+                    <g key={`${prereq.id}-${task.id}`}>
+                      <circle cx={x1} cy={y1} r={4} fill={ACCENT_BLUE} />
+                      <path
+                        d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`}
+                        fill="none"
+                        stroke={ACCENT_BLUE}
+                        strokeWidth={2.75}
+                        strokeLinecap="round"
+                        markerEnd="url(#work-flow-arrow)"
+                      />
+                    </g>
                   );
                 }),
               )}
             </svg>
-            {placed.map(({ task, x, y }) => (
-              <FlowCard key={task.id} task={task} x={x} y={y} />
-            ))}
           </div>
         </div>
       )}
@@ -193,30 +217,34 @@ function FlowCard({
 }) {
   const { t } = useI18n();
   const closed = task.status === "done" || task.status === "cancelled";
+  const accent = cardAccent(task);
   const needs = (task.prerequisites || []).map((item) => item.title).filter(Boolean);
 
   const card = (
     <Link
       href={`/work/tasks/${task.id}`}
+      dir="rtl"
       className={cx(
-        "flex h-full flex-col justify-between rounded-xl border bg-white px-3 py-2.5 shadow-sm transition hover:shadow-md",
-        closed ? "border-gray-200" : "border-navy-900/15",
+        "flex h-full flex-col justify-between rounded-xl bg-white px-3 py-2.5 shadow-sm transition hover:shadow-md",
+        closed && "opacity-80",
       )}
+      style={{
+        border: `2px solid ${accent}`,
+        boxShadow: `0 0 0 1px ${accent}22`,
+      }}
     >
       <div>
-        {(task.column_name || (task.labels || []).length > 0) && (
+        {task.column_name && (
           <div className="mb-1.5 flex flex-wrap gap-1">
-            {task.column_name && (
-              <span
-                className="rounded px-1.5 py-0.5 text-[10px] font-bold"
-                style={{
-                  backgroundColor: task.column_color || "#1A2B49",
-                  color: labelTextColor(task.column_color || "#1A2B49"),
-                }}
-              >
-                {task.column_name}
-              </span>
-            )}
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+              style={{
+                backgroundColor: task.column_color || ACCENT_BLUE,
+                color: labelTextColor(task.column_color || ACCENT_BLUE),
+              }}
+            >
+              {task.column_name}
+            </span>
           </div>
         )}
         <p
@@ -247,7 +275,7 @@ function FlowCard({
   }
 
   return (
-    <div className="absolute" style={{ left: x, top: y, width: CARD_W, height: CARD_H }}>
+    <div className="absolute z-0" style={{ left: x, top: y, width: CARD_W, height: CARD_H }}>
       {card}
     </div>
   );

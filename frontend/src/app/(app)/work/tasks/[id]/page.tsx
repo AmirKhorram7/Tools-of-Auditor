@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -38,6 +38,7 @@ import {
 export default function WorkTaskPage() {
   const params = useParams<{ id: string }>();
   const taskId = Number(params.id);
+  const router = useRouter();
   const { t, locale } = useI18n();
 
   const [task, setTask] = useState<WorkTaskDetail | null>(null);
@@ -144,6 +145,20 @@ export default function WorkTaskPage() {
     }
     body.prerequisite_ids = selectedPrereqs;
     await patchTask(body);
+  };
+
+  const removeTask = async () => {
+    if (!task) return;
+    if (!window.confirm(t("work.deleteTaskConfirm"))) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch(`/work/tasks/${taskId}/`, { method: "DELETE" });
+      router.push(`/work/projects/${task.project}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("work.deleteTaskFail"));
+      setSaving(false);
+    }
   };
 
   const toggleStep = async (stepId: number, done: boolean) => {
@@ -376,7 +391,12 @@ export default function WorkTaskPage() {
             </div>
           )}
         </div>
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          {canManage && (
+            <Button size="sm" variant="danger" loading={saving} onClick={() => void removeTask()}>
+              {t("work.deleteTask")}
+            </Button>
+          )}
           <Button size="sm" loading={saving} onClick={() => void saveDetails()}>
             {t("common.save")}
           </Button>

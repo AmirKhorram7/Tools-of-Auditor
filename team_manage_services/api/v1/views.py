@@ -91,6 +91,8 @@ from team_manage_services.services.work import (
     sync_team_role_to_projects,
     create_project,
     create_task,
+    delete_project,
+    delete_task,
     set_step_done,
     update_task,
 )
@@ -502,6 +504,11 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
         summary="Update work project",
         description="Project manager or company manager.",
     ),
+    destroy=extend_schema(
+        summary="Delete work project",
+        description="Project creator or manager only. Removes the project and its tasks.",
+        responses={204: None},
+    ),
 )
 class ProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -509,7 +516,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def destroy(self, request, *args, **kwargs):
-        raise MethodNotAllowed("DELETE")
+        project = self.get_object()
+        call_service(delete_project, user=request.user, project=project)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_queryset(self):
         qs = projects_for_user(self.request.user).select_related("company", "owner")
@@ -792,10 +801,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
         request=TaskSerializer,
         responses={200: TaskSerializer},
     ),
+    destroy=extend_schema(
+        summary="Delete task",
+        description="Project owner, maintainer, or company manager only.",
+        responses={204: None},
+    ),
 )
 class TaskViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    http_method_names = ["get", "post", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def get_serializer_class(self):
         if self.action == "retrieve":
@@ -841,6 +855,11 @@ class TaskViewSet(viewsets.ModelViewSet):
             update_task, user=request.user, task=task, **serializer.validated_data
         )
         return Response(self.get_serializer(task).data)
+
+    def destroy(self, request, *args, **kwargs):
+        task = self.get_object()
+        call_service(delete_task, user=request.user, task=task)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         methods=["GET"],

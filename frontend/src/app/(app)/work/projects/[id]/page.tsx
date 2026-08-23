@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -63,6 +63,7 @@ const VIEW_KEY = "ta-work-project-view";
 export default function WorkProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = Number(params.id);
+  const router = useRouter();
   const { profile } = useAuth();
   const { t, locale } = useI18n();
 
@@ -267,6 +268,34 @@ export default function WorkProjectPage() {
       setFormError(err instanceof ApiError ? err.message : t("work.deleteLabelFail"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const removeProject = async () => {
+    if (!project) return;
+    if (!window.confirm(t("work.deleteProjectConfirm"))) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch(`/work/projects/${project.id}/`, { method: "DELETE" });
+      router.push(`/work/companies/${project.company}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("work.deleteProjectFail"));
+      setSaving(false);
+    }
+  };
+
+  const removeTask = async (id: number) => {
+    if (!window.confirm(t("work.deleteTaskConfirm"))) return;
+    setBusyId(id);
+    setError(null);
+    try {
+      await apiFetch(`/work/tasks/${id}/`, { method: "DELETE" });
+      await load(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("work.deleteTaskFail"));
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -557,6 +586,11 @@ export default function WorkProjectPage() {
               {t("work.settings")}
             </Button>
           )}
+          {project.can_manage && (
+            <Button size="sm" variant="danger" loading={saving} onClick={() => void removeProject()}>
+              {t("work.deleteProject")}
+            </Button>
+          )}
           <WorkMeetButton />
           <WorkGuide compact />
         </div>
@@ -650,6 +684,7 @@ export default function WorkProjectPage() {
             t("work.colStatus"),
             t("work.colLabel"),
             t("work.colDue"),
+            ...(project.can_manage ? [t("work.colActions")] : []),
           ]}
         >
           {visibleTasks.map((task) => {
@@ -698,6 +733,18 @@ export default function WorkProjectPage() {
                 <WorkTd className={overdue ? "font-medium text-red-600" : ""}>
                   {formatWorkDate(task.due_date, locale, t("work.noDue"))}
                 </WorkTd>
+                {project.can_manage && (
+                  <WorkTd>
+                    <button
+                      type="button"
+                      disabled={busyId === task.id}
+                      onClick={() => void removeTask(task.id)}
+                      className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      {t("work.deleteTask")}
+                    </button>
+                  </WorkTd>
+                )}
               </tr>
             );
           })}
@@ -1292,7 +1339,10 @@ export default function WorkProjectPage() {
             )}
           </section>
           )}
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button variant="danger" loading={saving} onClick={() => void removeProject()}>
+              {t("work.deleteProject")}
+            </Button>
             <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
               {t("common.close")}
             </Button>
