@@ -112,6 +112,22 @@ const FONT_SIZES = [
 
 const DEFAULT_FONT = "Tahoma, sans-serif";
 const DEFAULT_SIZE = "14px";
+const MAX_TABLE_COLS = 8;
+const MAX_TABLE_ROWS = 20;
+const TABLE_EDGE = 8;
+const MIN_COL_W = 48;
+const MAX_COL_W = 520;
+const MIN_ROW_H = 28;
+const MAX_ROW_H = 360;
+
+type TableResize = {
+  kind: "col" | "row";
+  table: HTMLTableElement;
+  index: number;
+  startPos: number;
+  startSize: number;
+  rtl: boolean;
+};
 
 type Props = {
   value: string;
@@ -139,6 +155,78 @@ function matchFont(computed: string): string {
     .sort((a, b) => b.match.length - a.match.length)
     .find((font) => lower.includes(font.match));
   return found?.value ?? DEFAULT_FONT;
+}
+
+function currentTableCell(editor: HTMLElement | null): HTMLTableCellElement | null {
+  if (!editor) return null;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const node = selection.anchorNode;
+  const element = node instanceof HTMLElement ? node : node?.parentElement;
+  if (!element || !editor.contains(element)) return null;
+  return element.closest("td, th");
+}
+
+function tableRowCount(table: HTMLTableElement): number {
+  return table.rows.length;
+}
+
+function tableColCount(table: HTMLTableElement): number {
+  const first = table.rows[0];
+  return first ? first.cells.length : 0;
+}
+
+function emptyTableCell(tag: "th" | "td"): HTMLTableCellElement {
+  const cell = document.createElement(tag);
+  cell.innerHTML = "<br>";
+  return cell;
+}
+
+function closestTableCell(target: EventTarget | null, editor: HTMLElement | null) {
+  if (!(target instanceof Element) || !editor || !editor.contains(target)) return null;
+  const cell = target.closest("td, th");
+  return cell instanceof HTMLTableCellElement ? cell : null;
+}
+
+function tableEdge(
+  cell: HTMLTableCellElement,
+  clientX: number,
+  clientY: number,
+  rtl: boolean,
+): "col" | "row" | null {
+  const rect = cell.getBoundingClientRect();
+  const nearCol = rtl ? clientX - rect.left <= TABLE_EDGE : rect.right - clientX <= TABLE_EDGE;
+  const nearRow = rect.bottom - clientY <= TABLE_EDGE;
+  if (nearCol) return "col";
+  if (nearRow) return "row";
+  return null;
+}
+
+function clampSize(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function setColumnWidth(table: HTMLTableElement, index: number, width: number) {
+  const px = `${clampSize(width, MIN_COL_W, MAX_COL_W)}px`;
+  table.style.tableLayout = "fixed";
+  table.style.width = "auto";
+  Array.from(table.rows).forEach((row) => {
+    const cell = row.cells[index];
+    if (!cell) return;
+    cell.style.width = px;
+    cell.style.minWidth = px;
+    cell.style.maxWidth = px;
+  });
+}
+
+function setRowHeight(table: HTMLTableElement, index: number, height: number) {
+  const row = table.rows[index];
+  if (!row) return;
+  const px = `${clampSize(height, MIN_ROW_H, MAX_ROW_H)}px`;
+  row.style.height = px;
+  Array.from(row.cells).forEach((cell) => {
+    cell.style.height = px;
+  });
 }
 
 function matchSize(computed: string): string {
@@ -184,8 +272,11 @@ export default function RichTextEditor({
   const resolvedPlaceholder = placeholder ?? t("editor.placeholder");
   const editorRef = useRef<HTMLDivElement>(null);
   const savedRange = useRef<Range | null>(null);
+  const resizeRef = useRef<TableResize | null>(null);
+  const [tableCursor, setTableCursor] = useState<"col-resize" | "row-resize" | "">("");
   const [currentFont, setCurrentFont] = useState(DEFAULT_FONT);
   const [currentSize, setCurrentSize] = useState(DEFAULT_SIZE);
+  const [inTable, setInTable] = useState(false);
 
   // Only sync from props when the DOM differs, so typing keeps the caret stable.
   useEffect(() => {
@@ -230,6 +321,7 @@ export default function RichTextEditor({
     const style = window.getComputedStyle(element);
     setCurrentFont(matchFont(style.fontFamily));
     setCurrentSize(matchSize(style.fontSize));
+    setInTable(Boolean(element.closest("table")));
   };
 
   useEffect(() => {
@@ -237,6 +329,36 @@ export default function RichTextEditor({
     const onSelectionChange = () => readCurrentStyle();
     document.addEventListener("selectionchange", onSelectionChange);
     return () => document.removeEventListener("selectionchange", onSelectionChange);
+  }, [readOnly]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    const onMove = (event: MouseEvent) => {
+      const resize = resizeRef.current;
+      if (!resize) return;
+      event.preventDefault();
+      if (resize.kind === "col") {
+        const delta = resize.rtl
+          ? resize.startPos - event.clientX
+          : event.clientX - resize.startPos;
+        setColumnWidth(resize.table, resize.index, resize.startSize + delta);
+      } else {
+        setRowHeight(resize.table, resize.index, resize.startSize + (event.clientY - resize.startPos));
+      }
+    };
+    const onUp = () => {
+      if (!resizeRef.current) return;
+      resizeRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      emit();
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
   }, [readOnly]);
 
   const run = (action: ToolbarAction) => {
@@ -337,6 +459,96 @@ export default function RichTextEditor({
     emit();
   };
 
+  const insertTable = () => {
+    if (readOnly) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const colsRaw = window.prompt(t("editor.tableCols"), "3");
+    if (colsRaw === null) return;
+    const rowsRaw = window.prompt(t("editor.tableRows"), "4");
+    if (rowsRaw === null) return;
+
+    const cols = Math.min(MAX_TABLE_COLS, Math.max(1, Number.parseInt(colsRaw, 10) || 3));
+    const rows = Math.min(MAX_TABLE_ROWS, Math.max(1, Number.parseInt(rowsRaw, 10) || 4));
+
+    restoreSelection();
+    editor.focus();
+
+    const header = Array.from(
+      { length: cols },
+      (_, index) => `<th>${t("editor.tableHeader")} ${index + 1}</th>`,
+    ).join("");
+    const body = Array.from({ length: Math.max(rows - 1, 0) }, () => {
+      const cells = Array.from({ length: cols }, () => "<td><br></td>").join("");
+      return `<tr>${cells}</tr>`;
+    }).join("");
+    const html =
+      rows === 1
+        ? `<table><tbody><tr>${header}</tr></tbody></table><p><br></p>`
+        : `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table><p><br></p>`;
+
+    document.execCommand("insertHTML", false, html);
+    emit();
+    setInTable(true);
+  };
+
+  const withTableCell = (fn: (cell: HTMLTableCellElement, table: HTMLTableElement) => void) => {
+    if (readOnly) return;
+    restoreSelection();
+    const editor = editorRef.current;
+    const cell = currentTableCell(editor);
+    const table = cell?.closest("table");
+    if (!editor || !cell || !table) return;
+    fn(cell, table);
+    editor.focus();
+    emit();
+    setInTable(true);
+  };
+
+  const addTableRow = () => {
+    withTableCell((cell, table) => {
+      if (tableRowCount(table) >= MAX_TABLE_ROWS) return;
+      const row = cell.parentElement;
+      if (!(row instanceof HTMLTableRowElement)) return;
+      const next = document.createElement("tr");
+      const tag = row.closest("thead") ? "th" : "td";
+      Array.from(row.cells).forEach(() => next.appendChild(emptyTableCell(tag)));
+      row.after(next);
+    });
+  };
+
+  const removeTableRow = () => {
+    withTableCell((cell, table) => {
+      if (tableRowCount(table) <= 1) return;
+      cell.parentElement?.remove();
+    });
+  };
+
+  const addTableCol = () => {
+    withTableCell((cell, table) => {
+      if (tableColCount(table) >= MAX_TABLE_COLS) return;
+      const index = cell.cellIndex;
+      Array.from(table.rows).forEach((row) => {
+        const tag = row.closest("thead") || row.cells[index]?.tagName === "TH" ? "th" : "td";
+        const next = emptyTableCell(tag);
+        const after = row.cells[index];
+        if (after) after.after(next);
+        else row.appendChild(next);
+      });
+    });
+  };
+
+  const removeTableCol = () => {
+    withTableCell((cell, table) => {
+      if (tableColCount(table) <= 1) return;
+      const index = cell.cellIndex;
+      Array.from(table.rows).forEach((row) => {
+        row.cells[index]?.remove();
+      });
+    });
+  };
+
   const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = (event.target as HTMLElement | null)?.closest("a");
     if (!target || !(target instanceof HTMLAnchorElement)) return;
@@ -348,6 +560,43 @@ export default function RichTextEditor({
         window.open(target.href, "_blank", "noopener,noreferrer");
       }
     }
+  };
+
+  const handleTablePointerMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (readOnly || resizeRef.current) return;
+    const cell = closestTableCell(event.target, editorRef.current);
+    if (!cell) {
+      if (tableCursor) setTableCursor("");
+      return;
+    }
+    const edge = tableEdge(cell, event.clientX, event.clientY, dir === "rtl");
+    const next = edge === "col" ? "col-resize" : edge === "row" ? "row-resize" : "";
+    if (next !== tableCursor) setTableCursor(next);
+  };
+
+  const handleTableResizeStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (readOnly || event.button !== 0) return;
+    const cell = closestTableCell(event.target, editorRef.current);
+    const table = cell?.closest("table");
+    if (!cell || !table) return;
+    const rtl = dir === "rtl";
+    const edge = tableEdge(cell, event.clientX, event.clientY, rtl);
+    if (!edge) return;
+    event.preventDefault();
+    const rect = cell.getBoundingClientRect();
+    resizeRef.current = {
+      kind: edge,
+      table,
+      index: edge === "col" ? cell.cellIndex : cell.parentElement instanceof HTMLTableRowElement
+        ? cell.parentElement.rowIndex
+        : 0,
+      startPos: edge === "col" ? event.clientX : event.clientY,
+      startSize: edge === "col" ? rect.width : rect.height,
+      rtl,
+    };
+    document.body.style.cursor = edge === "col" ? "col-resize" : "row-resize";
+    document.body.style.userSelect = "none";
+    setInTable(true);
   };
 
   return (
@@ -430,6 +679,45 @@ export default function RichTextEditor({
           >
             {t("editor.removeLink")}
           </button>
+          <button
+            type="button"
+            title={t("editor.tableTitle")}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              saveSelection();
+            }}
+            onClick={insertTable}
+            className="rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700"
+          >
+            {t("editor.table")}
+          </button>
+          {inTable && (
+            <>
+              <span className="mx-0.5 h-4 w-px bg-gray-300" />
+              {(
+                [
+                  ["editor.tableAddRow", addTableRow],
+                  ["editor.tableDelRow", removeTableRow],
+                  ["editor.tableAddCol", addTableCol],
+                  ["editor.tableDelCol", removeTableCol],
+                ] as const
+              ).map(([key, action]) => (
+                <button
+                  key={key}
+                  type="button"
+                  title={t(key)}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    saveSelection();
+                  }}
+                  onClick={action}
+                  className="rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700"
+                >
+                  {t(key)}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -439,7 +727,6 @@ export default function RichTextEditor({
         dir={dir}
         suppressContentEditableWarning
         data-placeholder={resolvedPlaceholder}
-        style={{ minHeight }}
         onInput={() => {
           if (!readOnly) emit();
         }}
@@ -449,6 +736,12 @@ export default function RichTextEditor({
         onClick={handleEditorClick}
         onKeyUp={readCurrentStyle}
         onMouseUp={readCurrentStyle}
+        onMouseMove={handleTablePointerMove}
+        onMouseDown={handleTableResizeStart}
+        onMouseLeave={() => {
+          if (!resizeRef.current) setTableCursor("");
+        }}
+        style={{ minHeight, cursor: tableCursor || undefined }}
         className={cx(
           "rich-content max-h-[520px] overflow-y-auto px-3 py-2.5 text-sm outline-none",
           readOnly && "bg-gray-50 text-gray-800",
