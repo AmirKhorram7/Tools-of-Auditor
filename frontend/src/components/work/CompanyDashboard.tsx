@@ -243,7 +243,7 @@ export default function CompanyDashboard({
           <div className="relative w-[8.5rem] shrink-0 bg-[#1A2B49] sm:w-40">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=70"
+              src="/work/team-banner.jpg"
               alt=""
               className="absolute inset-0 size-full object-cover"
             />
