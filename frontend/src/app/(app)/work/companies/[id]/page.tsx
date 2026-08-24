@@ -1,14 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
-  Badge,
   Button,
-  EmptyState,
   Field,
   Input,
   Modal,
@@ -16,19 +13,14 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import CompanyDashboard from "@/components/work/CompanyDashboard";
 import JalaliDateField from "@/components/work/JalaliDateField";
-import ProgressBar from "@/components/work/ProgressBar";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkGuide from "@/components/work/WorkGuide";
-import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
-  formatWorkDate,
-  labelTextColor,
-  teamColor,
   workPriorityLabel,
-  workProjectStatusLabel,
   type WorkBoardTemplate,
   type WorkCompany,
   type WorkProject,
@@ -38,7 +30,7 @@ import {
 export default function WorkCompanyPage() {
   const params = useParams<{ id: string }>();
   const companyId = Number(params.id);
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
 
   const [company, setCompany] = useState<WorkCompany | null>(null);
   const [teams, setTeams] = useState<WorkTeam[]>([]);
@@ -58,6 +50,14 @@ export default function WorkCompanyPage() {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editProject, setEditProject] = useState<WorkProject | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editDue, setEditDue] = useState("");
+  const [editPriority, setEditPriority] = useState("2");
 
   const load = useCallback(async () => {
     if (!Number.isFinite(companyId)) return;
@@ -123,6 +123,65 @@ export default function WorkCompanyPage() {
     }
   };
 
+  const togglePolicy = async () => {
+    if (!company || policyBusy) return;
+    setPolicyBusy(true);
+    setError(null);
+    try {
+      const updated = await apiFetch<WorkCompany>(`/work/companies/${companyId}/`, {
+        method: "PATCH",
+        body: {
+          require_approval_before_close: !company.require_approval_before_close,
+        },
+      });
+      setCompany(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("work.savePolicyFail"));
+    } finally {
+      setPolicyBusy(false);
+    }
+  };
+
+  const openEdit = (project: WorkProject) => {
+    setEditProject(project);
+    setEditName(project.name);
+    setEditDesc(project.description || "");
+    setEditDue(project.due_date || "");
+    setEditPriority(String(project.priority));
+    setFormError(null);
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editProject) return;
+    if (!editName.trim()) {
+      setFormError(t("work.projectRequired"));
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      const updated = await apiFetch<WorkProject>(`/work/projects/${editProject.id}/`, {
+        method: "PATCH",
+        body: {
+          name: editName.trim(),
+          description: editDesc.trim(),
+          due_date: editDue || null,
+          priority: Number(editPriority),
+        },
+      });
+      setProjects((current) =>
+        current.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)),
+      );
+      setEditOpen(false);
+      setEditProject(null);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t("work.createProjectFail"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const createProject = async () => {
     if (!projectName.trim()) {
       setFormError(t("work.projectRequired"));
@@ -159,12 +218,10 @@ export default function WorkCompanyPage() {
     return <Alert>{error || t("work.companyMissing")}</Alert>;
   }
 
-  const pct = (value: number) => (locale === "en" ? `${value}%` : `${value}٪`);
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <div className="flex h-[calc(100dvh-9.25rem)] flex-col gap-2 overflow-hidden max-md:h-auto max-md:overflow-visible">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <WorkBreadcrumb
             fallbackHref="/work"
             items={[
@@ -172,151 +229,55 @@ export default function WorkCompanyPage() {
               { label: company.name },
             ]}
           />
-          <h1 className="mt-2 text-xl font-bold text-ink">{company.name}</h1>
+          <h1 className="flex items-center gap-1.5 text-base font-bold text-ink">
+            {t("work.title")}
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+              {company.name}
+            </span>
+          </h1>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" onClick={() => { setFormError(null); setTeamOpen(true); }}>
-            {t("work.newTeam")}
+        <div className="flex flex-wrap items-center gap-2">
+          <WorkGuide compact icon />
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setFormError(null);
+              setTeamOpen(true);
+            }}
+          >
+            + {t("work.newTeam")}
           </Button>
-          <Button size="sm" onClick={() => { setFormError(null); setProjectOpen(true); }}>
-            {t("work.newProject")}
+          <Button
+            size="sm"
+            onClick={() => {
+              setFormError(null);
+              setProjectOpen(true);
+            }}
+          >
+            + {t("work.newProject")}
           </Button>
-          <WorkGuide compact />
         </div>
       </div>
 
       {error && <Alert>{error}</Alert>}
 
-      <section className="rounded-xl border border-black/[0.06] bg-white px-3 py-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold text-ink">{t("work.companyPolicy")}</p>
-            <p className="text-xs text-gray-500">
-              {t("work.companyPolicyHint")}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const updated = await apiFetch<WorkCompany>(`/work/companies/${companyId}/`, {
-                  method: "PATCH",
-                  body: {
-                    require_approval_before_close: !company.require_approval_before_close,
-                  },
-                });
-                setCompany(updated);
-              } catch (err) {
-                setError(err instanceof ApiError ? err.message : t("work.savePolicyFail"));
-              }
-            }}
-            className={`rounded-md px-3 py-1.5 text-xs font-bold ${
-              company.require_approval_before_close
-                ? "bg-navy-900 text-white"
-                : "border border-gray-200 text-gray-600"
-            }`}
-          >
-            {company.require_approval_before_close ? t("work.policyIsOn") : t("work.policyIsOff")}
-          </button>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink">{t("work.teams")}</h2>
-        {teams.length === 0 ? (
-          <EmptyState
-            title={t("work.noTeamTitle")}
-            description={t("work.noTeamDesc")}
-            action={
-              <Button size="sm" onClick={() => setTeamOpen(true)}>
-                {t("work.createTeam")}
-              </Button>
-            }
-          />
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {teams.map((team) => (
-              <Link
-                key={team.id}
-                href={`/work/teams/${team.id}`}
-                className="rounded-lg px-3 py-1.5 text-sm font-bold shadow-sm"
-                style={{
-                  backgroundColor: teamColor(team.id),
-                  color: labelTextColor(teamColor(team.id)),
-                }}
-              >
-                {team.name}
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink">{t("work.workProjects")}</h2>
-        {projects.length === 0 ? (
-          <EmptyState
-            title={t("work.noProjectTitle")}
-            description={t("work.noProjectDesc")}
-            action={
-              <Button size="sm" onClick={() => setProjectOpen(true)}>
-                {t("work.createProject")}
-              </Button>
-            }
-          />
-        ) : (
-          <WorkTable
-            columns={[
-              t("work.colProject"),
-              t("common.status"),
-              t("work.colProgress"),
-              t("work.priority"),
-              t("work.due"),
-              ...(projects.some((row) => row.can_manage) ? [t("work.colActions")] : []),
-            ]}
-          >
-            {projects.map((project) => (
-              <tr key={project.id} className="hover:bg-surface">
-                <WorkTd>
-                  <Link
-                    href={`/work/projects/${project.id}`}
-                    className="font-bold text-navy-900 hover:text-link"
-                  >
-                    {project.name} — {t("work.boardLink")}
-                  </Link>
-                </WorkTd>
-                <WorkTd>
-                  <Badge tone="blue">
-                    {workProjectStatusLabel(t, project.status) || project.status}
-                  </Badge>
-                </WorkTd>
-                <WorkTd>
-                  <div className="flex items-center gap-2">
-                    <ProgressBar value={project.progress_percent} className="w-20" />
-                    <span>{pct(project.progress_percent)}</span>
-                  </div>
-                </WorkTd>
-                <WorkTd>{workPriorityLabel(t, project.priority)}</WorkTd>
-                <WorkTd>{formatWorkDate(project.due_date, locale, t("work.noDue"))}</WorkTd>
-                {projects.some((row) => row.can_manage) && (
-                  <WorkTd>
-                    {project.can_manage ? (
-                      <button
-                        type="button"
-                        disabled={busyId === project.id}
-                        onClick={() => void removeProject(project)}
-                        className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
-                      >
-                        {t("work.deleteProject")}
-                      </button>
-                    ) : null}
-                  </WorkTd>
-                )}
-              </tr>
-            ))}
-          </WorkTable>
-        )}
-      </section>
+      <CompanyDashboard
+        company={company}
+        teams={teams}
+        projects={projects}
+        query={query}
+        onQuery={setQuery}
+        policyBusy={policyBusy}
+        busyId={busyId}
+        onTogglePolicy={() => void togglePolicy()}
+        onAddTeam={() => {
+          setFormError(null);
+          setTeamOpen(true);
+        }}
+        onEditProject={openEdit}
+        onDeleteProject={(project) => void removeProject(project)}
+      />
 
       <Modal open={teamOpen} title={t("work.newTeam")} onClose={() => setTeamOpen(false)}>
         <div className="space-y-3">
@@ -391,6 +352,48 @@ export default function WorkCompanyPage() {
             </Button>
             <Button loading={saving} onClick={createProject}>
               {t("common.create")}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={editOpen} title={t("work.editProject")} onClose={() => setEditOpen(false)}>
+        <div className="space-y-3">
+          {formError && <Alert>{formError}</Alert>}
+          <Field label={t("work.projectName")}>
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+          </Field>
+          <Field label={t("work.description")}>
+            <Textarea
+              rows={3}
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+            />
+          </Field>
+          <Field label={t("work.due")}>
+            <JalaliDateField value={editDue} onChange={setEditDue} />
+          </Field>
+          <Field label={t("work.priority")}>
+            <Select
+              value={editPriority}
+              onChange={(e) => setEditPriority(e.target.value)}
+            >
+              {[1, 2, 3, 4].map((value) => (
+                <option key={value} value={value}>
+                  {workPriorityLabel(t, value)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setEditOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button loading={saving} onClick={() => void saveEdit()}>
+              {t("common.save")}
             </Button>
           </div>
         </div>

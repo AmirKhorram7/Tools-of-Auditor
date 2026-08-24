@@ -7,6 +7,7 @@ export type WorkCompany = {
   require_approval_before_close?: boolean;
   can_manage?: boolean;
   created_at: string;
+  updated_at?: string;
 };
 
 export type WorkTeam = {
@@ -17,6 +18,9 @@ export type WorkTeam = {
   owner: number;
   status: string;
   can_manage?: boolean;
+  member_count?: number;
+  project_count?: number;
+  preview_members?: WorkTeamMember[];
 };
 
 export type WorkTeamMember = {
@@ -72,6 +76,7 @@ export type WorkProject = {
   id: number;
   company: number;
   company_name?: string;
+  team_names?: string[];
   name: string;
   description: string;
   owner: number;
@@ -383,6 +388,34 @@ export function formatWorkDate(
 
 export function formatFaDate(value: string | null | undefined): string {
   return formatWorkDate(value, "fa", "بدون سررسید");
+}
+
+export function daysUntil(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const day = value.slice(0, 10);
+  const target = new Date(`${day}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+export function relativeFromNow(
+  value: string | null | undefined,
+): { kind: "now" | "days"; days: number } | null {
+  if (!value) return null;
+  const then = new Date(value);
+  if (Number.isNaN(then.getTime())) return null;
+  const days = Math.max(0, Math.round((Date.now() - then.getTime()) / 86_400_000));
+  return days === 0 ? { kind: "now", days: 0 } : { kind: "days", days };
+}
+
+export function teamInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }
+  return name.trim().slice(0, 2).toUpperCase() || "?";
 }
 
 /** Saturday → Friday week, matching the Persian calendar. */

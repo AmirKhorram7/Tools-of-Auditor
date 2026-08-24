@@ -76,6 +76,8 @@ class WorkAPISmokeTests(APITestCase):
         )
         self.assertEqual(team_res.status_code, status.HTTP_201_CREATED, team_res.data)
         team_id = team_res.data["id"]
+        self.assertIn("member_count", team_res.data)
+        self.assertIn("preview_members", team_res.data)
 
         invite_res = self.manager_client.post(
             f"{WORK}/teams/{team_id}/invite/",
@@ -113,6 +115,7 @@ class WorkAPISmokeTests(APITestCase):
         self.assertEqual(project_res.status_code, status.HTTP_201_CREATED, project_res.data)
         project_id = project_res.data["id"]
         self.assertIn("progress_percent", project_res.data)
+        self.assertIn("team_names", project_res.data)
 
         add_team = self.manager_client.post(
             f"{WORK}/projects/{project_id}/add-team/",

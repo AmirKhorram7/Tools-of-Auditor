@@ -32,6 +32,8 @@ from team_manage_services.services.progress import (
 
 
 class CompanySerializer(serializers.ModelSerializer):
+    can_manage = serializers.SerializerMethodField()
+
     class Meta:
         model = Company
         fields = [
@@ -41,10 +43,17 @@ class CompanySerializer(serializers.ModelSerializer):
             "owner",
             "status",
             "require_approval_before_close",
+            "can_manage",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["owner", "created_at", "updated_at"]
+        read_only_fields = ["owner", "can_manage", "created_at", "updated_at"]
+
+    def get_can_manage(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return is_company_manager(request.user, obj)
 
 
 class CompanyMemberSerializer(serializers.ModelSerializer):
@@ -71,6 +80,9 @@ class CompanyMemberSerializer(serializers.ModelSerializer):
 class TeamSerializer(serializers.ModelSerializer):
     can_manage = serializers.SerializerMethodField()
     company_name = serializers.CharField(source="company.name", read_only=True)
+    member_count = serializers.SerializerMethodField()
+    project_count = serializers.SerializerMethodField()
+    preview_members = serializers.SerializerMethodField()
 
     class Meta:
         model = Team
@@ -82,16 +94,48 @@ class TeamSerializer(serializers.ModelSerializer):
             "owner",
             "status",
             "can_manage",
+            "member_count",
+            "project_count",
+            "preview_members",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["owner", "created_at", "updated_at"]
+        read_only_fields = [
+            "owner",
+            "can_manage",
+            "member_count",
+            "project_count",
+            "preview_members",
+            "created_at",
+            "updated_at",
+        ]
 
     def get_can_manage(self, obj):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return False
         return is_company_manager(request.user, obj.company)
+
+    def get_member_count(self, obj):
+        annotated = getattr(obj, "member_count", None)
+        if isinstance(annotated, int):
+            return annotated
+        return obj.members.filter(status=TeamMember.Status.ACTIVE).count()
+
+    def get_project_count(self, obj):
+        annotated = getattr(obj, "project_count", None)
+        if isinstance(annotated, int):
+            return annotated
+        return obj.project_links.count()
+
+    def get_preview_members(self, obj):
+        members = getattr(obj, "active_members", None)
+        if members is None:
+            members = obj.members.filter(status=TeamMember.Status.ACTIVE).select_related(
+                "user",
+                "user__profile",
+            )
+        return TeamMemberSerializer(list(members)[:5], many=True).data
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
@@ -282,6 +326,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     can_manage_company = serializers.SerializerMethodField()
     require_approval = serializers.SerializerMethodField()
     company_name = serializers.CharField(source="company.name", read_only=True)
+    team_names = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -289,6 +334,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "id",
             "company",
             "company_name",
+            "team_names",
             "name",
             "description",
             "owner",
@@ -330,6 +376,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_require_approval(self, obj):
         return project_requires_approval(obj)
+
+    def get_team_names(self, obj):
+        links = obj.project_teams.all()
+        names = []
+        for link in links:
+            team = getattr(link, "team", None)
+            if team and team.name:
+                names.append(team.name)
+        return names
 
 
 class TaskStepSerializer(serializers.ModelSerializer):

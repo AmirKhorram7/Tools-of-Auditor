@@ -9,16 +9,23 @@ export default function WorkTable({
   children,
   empty,
   compact,
+  className,
 }: {
   columns: string[];
   children: ReactNode;
   empty?: ReactNode;
   compact?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div
+      className={cx(
+        "overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm",
+        className,
+      )}
+    >
       <table className={cx("w-full text-right text-sm", !compact && "min-w-[560px]")}>
-        <thead className="bg-navy-900 text-white">
+        <thead className="sticky top-0 z-10 bg-navy-900 text-white">
           <tr>
             {columns.map((column) => (
               <th

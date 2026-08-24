@@ -7,8 +7,6 @@ import TaskCard from "@/components/work/TaskCard";
 import { useI18n } from "@/lib/i18n";
 import {
   LABEL_COLORS,
-  labelTextColor,
-  toHeaderColor,
   type WorkBoard,
   type WorkBoardColumn,
   type WorkTask,
@@ -90,57 +88,73 @@ export default function TaskBoard({
             }
             void onMove(task, column);
           }}
-          className={`flex w-[300px] shrink-0 flex-col overflow-hidden rounded-xl border ${
-            dropId === column.id
-              ? "border-navy-400 shadow-[0_8px_24px_rgba(26,43,73,0.12)]"
-              : "border-black/[0.06]"
+          className={`flex h-[calc(100vh-16.5rem)] min-h-[280px] w-[270px] shrink-0 flex-col overflow-hidden rounded-xl border bg-white ${
+            dropId === column.id ? "border-navy-400 shadow-md" : "border-gray-200"
           }`}
         >
-          <header
-            className="flex items-center justify-between gap-2 px-3 py-2"
-            style={{
-              backgroundColor: toHeaderColor(column.color),
-              color: labelTextColor(toHeaderColor(column.color)),
-            }}
-          >
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-bold">{column.name}</p>
-              <p className="text-[11px] opacity-70">
-                {t("work.taskCount", { count: column.tasks.length })}
-              </p>
-            </div>
+          <div className="h-1.5 shrink-0" style={{ backgroundColor: column.color }} />
+          <header className="flex shrink-0 items-center gap-2 px-3 py-2">
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: column.color }}
+            />
+            <p className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink">
+              {column.name}
+            </p>
             {showAddTask && (
               <button
                 type="button"
                 onClick={() => onAddTask?.(column)}
-                className="shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold hover:bg-white/25"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-lg leading-none text-gray-400 hover:bg-surface hover:text-navy-800"
+                title={t("work.addTask")}
+                aria-label={t("work.addTask")}
               >
-                {t("work.addTask")}
+                +
               </button>
             )}
           </header>
-          <div className="flex h-[calc(100vh-14rem)] min-h-[280px] flex-col gap-1.5 overflow-y-auto bg-[#F4F5F7] p-1.5">
-            {column.tasks.length === 0 ? (
-              <p className="px-1 py-8 text-center text-xs text-navy-800/35">
-                {t("work.emptyColumn")}
-              </p>
-            ) : (
-              column.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  draggable={task.can_move}
-                  mine={Boolean(currentUserId && task.assignee_user_id === currentUserId)}
-                  columnName={column.name}
-                  columnColor={column.color}
-                />
-              ))
-            )}
+          <div className="min-h-0 flex-1 px-2 pb-1">
+            <div
+              className={`flex h-full flex-col gap-1.5 overflow-y-auto rounded-lg border p-1.5 ${
+                dropId === column.id
+                  ? "border-navy-400 bg-white"
+                  : "border-dashed border-gray-300 bg-[#F7F8FA]"
+              }`}
+            >
+              {column.tasks.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center px-3 text-center">
+                  <p className="text-sm font-bold text-gray-400">{t("work.emptyColumn")}</p>
+                  <p className="mt-1 text-[11px] leading-5 text-gray-400">
+                    {t("work.emptyColumnHint")}
+                  </p>
+                </div>
+              ) : (
+                column.tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    draggable={task.can_move}
+                    mine={Boolean(currentUserId && task.assignee_user_id === currentUserId)}
+                    columnName={column.name}
+                    columnColor={column.color}
+                  />
+                ))
+              )}
+            </div>
           </div>
+          {showAddTask && (
+            <button
+              type="button"
+              onClick={() => onAddTask?.(column)}
+              className="mx-2 mb-2 shrink-0 rounded-lg bg-[#F2F3F5] px-2 py-2 text-[12px] font-bold text-gray-600 hover:bg-surface hover:text-navy-800"
+            >
+              + {t("work.addTask")}
+            </button>
+          )}
         </section>
       ))}
       {canManage && onAddColumn && (
-        <section className="w-[240px] shrink-0 rounded-2xl border border-dashed border-black/10 bg-white/80 p-3">
+        <section className="w-[240px] shrink-0 rounded-xl border border-dashed border-gray-300 bg-white p-3">
           <p className="mb-2 text-sm font-semibold text-ink">{t("work.newColumn")}</p>
           <Field label={t("work.columnName")}>
             <Input

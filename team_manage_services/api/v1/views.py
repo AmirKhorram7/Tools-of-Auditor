@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Count, Prefetch, Q
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status, viewsets
@@ -333,9 +333,29 @@ class TeamViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
-        qs = Team.objects.filter(
-            company_id__in=companies_for_user(self.request.user).values("id")
-        ).select_related("company", "owner")
+        qs = (
+            Team.objects.filter(
+                company_id__in=companies_for_user(self.request.user).values("id")
+            )
+            .select_related("company", "owner")
+            .annotate(
+                member_count=Count(
+                    "members",
+                    filter=Q(members__status=TeamMember.Status.ACTIVE),
+                    distinct=True,
+                ),
+                project_count=Count("project_links", distinct=True),
+            )
+            .prefetch_related(
+                Prefetch(
+                    "members",
+                    queryset=TeamMember.objects.filter(status=TeamMember.Status.ACTIVE)
+                    .select_related("user", "user__profile")
+                    .order_by("id"),
+                    to_attr="active_members",
+                )
+            )
+        )
         company_id = _int_param(self.request, "company")
         if company_id:
             qs = qs.filter(company_id=company_id)
@@ -521,7 +541,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_queryset(self):
-        qs = projects_for_user(self.request.user).select_related("company", "owner")
+        qs = projects_for_user(self.request.user).select_related(
+            "company",
+            "owner",
+        ).prefetch_related("project_teams__team")
         company_id = _int_param(self.request, "company")
         if company_id:
             qs = qs.filter(company_id=company_id)

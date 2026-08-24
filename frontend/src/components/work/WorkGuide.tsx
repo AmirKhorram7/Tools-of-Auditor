@@ -21,19 +21,37 @@ const SECTION_KEYS = [
   { title: "work.guide.rolesTitle", body: "work.guide.rolesBody", tone: "bg-[#FDECEC] text-[#6B1C1C] border-[#E8B4B4]", mark: "5" },
 ] as const;
 
-export default function WorkGuide({ compact = false }: { compact?: boolean }) {
+export default function WorkGuide({
+  compact = false,
+  icon = false,
+}: {
+  compact?: boolean;
+  icon?: boolean;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button
-        size="sm"
-        variant={compact ? "secondary" : "primary"}
-        onClick={() => setOpen(true)}
-      >
-        {t("work.guide")}
-      </Button>
+      {icon ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-base font-bold text-navy-800 shadow-sm transition hover:bg-surface"
+          aria-label={t("work.guide")}
+          title={t("work.guide")}
+        >
+          ?
+        </button>
+      ) : (
+        <Button
+          size="sm"
+          variant={compact ? "secondary" : "primary"}
+          onClick={() => setOpen(true)}
+        >
+          {t("work.guide")}
+        </Button>
+      )}
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-3 sm:items-center">
           <button

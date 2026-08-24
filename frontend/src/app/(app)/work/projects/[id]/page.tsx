@@ -60,6 +60,36 @@ import {
 
 const VIEW_KEY = "ta-work-project-view";
 
+function ViewIconBoard() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-3.5" fill="currentColor" aria-hidden>
+      <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1" />
+      <rect x="9" y="1.5" width="5.5" height="5.5" rx="1" />
+      <rect x="1.5" y="9" width="5.5" height="5.5" rx="1" />
+      <rect x="9" y="9" width="5.5" height="5.5" rx="1" />
+    </svg>
+  );
+}
+
+function ViewIconList() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-3.5" fill="none" aria-hidden>
+      <path d="M2 3.5h12M2 8h12M2 12.5h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ViewIconFlow() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-3.5" fill="none" aria-hidden>
+      <circle cx="3.5" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="12.5" cy="4" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="12.5" cy="12" r="2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M5.5 8h3M8.5 8 11 5.2M8.5 8 11 10.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function WorkProjectPage() {
   const params = useParams<{ id: string }>();
   const projectId = Number(params.id);
@@ -537,93 +567,19 @@ export default function WorkProjectPage() {
       teams={projectTeams}
       canCreate={canAddTask}
     >
-    <div className="space-y-2.5">
-      <WorkBreadcrumb
-        fallbackHref={`/work/companies/${project.company}`}
-        items={[
-          { href: "/work", label: t("work.crumb") },
-          {
-            href: `/work/companies/${project.company}`,
-            label: project.company_name || t("work.company"),
-          },
-          { label: project.name },
-        ]}
-      />
+    <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <h1 className="text-lg font-bold text-ink">{project.name}</h1>
-          <Badge tone="blue">
-            {workProjectStatusLabel(t, project.status) || project.status}
-          </Badge>
-          {projectTeams.map((team) => (
-            <Link
-              key={team.id}
-              href={`/work/teams/${team.id}`}
-              className="rounded-md px-2 py-0.5 text-xs font-bold"
-              style={{
-                backgroundColor: teamColor(team.id),
-                color: labelTextColor(teamColor(team.id)),
-              }}
-            >
-              {team.name}
-            </Link>
-          ))}
-          <ProgressGauge value={project.progress_percent} size={44} />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canAddTask && (
-            <Button size="sm" onClick={() => openTaskModal()}>
-              {t("work.addTask")}
-            </Button>
-          )}
-          {project.can_manage && (
-            <Button size="sm" variant="secondary" onClick={() => setTeamOpen(true)}>
-              {t("work.addTeam")}
-            </Button>
-          )}
-          {project.can_manage && (
-            <Button size="sm" variant="secondary" onClick={() => { setFormError(null); setSettingsOpen(true); }}>
-              {t("work.settings")}
-            </Button>
-          )}
-          {project.can_manage && (
-            <Button size="sm" variant="danger" loading={saving} onClick={() => void removeProject()}>
-              {t("work.deleteProject")}
-            </Button>
-          )}
-          <WorkMeetButton />
-          <WorkGuide compact />
-        </div>
-      </div>
-
-      <WorkMeetLiveBar />
-
-      {error && <Alert>{error}</Alert>}
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 text-sm">
-          <button
-            type="button"
-            onClick={() => setSavedView("board")}
-            className={`rounded-md px-3 py-1.5 ${view === "board" ? "bg-navy-900 text-white" : "text-gray-600"}`}
-          >
-            {t("work.board")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSavedView("list")}
-            className={`rounded-md px-3 py-1.5 ${view === "list" ? "bg-navy-900 text-white" : "text-gray-600"}`}
-          >
-            {t("work.list")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSavedView("flow")}
-            className={`rounded-md px-3 py-1.5 ${view === "flow" ? "bg-navy-900 text-white" : "text-gray-600"}`}
-          >
-            {t("work.flow")}
-          </button>
-        </div>
+        <WorkBreadcrumb
+          fallbackHref={`/work/companies/${project.company}`}
+          items={[
+            { href: "/work", label: t("work.crumb") },
+            {
+              href: `/work/companies/${project.company}`,
+              label: project.company_name || t("work.company"),
+            },
+            { label: project.name },
+          ]}
+        />
         <button
           type="button"
           onClick={() => setMineOnly((value) => !value)}
@@ -634,6 +590,91 @@ export default function WorkProjectPage() {
           {mineOnly ? t("work.mine") : t("work.allTasks")}
         </button>
       </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-1 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-navy-900 text-white">
+            <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
+              <path d="M4 5h7v6H4V5Zm9 0h7v6h-7V5ZM4 13h7v6H4v-6Zm9 0h7v6h-7v-6Z" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-lg font-bold text-ink">{project.name}</h1>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-link">
+                <span className="size-1.5 rounded-full bg-link" />
+                {workProjectStatusLabel(t, project.status) || project.status}
+              </span>
+              <ProgressGauge value={project.progress_percent} size={28} />
+            </div>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[11px] text-gray-500">
+              {projectTeams.length > 0 ? (
+                projectTeams.map((team, index) => (
+                  <span key={team.id} className="inline-flex items-center gap-1">
+                    {index > 0 && <span>·</span>}
+                    <Link href={`/work/teams/${team.id}`} className="hover:text-link">
+                      {team.name}
+                    </Link>
+                  </span>
+                ))
+              ) : (
+                t("work.noLinkedTeam")
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {canAddTask && (
+            <Button size="sm" onClick={() => openTaskModal()}>
+              + {t("work.addTask")}
+            </Button>
+          )}
+          {(project.can_manage || canAddTask) && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setFormError(null);
+                setSettingsOpen(true);
+              }}
+            >
+              {t("work.settings")}
+            </Button>
+          )}
+          <WorkGuide compact />
+        </div>
+      </div>
+
+      <div className="flex justify-start">
+        <div className="inline-flex rounded-xl bg-[#F2F3F5] p-1 text-sm">
+          {(
+            [
+              { key: "board" as const, label: t("work.board"), icon: <ViewIconBoard /> },
+              { key: "list" as const, label: t("work.list"), icon: <ViewIconList /> },
+              { key: "flow" as const, label: t("work.flow"), icon: <ViewIconFlow /> },
+            ]
+          ).map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setSavedView(item.key)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
+                view === item.key
+                  ? "bg-white font-semibold text-navy-900 shadow-sm"
+                  : "text-gray-500 hover:text-navy-800"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <WorkMeetLiveBar />
+
+      {error && <Alert>{error}</Alert>}
 
       {view === "board" && board ? (
         <TaskBoard
@@ -875,6 +916,22 @@ export default function WorkProjectPage() {
       >
         <div className="space-y-4">
           {formError && <Alert>{formError}</Alert>}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-[#F7F8FA] p-2">
+            {project.can_manage && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setFormError(null);
+                  setTeamOpen(true);
+                }}
+              >
+                {t("work.addTeam")}
+              </Button>
+            )}
+            <WorkMeetButton />
+          </div>
           <div className="flex flex-wrap rounded-lg border border-gray-200 bg-[#F7F8FA] p-0.5 text-xs">
             {(
               [
