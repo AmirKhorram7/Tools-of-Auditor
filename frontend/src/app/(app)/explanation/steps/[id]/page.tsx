@@ -19,7 +19,7 @@ import {
   PageLoader,
   cx,
 } from "@/components/ui";
-import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { ApiError, apiDownload, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
   canEditProject,
@@ -41,6 +41,7 @@ export default function StepDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("explanation");
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const [explanation, setExplanation] = useState("");
   const [savingExplanation, setSavingExplanation] = useState(false);
@@ -187,7 +188,29 @@ export default function StepDetailPage() {
             {editable ? t("exp.stepHintEdit") : t("exp.stepHintView")}
           </p>
         </div>
-        <ExplanationGuide compact />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={pdfLoading}
+            onClick={async () => {
+              setPdfLoading(true);
+              setError(null);
+              try {
+                await apiDownload(`/steps/${stepId}/export-pdf/`, `step-${stepId}.pdf`);
+              } catch (err) {
+                setError(err instanceof ApiError ? err.message : t("exp.pdfFail"));
+              } finally {
+                setPdfLoading(false);
+              }
+            }}
+            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-navy-800 shadow-sm transition hover:bg-surface disabled:opacity-60"
+            aria-label={pdfLoading ? t("exp.buildingPdf") : t("exp.downloadPdf")}
+            title={pdfLoading ? t("exp.buildingPdf") : t("exp.downloadPdf")}
+          >
+            <PdfDownloadIcon />
+          </button>
+          <ExplanationGuide compact />
+        </div>
       </div>
 
       {error && <Alert>{error}</Alert>}
@@ -557,5 +580,26 @@ function ItemEditor({
         </div>
       )}
     </Card>
+  );
+}
+
+function PdfDownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden>
+      <path
+        d="M7 3.5h7l4 4V20.5H7V3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M14 3.5V8h4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path
+        d="M12 11.5v6M9.5 15 12 17.5 14.5 15"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

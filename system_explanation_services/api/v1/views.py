@@ -48,6 +48,7 @@ from system_explanation_services.services.access import (
 from system_explanation_services.services.pdf_export import (
     build_process_pdf,
     build_project_pdf,
+    build_step_pdf,
 )
 
 User = get_user_model()
@@ -362,7 +363,7 @@ class ProcessStepViewSet(viewsets.ModelViewSet):
         if process_id:
             qs = qs.filter(process_id=process_id)
 
-        if self.action == "retrieve":
+        if self.action in ("retrieve", "export_pdf"):
             qs = qs.prefetch_related(
                 Prefetch(
                     "risks",
@@ -395,6 +396,19 @@ class ProcessStepViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         _require_edit(self.request.user, instance.process.project)
         instance.soft_delete()
+
+    @action(detail=True, methods=["get"], url_path="export-pdf")
+    def export_pdf(self, request, pk=None):
+        step = self.get_object()
+        _require_view(request.user, step.process.project)
+        pdf = build_step_pdf(step)
+        filename = f"step-{step.id}-{step.title[:40]}.pdf".replace(" ", "_")
+        return FileResponse(
+            pdf,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf",
+        )
 
 
 @extend_schema(tags=["Step Connections"])
