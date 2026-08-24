@@ -116,6 +116,7 @@ def build_user_activity(user) -> dict:
         .select_related("company", "project")
         .order_by("-created_at")[:25]
     )
+    builder_clicks = list(user.builder_contact_clicks.order_by("-created_at")[:40])
 
     stats = [
         {
@@ -168,6 +169,18 @@ def build_user_activity(user) -> dict:
             "value": user.owned_teams.count(),
             "hint": "Company teams",
         },
+        {
+            "key": "linkedin",
+            "label": "LinkedIn footer clicks",
+            "value": user.builder_contact_clicks.filter(channel="linkedin").count(),
+            "hint": "Contact the builder",
+        },
+        {
+            "key": "telegram",
+            "label": "Telegram footer clicks",
+            "value": user.builder_contact_clicks.filter(channel="telegram").count(),
+            "hint": "Contact the builder",
+        },
     ]
     peak = max((row["value"] for row in stats), default=1) or 1
     for row in stats:
@@ -192,4 +205,5 @@ def build_user_activity(user) -> dict:
         "tasks_assigned": tasks_assigned,
         "tickets": tickets,
         "activity": activity,
+        "builder_clicks": builder_clicks,
     }

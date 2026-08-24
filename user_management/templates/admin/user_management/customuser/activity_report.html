@@ -328,6 +328,22 @@
     </section>
 
     <section class="ta-card ta-wide">
+      <h2>Builder contact — LinkedIn &amp; Telegram footer</h2>
+      {% if builder_clicks %}
+      <table>
+        <tr><th>When</th><th>Channel</th><th>Page</th></tr>
+        {% for row in builder_clicks %}
+        <tr>
+          <td>{{ row.created_at|date:"Y-m-d H:i" }}</td>
+          <td>{{ row.get_channel_display }}</td>
+          <td>{% if row.page %}<span dir="ltr">{{ row.page }}</span>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}<p class="ta-empty">This user has not clicked LinkedIn or Telegram in the footer.</p>{% endif %}
+    </section>
+
+    <section class="ta-card ta-wide">
       <h2>Recent work activity</h2>
       {% if activity %}
       <table>

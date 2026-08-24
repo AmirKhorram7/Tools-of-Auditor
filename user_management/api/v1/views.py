@@ -14,6 +14,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from user_management.api.v1.serializers import (
+    BuilderContactClickSerializer,
     LogoutSerializer,
     MessageResponseSerializer,
     PasswordLoginSerializer,
@@ -29,7 +30,7 @@ from user_management.api.v1.serializers import (
     VerifyOTPResponseSerializer,
     VerifyOTPSerializer,
 )
-from user_management.models import CustomUser, Ticket, TicketMessage, TicketStatus
+from user_management.models import BuilderContactClick, CustomUser, Ticket, TicketMessage, TicketStatus
 from user_management.utils import OTPService
 
 
@@ -310,3 +311,24 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket.closed_at = timezone.now()
         ticket.save(update_fields=["status", "closed_at", "updated_at"])
         return Response({"detail": "Ticket closed."})
+
+
+@extend_schema(
+    summary="Record a footer click on LinkedIn or Telegram (contact the builder)",
+    tags=["Builder contact"],
+    request=BuilderContactClickSerializer,
+    responses={201: MessageResponseSerializer},
+)
+class BuilderContactClickAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = BuilderContactClickSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = request.user if request.user.is_authenticated else None
+        BuilderContactClick.objects.create(
+            user=user,
+            channel=serializer.validated_data["channel"],
+            page=(serializer.validated_data.get("page") or "")[:255],
+        )
+        return Response({"message": "ok"}, status=status.HTTP_201_CREATED)

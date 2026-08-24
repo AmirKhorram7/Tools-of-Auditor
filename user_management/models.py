@@ -168,3 +168,35 @@ class TicketMessage(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class BuilderContactClick(models.Model):
+    """Footer LinkedIn / Telegram click — contact the product builder."""
+
+    class Channel(models.TextChoices):
+        LINKEDIN = "linkedin", "LinkedIn"
+        TELEGRAM = "telegram", "Telegram"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="builder_contact_clicks",
+    )
+    channel = models.CharField(max_length=16, choices=Channel.choices)
+    page = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("Builder contact click")
+        verbose_name_plural = _("Builder contact clicks")
+        indexes = [
+            models.Index(fields=["channel", "-created_at"]),
+            models.Index(fields=["user", "-created_at"]),
+        ]
+
+    def __str__(self):
+        who = self.user.phone_number if self.user_id else "guest"
+        return f"{who} → {self.channel}"

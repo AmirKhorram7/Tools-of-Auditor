@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from user_management.api.v1.views import (
+    BuilderContactClickAPIView,
     LogoutAPIView,
     PasswordLoginAPIView,
     ProfileView,
@@ -24,6 +25,7 @@ urlpatterns = [
     path("auth/refresh/", RefreshTokenAPIView.as_view(), name="refresh-token"),
     path("auth/logout/", LogoutAPIView.as_view(), name="logout"),
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("builder-contact-clicks/", BuilderContactClickAPIView.as_view(), name="builder-contact-clicks"),
     path("users/lookup/", UserLookupAPIView.as_view(), name="users-lookup"),
     path("", include(router.urls)),
 ]

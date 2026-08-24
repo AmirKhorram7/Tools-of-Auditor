@@ -162,6 +162,11 @@ class MessageResponseSerializer(serializers.Serializer):
     debug_code = serializers.CharField(required=False)
 
 
+class BuilderContactClickSerializer(serializers.Serializer):
+    channel = serializers.ChoiceField(choices=["linkedin", "telegram"])
+    page = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     first_name = serializers.CharField(source="user.first_name", required=False, allow_blank=True)

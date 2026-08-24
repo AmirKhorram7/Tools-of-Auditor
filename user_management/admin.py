@@ -8,6 +8,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from user_management.models import (
+    BuilderContactClick,
     CustomUser,
     Profile,
     Ticket,
@@ -193,6 +194,38 @@ class ProfileAdmin(admin.ModelAdmin):
         "job_title",
     )
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(BuilderContactClick)
+class BuilderContactClickAdmin(admin.ModelAdmin):
+    list_display = ("id", "user_label", "channel", "page", "created_at")
+    list_filter = ("channel", "created_at")
+    search_fields = (
+        "user__phone_number",
+        "user__first_name",
+        "user__last_name",
+        "page",
+    )
+    date_hierarchy = "created_at"
+    readonly_fields = ("user", "channel", "page", "created_at")
+    ordering = ("-created_at",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description=_("User"), ordering="user")
+    def user_label(self, obj):
+        if not obj.user_id:
+            return _("Guest (not logged in)")
+        name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        phone = obj.user.phone_number
+        return f"{name} ({phone})" if name else phone
 
 
 class TicketMessageInline(admin.TabularInline):
