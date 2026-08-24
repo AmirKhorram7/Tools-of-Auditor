@@ -219,7 +219,7 @@ export default function WorkCompanyPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-9.25rem)] flex-col gap-2 overflow-hidden max-md:h-auto max-md:overflow-visible">
+    <div className="flex h-[calc(100dvh-9.25rem)] flex-col gap-3 overflow-hidden pt-1 max-md:h-auto max-md:overflow-visible">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <WorkBreadcrumb

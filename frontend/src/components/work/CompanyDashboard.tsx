@@ -218,7 +218,7 @@ export default function CompanyDashboard({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label={t("work.activeProjects")}
@@ -235,7 +235,7 @@ export default function CompanyDashboard({
         />
       </div>
 
-      <div className="grid shrink-0 gap-2 lg:h-[7.25rem] lg:grid-cols-2" dir="ltr">
+      <div className="grid shrink-0 gap-3 lg:h-[6.75rem] lg:grid-cols-2" dir="ltr">
         <section
           dir={dir}
           className="flex overflow-hidden rounded-xl border border-black/[0.05] bg-white shadow-[0_1px_3px_rgba(20,35,58,0.06)]"
