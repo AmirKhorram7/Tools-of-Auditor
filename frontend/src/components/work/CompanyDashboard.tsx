@@ -12,6 +12,7 @@ import {
   formatWorkDate,
   relativeFromNow,
   teamInitials,
+  workCompanyPhoto,
   workPriorityLabel,
   workProjectStatusLabel,
   type WorkCompany,
@@ -243,7 +244,7 @@ export default function CompanyDashboard({
           <div className="relative w-[8.5rem] shrink-0 bg-[#1A2B49] sm:w-40">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/work/team-banner.jpg"
+              src={workCompanyPhoto(company.id)}
               alt=""
               className="absolute inset-0 size-full object-cover"
             />

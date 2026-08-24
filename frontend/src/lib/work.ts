@@ -410,6 +410,17 @@ export function relativeFromNow(
   return days === 0 ? { kind: "now", days: 0 } : { kind: "days", days };
 }
 
+const COMPANY_PHOTOS = [
+  "/work/company-1.jpg",
+  "/work/company-2.jpg",
+  "/work/company-3.jpg",
+] as const;
+
+export function workCompanyPhoto(companyId: number): string {
+  const index = Math.abs(companyId) % COMPANY_PHOTOS.length;
+  return COMPANY_PHOTOS[index];
+}
+
 export function teamInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
