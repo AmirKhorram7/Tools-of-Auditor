@@ -219,7 +219,7 @@ export default function WorkCompanyPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-9.25rem)] flex-col gap-3 overflow-hidden pt-1 max-md:h-auto max-md:overflow-visible">
+    <div className="flex h-[calc(100dvh-9.25rem)] flex-col gap-3 overflow-hidden pt-4 max-md:h-auto max-md:overflow-visible">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <WorkBreadcrumb
@@ -262,22 +262,24 @@ export default function WorkCompanyPage() {
 
       {error && <Alert>{error}</Alert>}
 
-      <CompanyDashboard
-        company={company}
-        teams={teams}
-        projects={projects}
-        query={query}
-        onQuery={setQuery}
-        policyBusy={policyBusy}
-        busyId={busyId}
-        onTogglePolicy={() => void togglePolicy()}
-        onAddTeam={() => {
-          setFormError(null);
-          setTeamOpen(true);
-        }}
-        onEditProject={openEdit}
-        onDeleteProject={(project) => void removeProject(project)}
-      />
+      <div className="min-h-0 flex-1">
+        <CompanyDashboard
+          company={company}
+          teams={teams}
+          projects={projects}
+          query={query}
+          onQuery={setQuery}
+          policyBusy={policyBusy}
+          busyId={busyId}
+          onTogglePolicy={() => void togglePolicy()}
+          onAddTeam={() => {
+            setFormError(null);
+            setTeamOpen(true);
+          }}
+          onEditProject={openEdit}
+          onDeleteProject={(project) => void removeProject(project)}
+        />
+      </div>
 
       <Modal open={teamOpen} title={t("work.newTeam")} onClose={() => setTeamOpen(false)}>
         <div className="space-y-3">
