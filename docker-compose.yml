@@ -3,7 +3,15 @@
 # Usage on server:
 #   1. cp .env.example .env   && edit secrets / domains
 #   2. docker compose up -d --build
+#      If Docker Hub times out (python:3.13-slim ... EOF), start without rebuild:
+#        docker compose up -d --pull never
 #   3. open http://YOUR_SERVER_IP  (or configure TLS in deploy/nginx/nginx.conf)
+#
+# Monitoring (Grafana is the only UI you open):
+#   http://127.0.0.1:3030  — default bind is localhost only (not on public :80)
+#   Login: GRAFANA_ADMIN_USER / GRAFANA_ADMIN_PASSWORD in .env
+#   Remote server: ssh -L 3030:127.0.0.1:3030 user@YOUR_SERVER
+#     then open http://127.0.0.1:3030 on your laptop.
 
 # Cap container logs so a long-running server never fills the disk.
 x-logging: &default-logging
@@ -15,6 +23,7 @@ x-logging: &default-logging
 services:
   db:
     image: postgres:16-alpine
+    pull_policy: missing
     restart: unless-stopped
     logging: *default-logging
     environment:
@@ -32,6 +41,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    pull_policy: missing
     restart: unless-stopped
     logging: *default-logging
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
@@ -47,6 +57,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      pull: false
     restart: unless-stopped
     logging: *default-logging
     env_file:
@@ -85,6 +96,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      pull: false
       args:
         # Same-origin API via nginx → browser calls /api/v1/...
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/v1}
@@ -104,6 +116,7 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
+    pull_policy: missing
     restart: unless-stopped
     logging: *default-logging
     ports:
@@ -125,8 +138,114 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Monitoring: Prometheus stores metrics; Grafana is the dashboard UI. ---
+  # Prometheus / exporters / cAdvisor are internal. Only Grafana is published.
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    pull_policy: missing
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/host/root"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    # Host CPU / RAM / disk. On Docker Desktop this is the Linux VM, not Windows.
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    pull_policy: missing
+    restart: unless-stopped
+    logging: *default-logging
+    privileged: true
+    command:
+      - --housekeeping_interval=15s
+      - --docker_only=true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    # Per-container CPU, RAM, network.
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    pull_policy: missing
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      DATA_SOURCE_URI: "db:5432/${DB_NAME:-tauditor}?sslmode=disable"
+      DATA_SOURCE_USER: ${DB_USER:-tauditor}
+      DATA_SOURCE_PASS: ${DB_PASSWORD:-changeme}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    pull_policy: missing
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    pull_policy: missing
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - node-exporter
+      - cadvisor
+      - postgres-exporter
+      - redis-exporter
+    # Not published — Grafana talks to it on the Docker network.
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    pull_policy: missing
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      # Localhost by default so the public site on :80 is unchanged.
+      - "${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3030}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL: ""
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://127.0.0.1:3030}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/tauditor-overview.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
   redis_data:
   media_data:
   static_data:
+  prometheus_data:
+  grafana_data:
