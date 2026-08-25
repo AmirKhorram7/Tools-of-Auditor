@@ -300,6 +300,7 @@ export default function RichTextEditor({
   const [tableCursor, setTableCursor] = useState<"col-resize" | "row-resize" | "">("");
   const [currentFont, setCurrentFont] = useState(DEFAULT_FONT);
   const [currentSize, setCurrentSize] = useState(DEFAULT_SIZE);
+  const [activeMarks, setActiveMarks] = useState<string[]>([]);
   const [inTable, setInTable] = useState(false);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -380,6 +381,29 @@ export default function RichTextEditor({
     setCurrentFont(matchFont(style.fontFamily));
     setCurrentSize(matchSize(style.fontSize));
     setInTable(Boolean(element.closest("table")));
+
+    const marks: string[] = [];
+    try {
+      if (document.queryCommandState("bold")) marks.push("bold");
+      if (document.queryCommandState("italic")) marks.push("italic");
+      if (document.queryCommandState("underline")) marks.push("underline");
+      if (document.queryCommandState("insertUnorderedList")) marks.push("insertUnorderedList");
+      if (document.queryCommandState("insertOrderedList")) marks.push("insertOrderedList");
+      if (document.queryCommandState("justifyRight")) marks.push("justifyRight");
+      if (document.queryCommandState("justifyCenter")) marks.push("justifyCenter");
+      if (document.queryCommandState("justifyLeft")) marks.push("justifyLeft");
+      const block = (document.queryCommandValue("formatBlock") || "")
+        .replace(/[<>]/g, "")
+        .toLowerCase();
+      if (block === "h1") marks.push("h1");
+      else if (block === "h2") marks.push("h2");
+      else if (block === "blockquote") marks.push("blockquote");
+      else marks.push("p");
+      if (element.closest("a")) marks.push("createLink");
+    } catch {
+      /* some browsers throw on queryCommandState */
+    }
+    setActiveMarks(marks);
   };
 
   useEffect(() => {
@@ -759,30 +783,45 @@ export default function RichTextEditor({
 
           <span className="mx-0.5 h-4 w-px bg-gray-300" />
 
-          {ACTIONS.map((action) => (
-            <button
-              key={action.titleKey}
-              type="button"
-              title={t(action.titleKey)}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => run(action)}
-              className={cx(
-                "rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700",
-                action.command === "bold" && "font-bold",
-                action.command === "italic" && "italic",
-                action.command === "underline" && "underline",
-              )}
-            >
-              {action.label ?? t(action.labelKey ?? action.titleKey)}
-            </button>
-          ))}
+          {ACTIONS.map((action) => {
+            const mark =
+              action.command === "formatBlock" ? action.value ?? "" : action.command;
+            const selected = activeMarks.includes(mark);
+            return (
+              <button
+                key={action.titleKey}
+                type="button"
+                title={t(action.titleKey)}
+                aria-pressed={selected}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => run(action)}
+                className={cx(
+                  "rounded px-2 py-1 text-xs transition",
+                  selected
+                    ? "bg-navy-900 text-white"
+                    : "text-navy-800 hover:bg-white hover:text-brand-700",
+                  action.command === "bold" && "font-bold",
+                  action.command === "italic" && "italic",
+                  action.command === "underline" && "underline",
+                )}
+              >
+                {action.label ?? t(action.labelKey ?? action.titleKey)}
+              </button>
+            );
+          })}
 
           <button
             type="button"
             title={t("editor.addLinkTitle")}
+            aria-pressed={activeMarks.includes("createLink")}
             onMouseDown={(event) => event.preventDefault()}
             onClick={addLink}
-            className="rounded px-2 py-1 text-xs text-navy-800 transition hover:bg-white hover:text-brand-700"
+            className={cx(
+              "rounded px-2 py-1 text-xs transition",
+              activeMarks.includes("createLink")
+                ? "bg-navy-900 text-white"
+                : "text-navy-800 hover:bg-white hover:text-brand-700",
+            )}
           >
             {t("editor.addLink")}
           </button>

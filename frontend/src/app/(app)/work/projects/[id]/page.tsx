@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { CalendarColorGrid } from "@/components/CalendarColorPicker";
 import {
   Alert,
   Badge,
@@ -37,8 +38,8 @@ import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
   ASSIGNABLE_TEAM_ROLES,
+  BOARD_COLUMN_COLORS,
   LABEL_COLORS,
-  TAG_COLORS,
   formatWorkDate,
   isOverdue,
   labelTextColor,
@@ -128,9 +129,10 @@ export default function WorkProjectPage() {
   const [columnId, setColumnId] = useState<number | "">("");
   const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
   const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState(TAG_COLORS[0]);
+  const [newLabelColor, setNewLabelColor] = useState<string>("#E67C73");
+  const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
   const [newColumnName, setNewColumnName] = useState("");
-  const [newColumnColor, setNewColumnColor] = useState(LABEL_COLORS[1]);
+  const [newColumnColor, setNewColumnColor] = useState<string>(BOARD_COLUMN_COLORS.inProgress);
   const [columnNames, setColumnNames] = useState<Record<number, string>>({});
   const [teamId, setTeamId] = useState("");
   const [inviteTeamId, setInviteTeamId] = useState("");
@@ -148,9 +150,11 @@ export default function WorkProjectPage() {
 
   useEffect(() => {
     setTemplateCols([
-      { name: t("work.col.todo"), color: LABEL_COLORS[0] },
-      { name: t("work.col.doing"), color: LABEL_COLORS[1] },
-      { name: t("work.col.done"), color: LABEL_COLORS[6] },
+      { name: t("work.col.todo"), color: BOARD_COLUMN_COLORS.todo },
+      { name: t("work.col.doing"), color: BOARD_COLUMN_COLORS.inProgress },
+      { name: t("work.col.test"), color: BOARD_COLUMN_COLORS.test },
+      { name: t("work.col.wait"), color: BOARD_COLUMN_COLORS.waiting },
+      { name: t("work.col.done"), color: BOARD_COLUMN_COLORS.done },
     ]);
   }, [locale, t]);
 
@@ -280,6 +284,20 @@ export default function WorkProjectPage() {
       setFormError(err instanceof ApiError ? err.message : t("work.createLabelFail"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const patchLabelColor = async (labelId: number, color: string) => {
+    if (!project) return;
+    setFormError(null);
+    try {
+      const row = await apiFetch<WorkLabel>(
+        `/work/companies/${project.company}/labels/${labelId}/`,
+        { method: "PATCH", body: { color } },
+      );
+      setLabels((current) => current.map((item) => (item.id === labelId ? row : item)));
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t("work.createLabelFail"));
     }
   };
 
@@ -1035,7 +1053,20 @@ export default function WorkProjectPage() {
               {labels.map((label) => (
                 <span
                   key={label.id}
-                  className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    setEditingLabelId((current) => (current === label.id ? null : label.id))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setEditingLabelId((current) => (current === label.id ? null : label.id));
+                    }
+                  }}
+                  className={`inline-flex cursor-pointer items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${
+                    editingLabelId === label.id ? "ring-2 ring-navy-900 ring-offset-1" : ""
+                  }`}
                   style={{
                     backgroundColor: label.color,
                     color: labelTextColor(label.color),
@@ -1045,7 +1076,10 @@ export default function WorkProjectPage() {
                   {project.can_manage_company && (
                     <button
                       type="button"
-                      onClick={() => void deleteLabel(label.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void deleteLabel(label.id);
+                      }}
                       className="rounded-sm px-0.5 text-[11px] leading-none opacity-80 hover:bg-black/15 hover:opacity-100"
                       aria-label={t("work.deleteLabel")}
                       title={t("common.delete")}
@@ -1062,19 +1096,20 @@ export default function WorkProjectPage() {
                 onChange={(e) => setNewLabelName(e.target.value)}
                 placeholder={t("work.labelName")}
               />
-              <div className="flex flex-wrap items-center gap-2">
-                {TAG_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setNewLabelColor(color)}
-                    className={`size-6 rounded-full ${
-                      newLabelColor === color ? "ring-2 ring-navy-900/40 ring-offset-1" : ""
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
+              <CalendarColorGrid
+                value={
+                  editingLabelId
+                    ? labels.find((item) => item.id === editingLabelId)?.color ?? newLabelColor
+                    : newLabelColor
+                }
+                onChange={(color) => {
+                  if (editingLabelId) {
+                    void patchLabelColor(editingLabelId, color);
+                    return;
+                  }
+                  setNewLabelColor(color);
+                }}
+              />
               {newLabelName.trim() && (
                 <span
                   className="inline-flex rounded px-2.5 py-0.5 text-xs font-bold"
@@ -1102,10 +1137,6 @@ export default function WorkProjectPage() {
               {columns.map((column) => (
                 <li key={column.id} className="rounded-xl border border-black/[0.06] p-2.5">
                   <div className="flex items-center gap-2">
-                    <span
-                      className="size-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: column.color }}
-                    />
                     <Input
                       value={columnNames[column.id] ?? column.name}
                       onChange={(event) =>
@@ -1137,21 +1168,11 @@ export default function WorkProjectPage() {
                       </Button>
                     )}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {LABEL_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => void patchColumn(column.id, { color })}
-                        className={`size-5 rounded-full ${
-                          column.color.toLowerCase() === color.toLowerCase()
-                            ? "ring-2 ring-navy-900/30 ring-offset-1"
-                            : ""
-                        }`}
-                        style={{ backgroundColor: color }}
-                        aria-label={color}
-                      />
-                    ))}
+                  <div className="mt-2">
+                    <CalendarColorGrid
+                      value={column.color}
+                      onChange={(color) => void patchColumn(column.id, { color })}
+                    />
                   </div>
                 </li>
               ))}
@@ -1163,20 +1184,10 @@ export default function WorkProjectPage() {
                 onChange={(event) => setNewColumnName(event.target.value)}
                 placeholder={t("work.columnExample")}
               />
-              <div className="flex flex-wrap gap-1.5">
-                {LABEL_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setNewColumnColor(color)}
-                    className={`size-5 rounded-full ${
-                      newColumnColor === color ? "ring-2 ring-navy-900/30 ring-offset-1" : ""
-                    }`}
-                    style={{ backgroundColor: color }}
-                    aria-label={color}
-                  />
-                ))}
-              </div>
+              <CalendarColorGrid
+                value={newColumnColor}
+                onChange={setNewColumnColor}
+              />
               <Button
                 size="sm"
                 loading={saving}
@@ -1349,28 +1360,16 @@ export default function WorkProjectPage() {
                         </Button>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {LABEL_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() =>
-                            setTemplateCols((current) =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index ? { ...item, color } : item,
-                              ),
-                            )
-                          }
-                          className={`size-5 rounded-full ${
-                            row.color.toLowerCase() === color.toLowerCase()
-                              ? "ring-2 ring-navy-900/30 ring-offset-1"
-                              : ""
-                          }`}
-                          style={{ backgroundColor: color }}
-                          aria-label={color}
-                        />
-                      ))}
-                    </div>
+                    <CalendarColorGrid
+                      value={row.color}
+                      onChange={(color) =>
+                        setTemplateCols((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, color } : item,
+                          ),
+                        )
+                      }
+                    />
                   </div>
                 ))}
                 <Button

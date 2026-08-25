@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -17,6 +19,31 @@ from system_explanation_services.services.access import (
 )
 
 User = get_user_model()
+
+_LEGACY_COLORS = {
+    "default",
+    "slate",
+    "navy",
+    "sky",
+    "teal",
+    "green",
+    "lime",
+    "amber",
+    "orange",
+    "rose",
+    "purple",
+}
+_HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def _clean_card_color(value):
+    raw = (value or "default").strip()
+    lowered = raw.lower()
+    if lowered in _LEGACY_COLORS:
+        return lowered
+    if _HEX_COLOR.match(raw):
+        return raw.upper()
+    raise serializers.ValidationError("Invalid card color.")
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -81,6 +108,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "Sub-projects can only be created under a root project."
             )
         return parent
+
+    def validate_color(self, value):
+        return _clean_card_color(value)
 
 
 class ProjectDetailSerializer(ProjectSerializer):
@@ -178,6 +208,9 @@ class ProcessSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return None
         return user_role_on_project(request.user, obj.project)
+
+    def validate_color(self, value):
+        return _clean_card_color(value)
 
 
 class StepMediaSerializer(serializers.ModelSerializer):

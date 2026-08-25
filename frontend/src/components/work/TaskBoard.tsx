@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 
+import CalendarColorPicker from "@/components/CalendarColorPicker";
 import { Button, Field, Input } from "@/components/ui";
 import TaskCard from "@/components/work/TaskCard";
 import { useI18n } from "@/lib/i18n";
 import {
-  LABEL_COLORS,
+  BOARD_COLUMN_COLORS,
   type WorkBoard,
   type WorkBoardColumn,
   type WorkTask,
@@ -39,7 +40,7 @@ export default function TaskBoard({
   const showAddTask = Boolean(canAddTask ?? canManage) && Boolean(onAddTask);
   const [dropId, setDropId] = useState<number | null>(null);
   const [columnName, setColumnName] = useState("");
-  const [columnColor, setColumnColor] = useState(LABEL_COLORS[1]);
+  const [columnColor, setColumnColor] = useState<string>(BOARD_COLUMN_COLORS.inProgress);
   const [adding, setAdding] = useState(false);
 
   const visibleColumns = board.columns.map((column) => ({
@@ -163,20 +164,11 @@ export default function TaskBoard({
               placeholder={t("work.columnExample")}
             />
           </Field>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {LABEL_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setColumnColor(color)}
-                className={`size-6 rounded-full ${
-                  columnColor === color ? "ring-2 ring-navy-900/30 ring-offset-1" : ""
-                }`}
-                style={{ backgroundColor: color }}
-                aria-label={color}
-              />
-            ))}
-          </div>
+          <CalendarColorPicker
+            value={columnColor}
+            onChange={setColumnColor}
+            title={t("common.color")}
+          />
           <Button className="mt-3 w-full" size="sm" loading={adding} onClick={() => void addColumn()}>
             {t("common.add")}
           </Button>

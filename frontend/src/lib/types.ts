@@ -71,7 +71,7 @@ export type Project = {
   status: ProjectStatus;
   is_active: boolean;
   is_root: boolean;
-  /** Card background palette key (see CARD_COLORS in lib/explanation.ts). */
+  /** Card colour: legacy key or Google Calendar hex. */
   color?: string;
   owner: number;
   my_role?: ProjectRole | null;
@@ -119,7 +119,7 @@ export type Process = {
   process_owner_name: string;
   department: string;
   order: number;
-  /** Card background palette key (see CARD_COLORS in lib/explanation.ts). */
+  /** Card colour: legacy key or Google Calendar hex. */
   color?: string;
   owner: number;
   my_role?: ProjectRole | null;

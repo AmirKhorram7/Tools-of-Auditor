@@ -1,21 +1,12 @@
+import { isLightHex, normalizeHex, shadeHex } from "@/lib/calendarColors";
 import type { ProjectStatus, ShapeType } from "@/lib/types";
 
 /**
  * Card colours for folders and processes in تشریح سیستم.
- * The backend only stores the key, so shades can be retuned here freely.
+ * Legacy named keys stay so existing cards still render. New picks store a
+ * Google Calendar hex from the shared palette.
  */
-export type CardColor =
-  | "default"
-  | "slate"
-  | "navy"
-  | "sky"
-  | "teal"
-  | "green"
-  | "lime"
-  | "amber"
-  | "orange"
-  | "rose"
-  | "purple";
+export type CardColor = string;
 
 export type CardPalette = {
   key: CardColor;
@@ -161,8 +152,28 @@ export const CARD_COLORS: CardPalette[] = [
 
 const BY_KEY = new Map(CARD_COLORS.map((item) => [item.key, item]));
 
+function paletteFromHex(hex: string): CardPalette {
+  const light = isLightHex(hex);
+  return {
+    key: hex,
+    label: hex,
+    labelEn: hex,
+    bg: hex,
+    border: shadeHex(hex, -22),
+    accent: shadeHex(hex, -28),
+    text: light ? "#1f1f1f" : "#ffffff",
+    muted: light ? "#4b5563" : "#e5e7eb",
+    hover: shadeHex(hex, -12),
+  };
+}
+
 export function cardPalette(color?: string | null): CardPalette {
-  return BY_KEY.get((color ?? "default") as CardColor) ?? CARD_COLORS[0];
+  const raw = color ?? "default";
+  const known = BY_KEY.get(raw);
+  if (known) return known;
+  const hex = normalizeHex(raw);
+  if (hex) return paletteFromHex(hex);
+  return CARD_COLORS[0];
 }
 
 /** Persian digits for small counts shown on cards and tree nodes. */

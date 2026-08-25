@@ -3,14 +3,15 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui";
+import { BOARD_COLUMN_COLORS } from "@/lib/calendarColors";
 import { useI18n } from "@/lib/i18n";
 
 const COLUMN_KEYS = [
-  { key: "work.col.todo", color: "#14233A" },
-  { key: "work.col.doing", color: "#1A2B49" },
-  { key: "work.col.test", color: "#243656" },
-  { key: "work.col.wait", color: "#C2940A" },
-  { key: "work.col.done", color: "#1E3328" },
+  { key: "work.col.todo", color: BOARD_COLUMN_COLORS.todo },
+  { key: "work.col.doing", color: BOARD_COLUMN_COLORS.inProgress },
+  { key: "work.col.test", color: BOARD_COLUMN_COLORS.test },
+  { key: "work.col.wait", color: BOARD_COLUMN_COLORS.waiting },
+  { key: "work.col.done", color: BOARD_COLUMN_COLORS.done },
 ] as const;
 
 const SECTION_KEYS = [

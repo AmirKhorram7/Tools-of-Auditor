@@ -37,10 +37,10 @@ def retire(queryset, timestamp):
 
 class CardColor(models.TextChoices):
     """
-    Card background palette for folders and processes.
+    Legacy named keys kept so existing cards still load.
 
-    Only the key is stored; the frontend owns the exact shades so the
-    palette can be restyled without a migration.
+    New colours are Google Calendar hex strings stored on the CharField
+    (no choices), so the frontend can grow the palette without a migration.
     """
 
     DEFAULT = "default", _("Default")
@@ -95,8 +95,7 @@ class Project(BaseModel):
     )
     is_active = models.BooleanField(default=True)
     color = models.CharField(
-        max_length=20,
-        choices=CardColor.choices,
+        max_length=32,
         default=CardColor.DEFAULT,
         help_text=_("Card background color shown in the UI."),
     )
@@ -233,8 +232,7 @@ class Process(BaseModel):
         related_name="owned_processes",
     )
     color = models.CharField(
-        max_length=20,
-        choices=CardColor.choices,
+        max_length=32,
         default=CardColor.DEFAULT,
         help_text=_("Card background color shown in the UI."),
     )

@@ -1,3 +1,5 @@
+import { BOARD_COLUMN_COLORS, GOOGLE_CALENDAR_COLORS } from "@/lib/calendarColors";
+
 export type WorkCompany = {
   id: number;
   name: string;
@@ -511,7 +513,13 @@ export function colorAlpha(hex: string, alpha: number): string {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 }
 
-export const LABEL_COLORS = [
+export const LABEL_COLORS: string[] = [...GOOGLE_CALENDAR_COLORS];
+
+export const TAG_COLORS: string[] = [...GOOGLE_CALENDAR_COLORS];
+
+export { BOARD_COLUMN_COLORS };
+
+const TEAM_COLORS = [
   "#14233A",
   "#1A2B49",
   "#243656",
@@ -520,17 +528,6 @@ export const LABEL_COLORS = [
   "#3A2430",
   "#1E3328",
   "#3A2E1C",
-];
-
-export const TAG_COLORS = [
-  "#C91C69",
-  "#1F75CB",
-  "#C2940A",
-  "#C91C1C",
-  "#1AAA55",
-  "#6B4FBB",
-  "#E67E22",
-  "#1A2B49",
 ];
 
 /** Keep column headers navy-dark even if an older light hue is stored. */
@@ -546,7 +543,7 @@ export function toHeaderColor(hex: string): string {
 }
 
 export function teamColor(id: number): string {
-  return LABEL_COLORS[Math.abs(id) % LABEL_COLORS.length];
+  return TEAM_COLORS[Math.abs(id) % TEAM_COLORS.length];
 }
 
 export function shortWorkDate(

@@ -10,34 +10,41 @@ from team_manage_services.models import (
 )
 from team_manage_services.services.access import is_company_manager, is_project_manager
 
+# Google Calendar palette — same hex values as frontend BOARD_COLUMN_COLORS.
+TODO_COLOR = "#4285F4"
+DOING_COLOR = "#F4511E"
+TEST_COLOR = "#F6BF26"
+WAITING_COLOR = "#8E24AA"
+DONE_COLOR = "#0B8043"
+DEFAULT_COLUMN_COLOR = DOING_COLOR
+
 DEFAULT_BOARD_COLUMNS = (
-    {"name": "برای انجام", "color": "#14233A", "status_key": Task.Status.TODO, "is_closed": False},
+    {"name": "برای انجام", "color": TODO_COLOR, "status_key": Task.Status.TODO, "is_closed": False},
     {
         "name": "در حال انجام",
-        "color": "#1A2B49",
+        "color": DOING_COLOR,
         "status_key": Task.Status.IN_PROGRESS,
         "is_closed": False,
     },
-    {"name": "بسته", "color": "#1E3328", "status_key": Task.Status.DONE, "is_closed": True},
+    {"name": "بسته", "color": DONE_COLOR, "status_key": Task.Status.DONE, "is_closed": True},
 )
 
-
 PLATFORM_BOARD_COLUMNS = (
-    {"name": "برای انجام", "color": "#14233A", "status_key": Task.Status.TODO, "is_closed": False},
+    {"name": "برای انجام", "color": TODO_COLOR, "status_key": Task.Status.TODO, "is_closed": False},
     {
         "name": "در حال انجام",
-        "color": "#1A2B49",
+        "color": DOING_COLOR,
         "status_key": Task.Status.IN_PROGRESS,
         "is_closed": False,
     },
-    {"name": "تست", "color": "#243656", "status_key": Task.Status.IN_PROGRESS, "is_closed": False},
+    {"name": "تست", "color": TEST_COLOR, "status_key": Task.Status.IN_PROGRESS, "is_closed": False},
     {
         "name": "در انتظار تأیید",
-        "color": "#3A2430",
+        "color": WAITING_COLOR,
         "status_key": Task.Status.IN_REVIEW,
         "is_closed": False,
     },
-    {"name": "بسته", "color": "#1E3328", "status_key": Task.Status.DONE, "is_closed": True},
+    {"name": "بسته", "color": DONE_COLOR, "status_key": Task.Status.DONE, "is_closed": True},
 )
 
 
@@ -45,11 +52,14 @@ def infer_column_status(name: str, is_closed=False) -> tuple[str, bool]:
     text = (name or "").strip().lower()
     closed_words = ("بسته", "تمام", "close", "closed", "done", "finished")
     review_words = ("تأیید", "تاييد", "تایید", "approve", "approval", "بازبینی", "review")
+    test_words = ("تست", "test", "qa")
     progress_words = ("انجام", "progress", "doing")
     if is_closed or any(word in text for word in closed_words):
         return Task.Status.DONE, True
     if any(word in text for word in review_words):
         return Task.Status.IN_REVIEW, False
+    if any(word in text for word in test_words):
+        return Task.Status.IN_PROGRESS, False
     if any(word in text for word in progress_words) and "برای" not in text:
         return Task.Status.IN_PROGRESS, False
     return Task.Status.TODO, False
@@ -93,7 +103,7 @@ def seed_project_columns(project: Project, template: BoardTemplate | None = None
                 BoardColumn.objects.create(
                     project=project,
                     name=spec.name,
-                    color=spec.color or "#1A2B49",
+                    color=spec.color or DEFAULT_COLUMN_COLOR,
                     status_key=spec.status_key or status_key,
                     is_closed=spec.is_closed or is_closed,
                     position=spec.position if spec.position is not None else index,
@@ -145,7 +155,7 @@ def apply_column_to_task(task: Task, column: BoardColumn | None) -> None:
         task.status = column.status_key
 
 
-def create_column(*, user, project: Project, name="", color="#1A2B49", status_key="", is_closed=False):
+def create_column(*, user, project: Project, name="", color="", status_key="", is_closed=False):
     from rest_framework.exceptions import PermissionDenied, ValidationError
 
     if not is_project_manager(user, project):
@@ -157,7 +167,7 @@ def create_column(*, user, project: Project, name="", color="#1A2B49", status_ke
     column = BoardColumn(
         project=project,
         name=name,
-        color=(color or "#1A2B49").strip(),
+        color=(color or DEFAULT_COLUMN_COLOR).strip(),
         status_key=status_key or Task.Status.IN_PROGRESS,
         is_closed=bool(is_closed or status_key == Task.Status.DONE),
         position=(last.position + 1) if last else 0,
@@ -269,7 +279,7 @@ def ensure_approval_column(project: Project) -> BoardColumn:
     return BoardColumn.objects.create(
         project=project,
         name="در انتظار تأیید",
-        color="#3A2430",
+        color=WAITING_COLOR,
         status_key=Task.Status.IN_REVIEW,
         is_closed=False,
         position=position,
@@ -291,7 +301,7 @@ def apply_template_to_project(*, user, project: Project, template: BoardTemplate
         BoardColumn.objects.create(
             project=project,
             name=spec.name,
-            color=spec.color or "#1A2B49",
+            color=spec.color or DEFAULT_COLUMN_COLOR,
             status_key=spec.status_key or status_key,
             is_closed=spec.is_closed or is_closed,
             position=position,
@@ -334,7 +344,7 @@ def save_board_template(*, user, company, name: str, columns: list, is_default=F
         BoardTemplateColumn.objects.create(
             template=template,
             name=col_name,
-            color=(row.get("color") or "#1A2B49").strip(),
+            color=(row.get("color") or DEFAULT_COLUMN_COLOR).strip(),
             position=index,
             status_key=row.get("status_key") or status_key,
             is_closed=bool(row.get("is_closed") or is_closed),
