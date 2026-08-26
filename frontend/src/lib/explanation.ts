@@ -1,5 +1,5 @@
 import { isLightHex, normalizeHex, shadeHex } from "@/lib/calendarColors";
-import type { ProjectStatus, ShapeType } from "@/lib/types";
+import type { ProjectStatus, ShapeType, StepStatus } from "@/lib/types";
 
 /**
  * Card colours for folders and processes in تشریح سیستم.
@@ -187,6 +187,7 @@ export type TreeStep = {
   id: number;
   title: string;
   shape_type: ShapeType;
+  status?: StepStatus;
 };
 
 export type TreeProcess = {

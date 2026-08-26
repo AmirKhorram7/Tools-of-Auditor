@@ -69,7 +69,7 @@ class ProjectMemberAdmin(admin.ModelAdmin):
 class ProcessStepInline(admin.TabularInline):
     model = ProcessStep
     extra = 0
-    fields = ("title", "shape_type", "order", "position_x", "position_y")
+    fields = ("title", "shape_type", "status", "order", "position_x", "position_y")
 
 
 class StepConnectionInline(admin.TabularInline):
@@ -105,8 +105,8 @@ class StepMediaInline(admin.TabularInline):
 
 @admin.register(ProcessStep)
 class ProcessStepAdmin(admin.ModelAdmin):
-    list_display = ("process__owner__first_name", "process__owner__last_name", "title", "process", "shape_type", "order", "created_at")
-    list_filter = ("shape_type", "is_deleted")
+    list_display = ("process__owner__first_name", "process__owner__last_name", "title", "process", "shape_type", "status", "order", "created_at")
+    list_filter = ("shape_type", "status", "is_deleted")
     search_fields = ("title", "process__name", "process__owner__first_name", "process__owner__last_name")
     inlines = [StepRiskInline, StepControlInline, StepMediaInline]
 

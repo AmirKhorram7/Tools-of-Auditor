@@ -267,6 +267,11 @@ class ProcessStep(BaseModel):
         DIAMOND = "diamond", _("Diamond")
         OVAL = "oval", _("Oval")
 
+    class Status(models.TextChoices):
+        DEFAULT = "default", _("Default")
+        WRITTEN = "written", _("Written")
+        COMPLETED = "completed", _("Completed")
+
     process = models.ForeignKey(
         Process,
         on_delete=models.CASCADE,
@@ -277,6 +282,12 @@ class ProcessStep(BaseModel):
         max_length=20,
         choices=ShapeType.choices,
         default=ShapeType.SQUARE,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DEFAULT,
+        help_text=_("Progress state shown as an outline on the process canvas."),
     )
     position_x = models.FloatField(default=0)
     position_y = models.FloatField(default=0)

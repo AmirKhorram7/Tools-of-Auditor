@@ -130,11 +130,29 @@ export type Process = {
 
 export type ShapeType = "square" | "rectangle" | "circle" | "diamond" | "oval";
 
+export type StepStatus = "default" | "written" | "completed";
+
+export const STEP_STATUS_OPTIONS: StepStatus[] = ["default", "written", "completed"];
+
+/** Thin outer ring on process-canvas shapes. Default has none. */
+export const STEP_STATUS_OUTLINE: Record<StepStatus, string | undefined> = {
+  default: undefined,
+  written: "0 0 0 2px #4285F4",
+  completed: "0 0 0 2px #0B8043",
+};
+
+export const STEP_STATUS_DOT: Record<StepStatus, string> = {
+  default: "#9CA3AF",
+  written: "#4285F4",
+  completed: "#0B8043",
+};
+
 export type ProcessStep = {
   id: number;
   process: number;
   title: string;
   shape_type: ShapeType;
+  status: StepStatus;
   position_x: number;
   position_y: number;
   order: number;

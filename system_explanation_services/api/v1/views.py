@@ -168,7 +168,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 process_id__in=[row["id"] for row in processes]
             )
             .order_by("order", "id")
-            .values("id", "process_id", "title", "shape_type")
+            .values("id", "process_id", "title", "shape_type", "status")
         )
 
         steps_by_process = defaultdict(list)
@@ -178,6 +178,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     "id": step["id"],
                     "title": step["title"],
                     "shape_type": step["shape_type"],
+                    "status": step["status"],
                 }
             )
 

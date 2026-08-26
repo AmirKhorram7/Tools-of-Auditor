@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import BackButton from "@/components/BackButton";
 import ExplanationGuide from "@/components/explanation/ExplanationGuide";
+import StepStatusBox from "@/components/explanation/StepStatusBox";
 import MediaPanel from "@/components/MediaPanel";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
@@ -209,6 +210,15 @@ export default function StepDetailPage() {
           >
             <PdfDownloadIcon />
           </button>
+          <StepStatusBox
+            stepId={step.id}
+            status={step.status}
+            editable={editable}
+            onChanged={(status) =>
+              setStep((current) => (current ? { ...current, status } : current))
+            }
+            onError={setError}
+          />
           <ExplanationGuide compact />
         </div>
       </div>

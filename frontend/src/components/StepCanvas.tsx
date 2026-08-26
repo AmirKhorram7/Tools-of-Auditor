@@ -6,7 +6,12 @@ import { useMemo, useRef, useState } from "react";
 import { cx } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { SHAPE_SIZES, type ProcessStep, type StepConnection } from "@/lib/types";
+import {
+  SHAPE_SIZES,
+  STEP_STATUS_OUTLINE,
+  type ProcessStep,
+  type StepConnection,
+} from "@/lib/types";
 
 /** Border-radius / rotation per shape. Dimensions come from SHAPE_SIZES. */
 const SHAPE_STYLE: Record<ProcessStep["shape_type"], string> = {
@@ -355,6 +360,10 @@ export default function StepCanvas({
             const size = SHAPE_SIZES[step.shape_type];
             const { x, y } = positionOf(step);
             const isSource = linkSource === step.id;
+            const outline =
+              !isSource && (step.status === "written" || step.status === "completed")
+                ? `${STEP_STATUS_OUTLINE[step.status]}, 0 1px 2px rgb(0 0 0 / 0.06)`
+                : undefined;
 
             return (
               <div key={step.id} className="group">
@@ -368,6 +377,7 @@ export default function StepCanvas({
                     top: y,
                     width: size.width,
                     height: size.height,
+                    boxShadow: outline,
                   }}
                   className={cx(
                     "absolute flex touch-none select-none items-center justify-center border-2 p-2 text-center shadow-sm transition",
