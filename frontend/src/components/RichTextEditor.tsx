@@ -143,6 +143,9 @@ type Props = {
   readOnly?: boolean;
   /** Other steps in this process. When set, `/` opens a picker and inserts a link. */
   mentions?: EditorMention[];
+  /** Orange save control next to Table. Same action as the page Save button. */
+  onSave?: () => void;
+  saving?: boolean;
 };
 
 function findSlashTrigger(editor: HTMLElement): { node: Text; start: number; query: string } | null {
@@ -291,6 +294,8 @@ export default function RichTextEditor({
   minHeight = 180,
   readOnly = false,
   mentions,
+  onSave,
+  saving = false,
 }: Props) {
   const { t, dir } = useI18n();
   const resolvedPlaceholder = placeholder ?? t("editor.placeholder");
@@ -846,6 +851,18 @@ export default function RichTextEditor({
           >
             {t("editor.table")}
           </button>
+          {onSave && (
+            <button
+              type="button"
+              title={t("editor.save")}
+              disabled={saving}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={onSave}
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white transition hover:bg-brand-700 disabled:opacity-60"
+            >
+              <SaveDiskIcon />
+            </button>
+          )}
           {inTable && (
             <>
               <span className="mx-0.5 h-4 w-px bg-gray-300" />
@@ -951,5 +968,20 @@ export default function RichTextEditor({
         </p>
       )}
     </div>
+  );
+}
+
+function SaveDiskIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden>
+      <path
+        d="M5.5 4.5h10.2L19.5 8.3V19.5H5.5V4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path d="M8 4.5h7v4.2H8V4.5Z" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8 13.2h8v6.3H8v-6.3Z" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
   );
 }

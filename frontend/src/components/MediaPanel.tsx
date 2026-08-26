@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Alert, Button, Input, Select, cx } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -16,6 +16,8 @@ type Props = {
   onChanged: () => void;
   /** Viewers can open links/files but not upload or delete. */
   readOnly?: boolean;
+  /** When the body is shown/hidden. Used to grow the editor on the step page. */
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 export default function MediaPanel({
@@ -26,6 +28,7 @@ export default function MediaPanel({
   items,
   onChanged,
   readOnly = false,
+  onExpandedChange,
 }: Props) {
   const { t } = useI18n();
   const [kind, setKind] = useState<MediaKind>("image");
@@ -35,12 +38,31 @@ export default function MediaPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(
+    onExpandedChange ? items.length > 0 : true,
+  );
+
+  useEffect(() => {
+    onExpandedChange?.(expanded);
+    // Notify once so the editor can start tall when this box is closed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const reset = () => {
     setTitle("");
     setUrl("");
     setFile(null);
     setError(null);
+  };
+
+  const toggleExpanded = () => {
+    const next = !expanded;
+    setExpanded(next);
+    onExpandedChange?.(next);
+    if (!next) {
+      setOpen(false);
+      setError(null);
+    }
   };
 
   const submit = async () => {
@@ -103,12 +125,35 @@ export default function MediaPanel({
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-700">
-          {t("media.attachments")}
-        </p>
-        {!readOnly && (
+    <div
+      className={cx(
+        "rounded-lg border border-gray-200 bg-gray-50/60",
+        expanded ? "p-3" : "px-3 py-1.5",
+      )}
+    >
+      <div className={cx("flex items-center justify-between", expanded && "mb-2")}>
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          className="flex min-w-0 items-center gap-2 text-start"
+          title={expanded ? t("media.collapse") : t("media.expand")}
+          aria-expanded={expanded}
+        >
+          <span
+            className={cx(
+              "flex size-6 shrink-0 items-center justify-center rounded text-gray-500 transition hover:bg-white hover:text-navy-800",
+              !expanded && "rotate-180",
+            )}
+            aria-hidden
+          >
+            <ChevronUpIcon />
+          </span>
+          <p className="text-xs font-semibold text-gray-700">
+            {t("media.attachments")}
+            {items.length > 0 ? ` (${items.length})` : ""}
+          </p>
+        </button>
+        {expanded && !readOnly && (
           <Button
             size="sm"
             variant="ghost"
@@ -122,7 +167,7 @@ export default function MediaPanel({
         )}
       </div>
 
-      {items.length > 0 && (
+      {expanded && items.length > 0 && (
         <ul className="mb-2 space-y-1.5">
           {items.map((item) => {
             const href = item.file_url || item.url;
@@ -169,11 +214,11 @@ export default function MediaPanel({
         </ul>
       )}
 
-      {items.length === 0 && !open && (
+      {expanded && items.length === 0 && !open && (
         <p className="text-xs text-gray-500">{t("media.empty")}</p>
       )}
 
-      {!readOnly && open && (
+      {expanded && !readOnly && open && (
         <div className="space-y-2 rounded-md border border-gray-200 bg-white p-2.5">
           <div className="grid gap-2 sm:grid-cols-3">
             <Select
@@ -226,5 +271,19 @@ export default function MediaPanel({
         </div>
       )}
     </div>
+  );
+}
+
+function ChevronUpIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden>
+      <path
+        d="M5 12.5 10 7.5 15 12.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

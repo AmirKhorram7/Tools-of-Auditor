@@ -52,6 +52,7 @@ export default function StepDetailPage() {
   const [itemTitle, setItemTitle] = useState("");
   const [savingItem, setSavingItem] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(stepId)) return;
@@ -257,9 +258,11 @@ export default function StepDetailPage() {
             value={explanation}
             onChange={setExplanation}
             placeholder={t("exp.explanationPlaceholder")}
-            minHeight={240}
+            minHeight={attachmentsOpen ? 240 : 480}
             readOnly={!editable}
             mentions={stepMentions}
+            onSave={editable ? saveExplanation : undefined}
+            saving={savingExplanation}
           />
 
           <MediaPanel
@@ -268,6 +271,7 @@ export default function StepDetailPage() {
             items={step.explanation_media}
             onChanged={load}
             readOnly={!editable}
+            onExpandedChange={setAttachmentsOpen}
           />
 
           {savedNote && <Alert tone="success">{savedNote}</Alert>}
