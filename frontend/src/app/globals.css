@@ -119,3 +119,54 @@
   background: #d5deea;
   color: #1a2b49;
 }
+
+/*
+  Writer name: only on hover, and above the sentence — never on the text.
+  Hidden while that block is being typed.
+*/
+.rich-content [data-author] {
+  position: relative;
+}
+
+.rich-content [data-author]::after {
+  content: attr(data-author);
+  position: absolute;
+  left: 0.15rem;
+  right: auto;
+  bottom: calc(100% + 1px);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.2;
+  color: #8b939e;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+}
+
+[dir="rtl"] .rich-content [data-author]::after {
+  left: auto;
+  right: 0.15rem;
+}
+
+.rich-content [data-author][style*="text-align: left"]::after,
+.rich-content [data-author][style*="text-align:left"]::after {
+  left: 0.15rem;
+  right: auto;
+}
+
+.rich-content [data-author]:hover::after {
+  opacity: 0.8;
+}
+
+.rich-content [data-writing]::after,
+.rich-content td[data-author]::after,
+.rich-content th[data-author]::after {
+  content: none;
+  opacity: 0;
+}

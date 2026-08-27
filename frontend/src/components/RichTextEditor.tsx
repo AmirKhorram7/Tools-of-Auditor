@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { cx } from "@/components/ui";
+import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 
 type ToolbarAction = {
@@ -147,6 +148,87 @@ type Props = {
   onSave?: () => void;
   saving?: boolean;
 };
+
+const AUTHOR_BLOCKS = new Set(["P", "H1", "H2", "LI", "BLOCKQUOTE", "TD", "TH", "DIV"]);
+
+function writerLabel(profile: { first_name?: string; last_name?: string; phone_number?: string } | null): string {
+  if (!profile) return "";
+  const full = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim();
+  const raw = full || (profile.phone_number ?? "");
+  return raw.replace(/[\u0000-\u001F<>"']/g, "").trim().slice(0, 80);
+}
+
+function closestAuthorBlock(node: Node | null, editor: HTMLElement): HTMLElement | null {
+  let current: Node | null = node;
+  while (current && current !== editor) {
+    if (current instanceof HTMLElement && AUTHOR_BLOCKS.has(current.tagName)) {
+      return current;
+    }
+    current = current.parentNode;
+  }
+  return null;
+}
+
+/** Mark the current paragraph/line as written by this user (last writer of the block). */
+function stampWriter(editor: HTMLElement | null, label: string) {
+  if (!editor || !label) return;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const anchor = selection.anchorNode;
+  if (!anchor || !editor.contains(anchor)) return;
+
+  let block = closestAuthorBlock(anchor, editor);
+  if (!block && (anchor === editor || anchor.parentNode === editor)) {
+    document.execCommand("formatBlock", false, "p");
+    block = closestAuthorBlock(selection.anchorNode, editor);
+  }
+  if (!block) return;
+
+  const text = (block.textContent || "").replace(/\u200B/g, "").trim();
+  if (!text) {
+    block.removeAttribute("data-author");
+    block.removeAttribute("data-self");
+    block.removeAttribute("title");
+    return;
+  }
+  if (block.getAttribute("data-author") !== label) {
+    block.setAttribute("data-author", label);
+  }
+  block.setAttribute("data-self", "");
+  block.title = label;
+}
+
+function markSelfBlocks(editor: HTMLElement | null, label: string) {
+  if (!editor) return;
+  editor.querySelectorAll("[data-author]").forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+    if (label && node.getAttribute("data-author") === label) {
+      node.setAttribute("data-self", "");
+    } else {
+      node.removeAttribute("data-self");
+    }
+    const who = node.getAttribute("data-author") || "";
+    if (who) node.title = who;
+    else node.removeAttribute("title");
+  });
+}
+
+function markWritingBlock(editor: HTMLElement | null) {
+  if (!editor) return;
+  editor.querySelectorAll("[data-writing]").forEach((node) => {
+    node.removeAttribute("data-writing");
+  });
+  const selection = window.getSelection();
+  if (!selection || !selection.anchorNode || !editor.contains(selection.anchorNode)) return;
+  const block = closestAuthorBlock(selection.anchorNode, editor);
+  if (block) block.setAttribute("data-writing", "");
+}
+
+function serializeEditorHtml(html: string): string {
+  return html
+    .replace(/\sdata-self(?:="[^"]*")?/gi, "")
+    .replace(/\sdata-writing(?:="[^"]*")?/gi, "");
+}
 
 function findSlashTrigger(editor: HTMLElement): { node: Text; start: number; query: string } | null {
   const selection = window.getSelection();
@@ -298,8 +380,12 @@ export default function RichTextEditor({
   saving = false,
 }: Props) {
   const { t, dir } = useI18n();
+  const { profile } = useAuth();
   const resolvedPlaceholder = placeholder ?? t("editor.placeholder");
   const editorRef = useRef<HTMLDivElement>(null);
+  const authorLabel = writerLabel(profile);
+  const authorLabelRef = useRef(authorLabel);
+  authorLabelRef.current = authorLabel;
   const savedRange = useRef<Range | null>(null);
   const resizeRef = useRef<TableResize | null>(null);
   const [tableCursor, setTableCursor] = useState<"col-resize" | "row-resize" | "">("");
@@ -317,16 +403,18 @@ export default function RichTextEditor({
     .filter((item) => item.title.toLowerCase().includes(mentionQuery.toLowerCase()))
     .slice(0, 8);
 
-  // Only sync from props when the DOM differs, so typing keeps the caret stable.
+  // Only sync from props when the saved HTML differs, so typing keeps the caret.
   useEffect(() => {
     const editor = editorRef.current;
-    if (editor && editor.innerHTML !== value) {
+    if (!editor) return;
+    if (serializeEditorHtml(editor.innerHTML) !== value) {
       editor.innerHTML = value || "";
+      markSelfBlocks(editor, authorLabelRef.current);
     }
   }, [value]);
 
   const emit = () => {
-    onChange(editorRef.current?.innerHTML ?? "");
+    onChange(serializeEditorHtml(editorRef.current?.innerHTML ?? ""));
   };
 
   const refreshMention = () => {
@@ -412,8 +500,10 @@ export default function RichTextEditor({
   };
 
   useEffect(() => {
-    if (readOnly) return;
-    const onSelectionChange = () => readCurrentStyle();
+    const onSelectionChange = () => {
+      readCurrentStyle();
+      markWritingBlock(editorRef.current);
+    };
     document.addEventListener("selectionchange", onSelectionChange);
     return () => document.removeEventListener("selectionchange", onSelectionChange);
   }, [readOnly]);
@@ -452,6 +542,7 @@ export default function RichTextEditor({
     if (readOnly) return;
     editorRef.current?.focus();
     document.execCommand(action.command, false, action.value);
+    stampWriter(editorRef.current, authorLabelRef.current);
     emit();
     readCurrentStyle();
   };
@@ -661,6 +752,7 @@ export default function RichTextEditor({
       `<a class="step-mention" href="${safeHref}" target="_blank" rel="noopener noreferrer">${safeTitle}</a>&nbsp;`,
     );
     setMentionOpen(false);
+    stampWriter(editor, authorLabelRef.current);
     emit();
   };
 
@@ -901,6 +993,8 @@ export default function RichTextEditor({
         data-placeholder={resolvedPlaceholder}
         onInput={() => {
           if (!readOnly) {
+            stampWriter(editorRef.current, authorLabelRef.current);
+            markWritingBlock(editorRef.current);
             emit();
             refreshMention();
           }
