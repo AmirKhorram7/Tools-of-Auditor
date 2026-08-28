@@ -286,7 +286,7 @@ export default function StepCanvas({
         ref={canvasRef}
         dir="ltr"
         className={cx(
-          "relative h-[560px] w-full overflow-auto rounded-xl border bg-white",
+          "relative h-[560px] w-full overflow-auto rounded-xl border bg-white max-md:h-[70dvh]",
           connectMode ? "border-brand-500" : "border-gray-200",
         )}
         style={{

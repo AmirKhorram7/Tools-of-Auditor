@@ -210,7 +210,7 @@ export default function WorkTeamPage() {
           <div className="border-t border-black/[0.05] bg-[#F7F8FA] px-3 py-2.5">
             {formError && !inviteOpen && !editMember && <Alert>{formError}</Alert>}
             <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[220px] flex-1">
+              <div className="min-w-0 flex-1 max-md:min-w-full">
                 <Field label={t("work.teamName")}>
                   <Input value={name} onChange={(e) => setName(e.target.value)} />
                 </Field>

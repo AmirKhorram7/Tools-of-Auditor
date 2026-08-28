@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Inter, Vazirmatn } from "next/font/google";
 
@@ -30,6 +30,13 @@ const titleDefault =
 
 const description =
   "تی‌ادیتور (Tauditor) پلتفرم تخصصی حسابرسان داخلی و خارجی برای تشریح سیستم، مستندسازی فرایندها، ریسک‌ها و کنترل‌ها. مناسب ممیزی ISO و تیم‌های تضمین کیفیت (QA) و کنترل کیفیت (QC).";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

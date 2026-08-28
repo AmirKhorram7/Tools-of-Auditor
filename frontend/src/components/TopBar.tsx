@@ -51,14 +51,14 @@ export default function TopBar() {
   ];
 
   useEffect(() => {
-    const onClickOutside = (event: MouseEvent) => {
+    const onClickOutside = (event: PointerEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) {
         setServicesOpen(false);
         setUserOpen(false);
       }
     };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    document.addEventListener("pointerdown", onClickOutside);
+    return () => document.removeEventListener("pointerdown", onClickOutside);
   }, []);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function TopBar() {
     <Link
       href={href}
       className={cx(
-        "rounded px-3 py-1.5 text-sm whitespace-nowrap transition",
+        "rounded px-3 py-1.5 text-sm whitespace-nowrap transition max-md:px-2.5 max-md:py-2",
         active
           ? "bg-navy-700 font-medium text-white"
           : "text-gray-200 hover:bg-navy-700 hover:text-white",
@@ -88,21 +88,21 @@ export default function TopBar() {
   return (
     <header ref={containerRef} className="sticky top-0 z-40">
       {/* Primary bar — Amazon dark navy */}
-      <div className="bg-navy-900 text-white">
-        <div className="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-4 px-2.5">
-          <div className="flex items-center gap-4">
+      <div className="bg-navy-900 text-white pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-2 px-2.5 md:gap-4">
+          <div className="flex min-w-0 items-center gap-2 md:gap-4">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 rounded px-1.5 py-1 transition hover:bg-navy-700"
+              className="flex min-w-0 items-center gap-2 rounded px-1.5 py-1 transition hover:bg-navy-700"
             >
-              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-ink">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-ink">
                 T
               </span>
-              <span className="text-base font-bold text-white">{t("brand.name")}</span>
+              <span className="truncate text-base font-bold text-white max-[360px]:hidden">{t("brand.name")}</span>
             </Link>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
             <ThemeToggle />
             <LanguageSwitch />
             <div className="relative">
@@ -122,14 +122,14 @@ export default function TopBar() {
                 name={displayName(profile)}
                 size={30}
               />
-              <span className="hidden text-sm text-gray-100 sm:block">
+              <span className="hidden text-sm text-gray-100 md:block">
                 {displayName(profile)}
               </span>
               <span className="text-[10px] text-brand-400">▾</span>
             </button>
 
             {userOpen && (
-              <div className="absolute end-0 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+              <div className="absolute end-0 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg max-md:end-0">
                 <div className="flex items-center gap-2.5 px-3 py-2">
                   <Avatar
                     src={profile?.profile_image}
@@ -168,7 +168,7 @@ export default function TopBar() {
 
       {/* Secondary bar — Amazon nav navy */}
       <div className="bg-navy-800">
-        <nav className="mx-auto flex h-10 max-w-screen-2xl items-center gap-1 px-2.5">
+        <nav className="mx-auto flex h-11 max-w-screen-2xl items-center gap-1 overflow-x-auto px-2.5 md:h-10 md:overflow-visible">
           {navLink("/dashboard", t("nav.home"), pathname === "/dashboard")}
           <div className="relative">
             <button
@@ -178,7 +178,7 @@ export default function TopBar() {
                 setUserOpen(false);
               }}
               className={cx(
-                "flex items-center gap-1.5 rounded px-3 py-1.5 text-sm whitespace-nowrap transition",
+                "flex items-center gap-1.5 rounded px-3 py-1.5 text-sm whitespace-nowrap transition max-md:px-2.5 max-md:py-2",
                 servicesOpen
                   ? "bg-navy-700 font-medium text-white"
                   : "text-gray-200 hover:bg-navy-700 hover:text-white",
@@ -188,7 +188,7 @@ export default function TopBar() {
               <span className="text-[10px] text-brand-400">▾</span>
             </button>
             {servicesOpen && (
-              <div className="absolute start-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+              <div className="absolute start-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg max-md:fixed max-md:inset-x-2.5 max-md:top-[calc(5.75rem+env(safe-area-inset-top))] max-md:mt-0 max-md:w-auto">
                 {services.map((service) =>
                   service.available ? (
                     <Link

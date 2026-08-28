@@ -24,7 +24,7 @@ export default function AppLayout({
   return (
     <div className="min-h-screen">
       <TopBar />
-      <main className="mx-auto w-full max-w-screen-2xl px-2.5 py-6">
+      <main className="mx-auto w-full max-w-screen-2xl px-2.5 py-6 max-md:overflow-x-clip max-md:px-3 max-md:py-4">
         {children}
       </main>
     </div>

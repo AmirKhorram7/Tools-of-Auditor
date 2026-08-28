@@ -184,7 +184,7 @@ export default function ExplanationSidePanel() {
       <button
         type="button"
         onClick={toggle}
-        className="sticky top-28 z-30 flex h-[calc(100vh-8rem)] w-10 shrink-0 flex-col items-center gap-3 rounded-xl bg-navy-900 py-4 text-white shadow-md transition hover:bg-navy-800"
+        className="sticky top-28 z-30 hidden h-[calc(100vh-8rem)] w-10 shrink-0 flex-col items-center gap-3 rounded-xl bg-navy-900 py-4 text-white shadow-md transition hover:bg-navy-800 md:flex"
         title={t("nav.showTools")}
         dir={dir}
       >
@@ -201,7 +201,7 @@ export default function ExplanationSidePanel() {
 
   return (
     <aside
-      className="sticky top-28 z-30 flex h-[calc(100vh-8rem)] w-56 shrink-0 flex-col overflow-hidden rounded-xl bg-navy-900 text-white shadow-md"
+      className="sticky top-28 z-30 hidden h-[calc(100vh-8rem)] w-56 shrink-0 flex-col overflow-hidden rounded-xl bg-navy-900 text-white shadow-md md:flex"
       dir={dir}
     >
       {/* Header */}

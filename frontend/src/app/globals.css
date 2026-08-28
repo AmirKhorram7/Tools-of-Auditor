@@ -293,3 +293,26 @@ html.dark .rich-content a.step-mention:hover {
   content: none;
   opacity: 0;
 }
+
+/* Phone-only: keep the desktop layout; stop horizontal blow-out and iOS zoom. */
+@media (max-width: 767px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    overflow-x: clip;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+}

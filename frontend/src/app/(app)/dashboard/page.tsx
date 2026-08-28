@@ -84,7 +84,7 @@ export default function DashboardPage() {
               {profile?.job_title || t("dash.pickService")}
             </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 md:flex">
               <ThemeToggle />
               <LanguageSwitch />
             </div>

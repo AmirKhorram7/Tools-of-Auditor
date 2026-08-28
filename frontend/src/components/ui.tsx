@@ -183,7 +183,7 @@ export function Modal({
   const { t } = useI18n();
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 max-md:items-end max-md:p-3">
       <div
         className="absolute inset-0 bg-navy-900/50"
         onClick={onClose}
@@ -191,7 +191,7 @@ export function Modal({
       />
       <div
         className={cx(
-          "relative z-10 w-full overflow-visible rounded-xl bg-white p-5 shadow-xl",
+          "relative z-10 w-full overflow-visible rounded-xl bg-white p-5 shadow-xl max-md:max-h-[85dvh] max-md:overflow-y-auto",
           className ?? "max-w-lg",
         )}
       >

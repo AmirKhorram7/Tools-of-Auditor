@@ -845,7 +845,7 @@ export default function RichTextEditor({
       )}
     >
       {!readOnly && (
-        <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 p-1.5">
+        <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 p-1.5 max-md:flex-nowrap max-md:overflow-x-auto">
           <select
             className="h-7 max-w-[168px] rounded border border-gray-300 bg-white px-1.5 text-xs text-navy-800"
             value={currentFont}

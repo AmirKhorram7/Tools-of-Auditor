@@ -250,7 +250,7 @@ export default function TreeView({
       </div>
 
       <div
-        className="overflow-auto rounded-2xl border border-gray-200 bg-white p-6"
+        className="overflow-auto rounded-2xl border border-gray-200 bg-white p-6 max-md:p-3"
         style={{
           backgroundImage:
             "linear-gradient(#f3f4f6 1px, transparent 1px), linear-gradient(90deg, #f3f4f6 1px, transparent 1px)",

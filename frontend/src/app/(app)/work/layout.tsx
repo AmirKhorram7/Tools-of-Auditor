@@ -16,13 +16,13 @@ export default function WorkLayout({ children }: { children: React.ReactNode }) 
   ];
 
   return (
-    <div className="flex items-start gap-2.5" dir="ltr">
-      <div className="min-w-0 flex-1 pb-16 md:pb-0" dir={dir}>
+    <div className="flex items-start gap-2.5 max-md:gap-0" dir="ltr">
+      <div className="min-w-0 flex-1 pb-16 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0" dir={dir}>
         {children}
       </div>
       <WorkSidePanel />
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-gray-200 bg-white md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
         {mobileTabs.map((tab) => {
           const active = tab.exact
             ? pathname === tab.href
