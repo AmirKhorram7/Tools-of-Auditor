@@ -23,7 +23,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ApiError, apiDownload, apiFetch, apiList, mediaUrl } from "@/lib/api";
-import { cardPalette, type CardColor } from "@/lib/explanation";
+import { cardBodyInk, cardPalette, type CardColor } from "@/lib/explanation";
 import { useI18n } from "@/lib/i18n";
 import {
   PROJECT_MEMBER_ROLE_OPTIONS,
@@ -585,7 +585,10 @@ export default function ProjectDetailPage() {
                 </span>
               </div>
               {project.description && (
-                <p className="mt-2 max-w-2xl text-sm text-gray-600">
+                <p
+                  className="mt-2 max-w-2xl text-sm leading-6"
+                  style={{ color: cardBodyInk(palette) }}
+                >
                   {project.description}
                 </p>
               )}
@@ -711,6 +714,7 @@ export default function ProjectDetailPage() {
                 href={`/explanation/projects/${sub.id}`}
                 color={sub.color}
                 kindLabel={t("common.subfolder")}
+                description={sub.description || null}
                 editable={editable}
                 busy={colorBusy === `sub-${sub.id}`}
                 onColor={(color) => changeSubColor(sub, color)}

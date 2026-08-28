@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import ColorPicker from "@/components/explanation/ColorPicker";
-import { cardPalette, type CardColor } from "@/lib/explanation";
+import { cardBodyInk, cardPalette, type CardColor } from "@/lib/explanation";
 import { useI18n } from "@/lib/i18n";
 
 /**
@@ -17,6 +17,7 @@ export default function FolderCard({
   color,
   kindLabel,
   subtitle,
+  description,
   meta,
   badge,
   editable = false,
@@ -30,6 +31,7 @@ export default function FolderCard({
   color?: string | null;
   kindLabel: string;
   subtitle?: string | null;
+  description?: string | null;
   meta?: ReactNode;
   badge?: ReactNode;
   editable?: boolean;
@@ -88,9 +90,18 @@ export default function FolderCard({
           {subtitle && (
             <p
               className="mt-0.5 truncate text-xs"
-              style={{ color: palette.muted }}
+              style={{ color: cardBodyInk(palette) }}
             >
               {subtitle}
+            </p>
+          )}
+          {description && (
+            <p
+              className="mt-1 line-clamp-2 text-xs leading-5"
+              style={{ color: cardBodyInk(palette) }}
+              title={description}
+            >
+              {description}
             </p>
           )}
         </div>

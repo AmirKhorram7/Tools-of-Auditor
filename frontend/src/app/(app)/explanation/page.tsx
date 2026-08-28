@@ -199,6 +199,7 @@ export default function ExplanationServicePage() {
               color={project.color}
               kindLabel={t("common.folder")}
               subtitle={project.company_name || null}
+              description={project.description || null}
               editable={canEditProject(project.my_role)}
               busy={colorBusy === project.id}
               onColor={(color) => changeColor(project, color)}

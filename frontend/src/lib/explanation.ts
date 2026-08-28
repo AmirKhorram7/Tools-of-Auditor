@@ -161,8 +161,8 @@ function paletteFromHex(hex: string): CardPalette {
     bg: hex,
     border: shadeHex(hex, -22),
     accent: shadeHex(hex, -28),
-    text: light ? "#1f1f1f" : "#ffffff",
-    muted: light ? "#4b5563" : "#e5e7eb",
+    text: light ? "#18181B" : "#FFFFFF",
+    muted: light ? "#3F3F46" : "#E4E4E7",
     hover: shadeHex(hex, -12),
   };
 }
@@ -174,6 +174,11 @@ export function cardPalette(color?: string | null): CardPalette {
   const hex = normalizeHex(raw);
   if (hex) return paletteFromHex(hex);
   return CARD_COLORS[0];
+}
+
+/** Body/description ink that stays readable on the card background. */
+export function cardBodyInk(palette: CardPalette): string {
+  return isLightHex(palette.bg) ? "#3F3F46" : "#F4F4F5";
 }
 
 /** Persian digits for small counts shown on cards and tree nodes. */
