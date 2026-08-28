@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar, cx } from "@/components/ui";
 import { displayName, useAuth } from "@/lib/auth";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 
 export default function TopBar() {
   const { profile, signOut } = useAuth();
@@ -99,63 +100,10 @@ export default function TopBar() {
               </span>
               <span className="text-base font-bold text-white">{t("brand.name")}</span>
             </Link>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setServicesOpen((open) => !open);
-                  setUserOpen(false);
-                }}
-                className={cx(
-                  "flex items-center gap-1.5 rounded px-3 py-1.5 text-sm transition",
-                  servicesOpen ||
-                    pathname.startsWith("/explanation") ||
-                    pathname.startsWith("/work")
-                    ? "bg-navy-700 font-medium text-white"
-                    : "text-gray-200 hover:bg-navy-700 hover:text-white",
-                )}
-              >
-                {t("nav.services")}
-                <span className="text-[10px] text-brand-400">▾</span>
-              </button>
-
-              {servicesOpen && (
-                <div className="absolute start-0 mt-2 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
-                  {services.map((service) =>
-                    service.available ? (
-                      <Link
-                        key={service.key}
-                        href={service.href}
-                        className="block rounded-lg px-3 py-2.5 transition hover:bg-surface"
-                      >
-                        <span className="block text-sm font-medium text-ink">
-                          {service.label}
-                        </span>
-                        <span className="block text-xs text-gray-500">
-                          {service.description}
-                        </span>
-                      </Link>
-                    ) : (
-                      <span
-                        key={service.key}
-                        className="block cursor-not-allowed rounded-lg px-3 py-2.5 opacity-55"
-                      >
-                        <span className="block text-sm font-medium text-ink">
-                          {service.label}
-                        </span>
-                        <span className="block text-xs text-gray-500">
-                          {service.description}
-                        </span>
-                      </span>
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <LanguageSwitch />
             <div className="relative">
             <button
@@ -220,8 +168,58 @@ export default function TopBar() {
 
       {/* Secondary bar — Amazon nav navy */}
       <div className="bg-navy-800">
-        <nav className="mx-auto flex h-10 max-w-screen-2xl items-center gap-1 overflow-x-auto px-2.5">
+        <nav className="mx-auto flex h-10 max-w-screen-2xl items-center gap-1 px-2.5">
           {navLink("/dashboard", t("nav.home"), pathname === "/dashboard")}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setServicesOpen((open) => !open);
+                setUserOpen(false);
+              }}
+              className={cx(
+                "flex items-center gap-1.5 rounded px-3 py-1.5 text-sm whitespace-nowrap transition",
+                servicesOpen
+                  ? "bg-navy-700 font-medium text-white"
+                  : "text-gray-200 hover:bg-navy-700 hover:text-white",
+              )}
+            >
+              {t("nav.services")}
+              <span className="text-[10px] text-brand-400">▾</span>
+            </button>
+            {servicesOpen && (
+              <div className="absolute start-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+                {services.map((service) =>
+                  service.available ? (
+                    <Link
+                      key={service.key}
+                      href={service.href}
+                      className="block rounded-lg px-3 py-2.5 transition hover:bg-surface"
+                    >
+                      <span className="block text-sm font-medium text-ink">
+                        {service.label}
+                      </span>
+                      <span className="block text-xs text-gray-500">
+                        {service.description}
+                      </span>
+                    </Link>
+                  ) : (
+                    <span
+                      key={service.key}
+                      className="block cursor-not-allowed rounded-lg px-3 py-2.5 opacity-55"
+                    >
+                      <span className="block text-sm font-medium text-ink">
+                        {service.label}
+                      </span>
+                      <span className="block text-xs text-gray-500">
+                        {service.description}
+                      </span>
+                    </span>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
           {navLink("/work", t("nav.work"), pathname.startsWith("/work"))}
           {navLink(
             "/explanation",

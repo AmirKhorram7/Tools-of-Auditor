@@ -4,6 +4,7 @@ import { Inter, Vazirmatn } from "next/font/google";
 
 import { AuthProvider } from "@/lib/auth";
 import { LocaleProvider } from "@/lib/i18n";
+import { ThemeProvider, type Theme } from "@/lib/theme";
 
 import "./globals.css";
 
@@ -103,22 +104,26 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const raw = cookieStore.get("ta_locale")?.value;
   const initialLocale = raw === "en" ? "en" : "fa";
+  const rawTheme = cookieStore.get("ta_theme")?.value;
+  const initialTheme: Theme = rawTheme === "dark" ? "dark" : "light";
 
   return (
     <html
       lang={initialLocale}
       dir={initialLocale === "fa" ? "rtl" : "ltr"}
-      className={`${vazirmatn.variable} ${inter.variable}`}
+      className={`${vazirmatn.variable} ${inter.variable}${initialTheme === "dark" ? " dark" : ""}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen antialiased">
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var l=localStorage.getItem("ta_locale");if(l==="en"||l==="fa"){document.documentElement.lang=l==="en"?"en":"fa";document.documentElement.dir=l==="en"?"ltr":"rtl";document.cookie="ta_locale="+l+";path=/;max-age=31536000;SameSite=Lax";}}catch(e){}`,
+            __html: `try{var d=document.documentElement;var l=localStorage.getItem("ta_locale");if(l==="en"||l==="fa"){d.lang=l==="en"?"en":"fa";d.dir=l==="en"?"ltr":"rtl";document.cookie="ta_locale="+l+";path=/;max-age=31536000;SameSite=Lax";}var th=localStorage.getItem("ta_theme");if(th!=="light"&&th!=="dark"){th=(document.cookie.match(/(?:^|; )ta_theme=([^;]*)/)||[])[1];}if(th==="dark"||th==="light"){document.cookie="ta_theme="+th+";path=/;max-age=31536000;SameSite=Lax";d.style.colorScheme=th;if(th==="dark")d.classList.add("dark");else d.classList.remove("dark");}}catch(e){}`,
           }}
         />
         <LocaleProvider initialLocale={initialLocale}>
-          <AuthProvider>{children}</AuthProvider>
+          <ThemeProvider initialTheme={initialTheme}>
+            <AuthProvider>{children}</AuthProvider>
+          </ThemeProvider>
         </LocaleProvider>
       </body>
     </html>

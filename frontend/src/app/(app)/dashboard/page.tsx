@@ -7,6 +7,7 @@ import { Avatar, Badge, Button, Card, Modal, Spinner } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
 import { displayName, useAuth } from "@/lib/auth";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 import { type Project } from "@/lib/types";
 import type { WorkDashboard } from "@/lib/work";
 
@@ -83,7 +84,10 @@ export default function DashboardPage() {
               {profile?.job_title || t("dash.pickService")}
             </p>
             </div>
-            <LanguageSwitch />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <LanguageSwitch />
+            </div>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">

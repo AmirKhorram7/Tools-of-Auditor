@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
@@ -28,8 +29,9 @@ module.exports = {
           DEFAULT: "#007185",
           hover: "#c7511f",
         },
-        ink: "#0f1111",
-        surface: "#eaeded",
+        ink: "var(--ta-ink)",
+        surface: "var(--ta-bg)",
+        card: "var(--ta-card)",
       },
       fontFamily: {
         sans: [

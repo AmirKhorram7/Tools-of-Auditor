@@ -8,6 +8,7 @@ import { Alert, Button, Card, Field, Input, cx } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
 
 type AuthResponse = {
   access: string;
@@ -151,7 +152,8 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-navy-900 to-navy-800 p-4">
       <div className="w-full max-w-md">
-        <div className="mb-4 flex justify-center">
+        <div className="mb-4 flex items-center justify-center gap-2">
+          <ThemeToggle />
           <LanguageSwitch />
         </div>
         <div className="mb-6 text-center">

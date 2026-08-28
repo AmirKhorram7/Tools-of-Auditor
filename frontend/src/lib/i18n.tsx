@@ -40,6 +40,8 @@ const FA: Dict = {
   "nav.workHomeShort": "پیشخوان",
   "lang.fa": "فارسی",
   "lang.en": "English",
+  "theme.toDark": "حالت تیره",
+  "theme.toLight": "حالت روشن",
 
   "common.create": "ساخت",
   "common.add": "افزودن",
@@ -844,6 +846,8 @@ const EN: Dict = {
   "nav.workHomeShort": "Home",
   "lang.fa": "فارسی",
   "lang.en": "English",
+  "theme.toDark": "Dark mode",
+  "theme.toLight": "Light mode",
 
   "common.create": "Create",
   "common.add": "Add",
