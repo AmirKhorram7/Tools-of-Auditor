@@ -46,6 +46,7 @@ export default function StepDetailPage() {
 
   const [explanation, setExplanation] = useState("");
   const [savingExplanation, setSavingExplanation] = useState(false);
+  const [explanationSaveTick, setExplanationSaveTick] = useState(0);
   const [savedNote, setSavedNote] = useState<string | null>(null);
 
   const [itemModal, setItemModal] = useState<Tab | null>(null);
@@ -92,6 +93,7 @@ export default function StepDetailPage() {
           : current,
       );
       setSavedNote(t("exp.explanationSaved"));
+      setExplanationSaveTick((tick) => tick + 1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("exp.saveExplanationFail"));
     } finally {
@@ -263,6 +265,7 @@ export default function StepDetailPage() {
             mentions={stepMentions}
             onSave={editable ? saveExplanation : undefined}
             saving={savingExplanation}
+            savedTick={explanationSaveTick}
           />
 
           <MediaPanel
@@ -496,6 +499,7 @@ function ItemEditor({
   const [content, setContent] = useState(item.content ?? "");
   const [title, setTitle] = useState(item.title);
   const [saving, setSaving] = useState(false);
+  const [saveTick, setSaveTick] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -524,6 +528,7 @@ function ItemEditor({
         media_items: updated.media_items ?? item.media_items,
       });
       setNote(t("exp.saved"));
+      setSaveTick((tick) => tick + 1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("exp.saveFail"));
     } finally {
@@ -571,6 +576,9 @@ function ItemEditor({
         minHeight={150}
         readOnly={!editable}
         mentions={mentions}
+        onSave={editable ? save : undefined}
+        saving={saving}
+        savedTick={saveTick}
       />
 
       <MediaPanel

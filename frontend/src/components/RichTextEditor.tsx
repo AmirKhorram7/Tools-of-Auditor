@@ -147,6 +147,8 @@ type Props = {
   /** Orange save control next to Table. Same action as the page Save button. */
   onSave?: () => void;
   saving?: boolean;
+  /** Increment after a successful save to flash the border green for 1s. */
+  savedTick?: number;
 };
 
 const AUTHOR_BLOCKS = new Set(["P", "H1", "H2", "LI", "BLOCKQUOTE", "TD", "TH", "DIV"]);
@@ -378,6 +380,7 @@ export default function RichTextEditor({
   mentions,
   onSave,
   saving = false,
+  savedTick = 0,
 }: Props) {
   const { t, dir } = useI18n();
   const { profile } = useAuth();
@@ -397,6 +400,7 @@ export default function RichTextEditor({
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionPos, setMentionPos] = useState({ top: 0, left: 0 });
+  const [savedFlash, setSavedFlash] = useState(false);
   const mentionItems = mentions || [];
   const mentionEnabled = mentions != null && !readOnly;
   const mentionMatches = mentionItems
@@ -412,6 +416,13 @@ export default function RichTextEditor({
       markSelfBlocks(editor, authorLabelRef.current);
     }
   }, [value]);
+
+  useEffect(() => {
+    if (!savedTick) return;
+    setSavedFlash(true);
+    const timer = window.setTimeout(() => setSavedFlash(false), 1000);
+    return () => window.clearTimeout(timer);
+  }, [savedTick]);
 
   const emit = () => {
     onChange(serializeEditorHtml(editorRef.current?.innerHTML ?? ""));
@@ -839,8 +850,12 @@ export default function RichTextEditor({
   return (
     <div
       className={cx(
-        "overflow-hidden rounded-lg border border-gray-300 bg-white",
+        "overflow-hidden rounded-lg border bg-white transition-[border-color,box-shadow] duration-200",
+        savedFlash
+          ? "border-emerald-700 ring-2 ring-emerald-700/50"
+          : "border-gray-300",
         !readOnly &&
+          !savedFlash &&
           "focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-200",
       )}
     >
