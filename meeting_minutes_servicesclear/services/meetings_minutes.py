@@ -1,186 +1,322 @@
-from meeting_minutes_servicesclear.models import Company,  Meeting, MeetingItem, GroupMember, Group
 from datetime import date
-from django.core.exceptions import ValidationError
-from django.contrib.auth import get_user_model
 
-ROLE_OWNER = GroupMember.Role.OWNER
-ROLE_MAINTAINER = GroupMember.Role.MAINTAINER
-ROLE_GUEST = GroupMember.Role.GUEST
+from django.db import transaction
+from django.db.models import Max, Q
+from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from meeting_minutes_servicesclear.models import (
+    Company,
+    Group,
+    GroupMember,
+    Meeting,
+    MeetingItem,
+)
 
-User = get_user_model()
-
-
-
-
-class GroupService:
-
-    def create_group(self, company: Company, name: str, owner: User) -> Group:
-        return Group.objects.create(company=company, name=name, owner=owner)
-    def update_group(self, group: Group, **fields) -> Group:
-        data = self._validate_data(fields)
-        group.name = data.get('name')
-        group.owner = data.get('owner')
-        group.save()
-        return group
-    def delete_group(self, group: Group) -> None:
-        self.soft_delete(group)
-        return group
-
-    
+MANAGE_ROLES = {GroupMember.Role.OWNER, GroupMember.Role.MAINTAINER}
+OPEN_ITEM_STATUSES = {
+    MeetingItem.Status.CREATED,
+    MeetingItem.Status.IN_PROGRESS,
+    MeetingItem.Status.TEST,
+}
 
 
 class MeetingService:
-
-
-    def is_comapny_owner(self, user: User, company: Company) -> bool:
-        return user == company.owner
-    def is_group_owner(self, user: User, group: Group) -> bool:
-        return user == group.owner
-    def is_group_member(self, user: User, group: Group) -> bool:
-        return user in group.members.all()
-    def is_meeting_owner(self, user: User, meeting: Meeting) -> bool:
-        return user == meeting.owner
-    def is_meeting_item_owner(self, user: User, meeting_item: MeetingItem) -> bool:
-        return user == meeting_item.owner
-
-    def _validate_data(self, data: dict) -> dict:
-        if data.get('is_default_group_meeting') and data.get('meeting_number') is not None:
-            raise ValidationError("Meeting number cannot be set when is_default_group_meeting is True")
-            
-        if data.get('meeting_number') is not None and data.get('meeting_number') <= 0:
-            raise ValidationError("Meeting number must be greater than 0")
-
-        if data.get('date') is not None and data.get('date') < date.today():
-            raise ValidationError("Date must be in the future")
-        
-        if data.get('is_default_group_meeting') and data.get('meeting_number') is None:
-            raise ValidationError("Meeting number is required when is_default_group_meeting is True")
-        if data.get('manual_number_generating') and data.get('meeting_number') is not None:
-            raise ValidationError("Meeting number cannot be set when manual_number_generating is False")
-        
-        if data.get('manual_number_generating') and data.get('meeting_number') is None:
-            raise ValidationError("Meeting number is required when manual_number_generating is True")
-        
-
-        return data
-            
-        
-
-
-
-
-
-    def meeting_list(self, group: Group, date: date) -> list[Meeting]:
-        return Meeting.objects.filter(group=group, date=date)
-    
-    def meeting_detail(self, meeting: Meeting) -> Meeting:
-        return meeting
-
-    def get_meeting(self, meeting_id: int) -> Meeting:
-        return Meeting.objects.get(id=meeting_id)
-
-
-    def meeting_items_list(self, meeting: Meeting) -> list[MeetingItem]:
-        return MeetingItem.objects.filter(meeting=meeting)
-    
-    def meeting_item_detail(self, meeting_item: MeetingItem) -> MeetingItem:
-        return meeting_item
-    def meeting_item_get(self, meeting_item_id: int) -> MeetingItem:
-        return MeetingItem.objects.get(id=meeting_item_id)
-
-
-
-    def generate_meeting_number(self, group: Group, date: date, manual_number_generating: bool) -> int:
-        if group.manual_number_generating:
-            return None
-        else:
-            return Meeting.objects.filter(group=group, date=date).count() + 1   
-
-
-    def create_meeting(self, group: Group, date: date, is_default_group_meeting: bool = False, **fields) -> Meeting:
-        data = self.validate_meeting_data(fields)
-        meeting_number = self.generate_meeting_number(group, data.get('date'))
-        meeting = Meeting.objects.create(
+    def _active_member(self, user, group: Group) -> GroupMember | None:
+        return GroupMember.objects.filter(
             group=group,
-            date=data.get('date'),
-            is_default_group_meeting=data.get('is_default_group_meeting'),
-            meeting_number=meeting_number,
-            manual_number_generating=data.get('manual_number_generating'),
-            **data
-        )
+            user=user,
+            status=GroupMember.Status.ACTIVE,
+            deleted_at__isnull=True,
+        ).first()
+
+    def can_clerk_group(self, user, group: Group) -> bool:
+        if group.company.owner_id == user.id:
+            return True
+        member = self._active_member(user, group)
+        return bool(member and member.role in MANAGE_ROLES)
+
+    def can_view(self, user, meeting: Meeting) -> bool:
+        if meeting.deleted_at:
+            return False
+        if meeting.group.company.owner_id == user.id:
+            return True
+        return self._active_member(user, meeting.group) is not None
+
+    def can_clerk(self, user, meeting: Meeting) -> bool:
+        return self.can_clerk_group(user, meeting.group)
+
+    def is_assignee(self, user, item: MeetingItem) -> bool:
+        return item.assignees.filter(
+            user=user,
+            status=GroupMember.Status.ACTIVE,
+            deleted_at__isnull=True,
+        ).exists()
+
+    def _require_view(self, user, meeting: Meeting) -> Meeting:
+        if not self.can_view(user, meeting):
+            raise PermissionDenied("You do not have access to this meeting.")
         return meeting
 
-    def update_meeting(self, meeting: Meeting, **fields) -> Meeting:
-        data = self.validate_meeting_data(fields)
-        meeting.date = data.get('date')
-        meeting.is_default_group_meeting = data.get('is_default_group_meeting')
-        meeting.manual_number_generating = data.get('manual_number_generating')
+    def _require_clerk(self, user, meeting: Meeting) -> Meeting:
+        self._require_view(user, meeting)
+        if not self.can_clerk(user, meeting):
+            raise PermissionDenied("Only an owner or maintainer can do this.")
+        return meeting
+
+    def meetings_for_user(self, user, group: Group | None = None):
+        owned_company_ids = Company.objects.filter(
+            owner=user, deleted_at__isnull=True
+        ).values("id")
+        qs = (
+            Meeting.objects.filter(deleted_at__isnull=True)
+            .filter(
+                Q(group__company_id__in=owned_company_ids)
+                | Q(
+                    group__members__user=user,
+                    group__members__status=GroupMember.Status.ACTIVE,
+                    group__members__deleted_at__isnull=True,
+                )
+            )
+            .select_related("group", "group__company", "created_by")
+            .distinct()
+            .order_by("-date", "-meeting_number")
+        )
+        if group:
+            qs = qs.filter(group=group)
+        return qs
+
+    def get_meeting(self, user, meeting_id: int) -> Meeting:
+        meeting = (
+            Meeting.objects.filter(pk=meeting_id, deleted_at__isnull=True)
+            .select_related("group", "group__company", "created_by")
+            .first()
+        )
+        if meeting is None:
+            raise ValidationError({"meeting": "Meeting not found."})
+        return self._require_view(user, meeting)
+
+    def _next_number(self, group: Group) -> int:
+        current = (
+            Meeting.objects.filter(group=group, deleted_at__isnull=True)
+            .aggregate(n=Max("meeting_number"))
+            .get("n")
+        )
+        return (current or 0) + 1
+
+    def create_meeting(
+        self,
+        *,
+        user,
+        group: Group,
+        name: str = "",
+        meeting_date=None,
+        description: str = "",
+    ) -> Meeting:
+        if group.deleted_at:
+            raise ValidationError({"group": "Group is deleted."})
+        if not self.can_clerk_group(user, group):
+            raise PermissionDenied("Only an owner or maintainer can do this.")
+
+        meeting = Meeting(
+            group=group,
+            name=(name or "").strip() or group.name,
+            date=meeting_date or date.today(),
+            description=(description or "").strip(),
+            meeting_number=self._next_number(group),
+            status=Meeting.Status.OPEN,
+            created_by=user,
+        )
+        meeting.full_clean()
         meeting.save()
         return meeting
-    
 
-    def delete_meeting(self, meeting: Meeting) -> None:
-        self.soft_delete(meeting)
+    def update_meeting(self, *, user, meeting: Meeting, **fields) -> Meeting:
+        self._require_clerk(user, meeting)
+        if "name" in fields:
+            meeting.name = (fields["name"] or "").strip() or meeting.name
+        if "date" in fields and fields["date"]:
+            meeting.date = fields["date"]
+        if "description" in fields:
+            meeting.description = (fields["description"] or "").strip()
+        if "group" in fields and fields["group"] and fields["group"].id != meeting.group_id:
+            new_group = fields["group"]
+            if not self.can_clerk_group(user, new_group):
+                raise PermissionDenied("You cannot move minutes to that group.")
+            if new_group.company_id != meeting.group.company_id:
+                raise ValidationError({"group": "Group must belong to the same company."})
+            meeting.group = new_group
+        meeting.updated_by = user
+        meeting.full_clean()
+        meeting.save()
         return meeting
 
+    def close_meeting(self, *, user, meeting: Meeting) -> Meeting:
+        self._require_clerk(user, meeting)
+        if meeting.status != Meeting.Status.CLOSED:
+            meeting.status = Meeting.Status.CLOSED
+            meeting.closed_at = timezone.now()
+            meeting.updated_by = user
+            meeting.save(update_fields=["status", "closed_at", "updated_by", "updated_at"])
+        return meeting
 
+    def delete_meeting(self, *, user, meeting: Meeting) -> Meeting:
+        self._require_clerk(user, meeting)
+        meeting.deleted_at = timezone.now()
+        meeting.deleted_by = user
+        meeting.status = Meeting.Status.ARCHIVED
+        meeting.save(update_fields=["deleted_at", "deleted_by", "status", "updated_at"])
+        return meeting
 
- 
-
-
-
-    def create_meeting_item(self, meeting: Meeting, title: str, description: str = "", priority: int = 2, assigned_to: GroupMember = None) -> MeetingItem:
-        data = self.validate_meeting_item_data(title, description, priority, assigned_to)
-        meeting_item = MeetingItem.objects.create(
-            meeting=meeting,
-            title=data.get('title'),
-            description=data.get('description'),
-            priority=data.get('priority'),
-            assigned_to=data.get('assigned_to'),
+    def items_for_meeting(self, user, meeting: Meeting):
+        self._require_view(user, meeting)
+        return (
+            meeting.items.filter(deleted_at__isnull=True)
+            .prefetch_related("assignees__user")
+            .order_by("order", "id")
         )
-        return meeting_item
 
-    def validate_meeting_item_data(self, title: str, description: str = "", priority: int = 2, assigned_to: GroupMember = None, **fields) -> dict:
-        if title is None or title == "":
-            raise ValidationError("Title is required")
-        if priority is not None and priority < 1 or priority > 4:
-            raise ValidationError("Priority must be between 1 and 4")
-        return {
-            'title': title,
-            'description': description,
-            'priority': priority,
-            'assigned_to': assigned_to,
-            'due_date': fields.get('due_date'),
-            'completed_at': fields.get('completed_at'),
-            'completed_by': fields.get('completed_by'),
-            'status': fields.get('status'),
-        }
-    
+    def _set_assignees(self, item: MeetingItem, meeting: Meeting, assignee_ids):
+        ids = list(assignee_ids or [])
+        if not ids:
+            item.assignees.clear()
+            return
+        members = list(
+            GroupMember.objects.filter(
+                pk__in=ids,
+                group=meeting.group,
+                status=GroupMember.Status.ACTIVE,
+                deleted_at__isnull=True,
+            )
+        )
+        if len(members) != len(set(ids)):
+            raise ValidationError(
+                {"assignee_ids": "Assignees must be active members of this group."}
+            )
+        item.assignees.set(members)
 
-    def update_meeting_item(self, meeting_item: MeetingItem, title: str = None, description: str = None, priority: int = None, assigned_to: GroupMember = None, due_date: date = None) -> MeetingItem:
-        data = self.validate_meeting_item_data(title, description, priority, assigned_to, due_date)
-        meeting_item.title = data.get('title')
-        meeting_item.description = data.get('description')
-        meeting_item.priority = data.get('priority')
-        meeting_item.assigned_to = data.get('assigned_to')
-        meeting_item.due_date = data.get('due_date')
-        meeting_item.save()
-        return meeting_item
-    
-    def delete_meeting_item(self, meeting_item: MeetingItem) -> None:
-        self.soft_delete(meeting_item)
-        return meeting_item
+    @transaction.atomic
+    def create_item(
+        self,
+        *,
+        user,
+        meeting: Meeting,
+        title: str,
+        description: str = "",
+        priority: int = 2,
+        due_date=None,
+        assignee_ids=None,
+    ) -> MeetingItem:
+        self._require_clerk(user, meeting)
+        if meeting.status != Meeting.Status.OPEN:
+            raise ValidationError({"meeting": "Meeting is not open."})
+        clean_title = (title or "").strip()
+        if not clean_title:
+            raise ValidationError({"title": "Title is required."})
+        if priority not in MeetingItem.Priority.values:
+            raise ValidationError({"priority": "Invalid priority."})
 
+        last = meeting.items.filter(deleted_at__isnull=True).aggregate(n=Max("order")).get("n") or 0
+        item = MeetingItem(
+            meeting=meeting,
+            title=clean_title,
+            description=(description or "").strip(),
+            priority=priority,
+            due_date=due_date,
+            status=MeetingItem.Status.CREATED,
+            order=last + 1,
+            created_by=user,
+        )
+        item.full_clean()
+        item.save()
+        self._set_assignees(item, meeting, assignee_ids)
+        return item
 
-    
+    def update_item(self, *, user, item: MeetingItem, **fields) -> MeetingItem:
+        meeting = item.meeting
+        self._require_view(user, meeting)
+        clerk = self.can_clerk(user, meeting)
+        assignee = self.is_assignee(user, item)
+        if not clerk and not assignee:
+            raise PermissionDenied("You cannot edit this line.")
+        if not clerk:
+            extra = set(fields) - {"status"}
+            if extra:
+                raise PermissionDenied("Assignees can only change status.")
+        if "title" in fields:
+            clean_title = (fields["title"] or "").strip()
+            if not clean_title:
+                raise ValidationError({"title": "Subject is required."})
+            item.title = clean_title
+        if "description" in fields:
+            item.description = (fields["description"] or "").strip()
+        if "priority" in fields:
+            if fields["priority"] not in MeetingItem.Priority.values:
+                raise ValidationError({"priority": "Invalid priority."})
+            item.priority = fields["priority"]
+        if "due_date" in fields:
+            item.due_date = fields["due_date"]
+        if "assignee_ids" in fields:
+            self._set_assignees(item, meeting, fields["assignee_ids"])
+        if "status" in fields:
+            new_status = fields["status"]
+            if new_status not in MeetingItem.Status.values:
+                raise ValidationError({"status": "Invalid status."})
+            if new_status == MeetingItem.Status.CANCELLED and not clerk:
+                raise PermissionDenied("Only a clerk can cancel a line.")
+            item.status = new_status
+            if new_status == MeetingItem.Status.COMPLETED:
+                item.completed_at = timezone.now()
+                item.completed_by = user
+            else:
+                item.completed_at = None
+                item.completed_by = None
+        item.updated_by = user
+        item.save()
+        return item
 
+    def delete_item(self, *, user, item: MeetingItem) -> MeetingItem:
+        self._require_clerk(user, item.meeting)
+        item.deleted_at = timezone.now()
+        item.deleted_by = user
+        item.status = MeetingItem.Status.CANCELLED
+        item.save(update_fields=["deleted_at", "deleted_by", "status", "updated_at"])
+        return item
 
-    def soft_delete(instance: Meeting | MeetingItem) -> None:
-        instance.status = instance.Status.DELETED
-        instance.save()
-        return instance
+    @transaction.atomic
+    def carry_over(self, *, user, meeting: Meeting, target: Meeting | None = None) -> Meeting:
+        self._require_clerk(user, meeting)
+        if target is None:
+            target = self.create_meeting(
+                user=user,
+                group=meeting.group,
+                name=meeting.name,
+                meeting_date=date.today(),
+            )
+        else:
+            self._require_clerk(user, target)
+            if target.status != Meeting.Status.OPEN:
+                raise ValidationError({"target_meeting": "Target minutes must be open."})
+            if target.group.company_id != meeting.group.company_id:
+                raise ValidationError({"target_meeting": "Target must be in the same company."})
 
-
-
-
+        open_items = meeting.items.filter(
+            deleted_at__isnull=True,
+            status__in=OPEN_ITEM_STATUSES,
+        ).prefetch_related("assignees")
+        last = target.items.filter(deleted_at__isnull=True).aggregate(n=Max("order")).get("n") or 0
+        for source in open_items:
+            last += 1
+            clone = MeetingItem.objects.create(
+                meeting=target,
+                title=source.title,
+                description=source.description,
+                priority=source.priority,
+                due_date=source.due_date,
+                status=MeetingItem.Status.CREATED,
+                order=last,
+                cloned_from=source,
+                created_by=user,
+            )
+            clone.assignees.set(source.assignees.all())
+        return target

@@ -1,34 +1,30 @@
 from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
+
 from meeting_minutes_servicesclear.models import (
     Company,
     Group,
     GroupInvitation,
     GroupMember,
 )
-from meeting_minutes_servicesclear.services.company import CompnayService
-
-
+from meeting_minutes_servicesclear.services.company import CompanyService
 
 User = get_user_model()
-company_service = CompnayService()
+company_service = CompanyService()
 INVITE_DAYS = 14
 MANAGE_ROLES = {GroupMember.Role.OWNER, GroupMember.Role.MAINTAINER}
 INVITE_ROLES = {GroupMember.Role.MAINTAINER, GroupMember.Role.GUEST}
 
 
-
-
-
-
 class GroupService:
-    def is_company_owner(self, user: User, company: Company) -> bool:
-        return company_service.is_company_owner(user, company)
-    
+    def is_company_owner(self, user, company: Company) -> bool:
+        return company_service.is_owner(user, company)
+
     def active_member(self, user, group: Group) -> GroupMember | None:
         return GroupMember.objects.filter(
             group=group,
@@ -36,28 +32,26 @@ class GroupService:
             status=GroupMember.Status.ACTIVE,
             deleted_at__isnull=True,
         ).first()
-    
 
     def member_role(self, user, group: Group) -> str | None:
         member = self.active_member(user, group)
         return member.role if member else None
-    
 
     def can_view(self, user, group: Group) -> bool:
         if group.deleted_at:
             return False
-        if self.company_owner(user, group.company):
+        if self.is_company_owner(user, group.company):
             return True
         return self.active_member(user, group) is not None
-    
-
 
     def can_manage_member(self, user, group: Group) -> bool:
         if self.is_company_owner(user, group.company):
             return True
         return self.member_role(user, group) in MANAGE_ROLES
-    
-    #*
+
+    def can_manage_members(self, user, group: Group) -> bool:
+        return self.can_manage_member(user, group)
+
     def groups_for_user(self, user, company: Company | None = None):
         owned_company_ids = Company.objects.filter(
             owner=user, deleted_at__isnull=True
@@ -80,8 +74,6 @@ class GroupService:
             qs = qs.filter(company=company)
         return qs
 
-
-
     def get_group(self, user, group_id: int) -> Group:
         group = (
             Group.objects.filter(pk=group_id, deleted_at__isnull=True)
@@ -93,7 +85,6 @@ class GroupService:
         if not self.can_view(user, group):
             raise PermissionDenied("You do not have access to this group.")
         return group
-    
 
     @transaction.atomic
     def create_group(self, *, user, company: Company, name: str) -> Group:
@@ -104,9 +95,9 @@ class GroupService:
         clean_name = (name or "").strip()
         if not clean_name:
             raise ValidationError({"name": "Group name is required."})
-        
-        group = Group.objects.create(
-             company=company,
+
+        group = Group(
+            company=company,
             name=clean_name,
             owner=user,
             created_by=user,
@@ -115,7 +106,7 @@ class GroupService:
         group.full_clean()
         group.save()
         GroupMember.objects.create(
-             group=group,
+            group=group,
             user=user,
             role=GroupMember.Role.OWNER,
             status=GroupMember.Status.ACTIVE,
@@ -123,7 +114,7 @@ class GroupService:
             created_by=user,
         )
         return group
-    
+
     def update_group(self, *, user, group: Group, **fields) -> Group:
         if not self.is_company_owner(user, group.company):
             raise PermissionDenied("Only the company owner can update this group.")
@@ -139,17 +130,14 @@ class GroupService:
         group.save()
         return group
 
-
-    def delete_group(self, *, user, group: Group) -> None:
+    def delete_group(self, *, user, group: Group) -> Group:
         if not self.is_company_owner(user, group.company):
             raise PermissionDenied("Only the company owner can delete this group.")
         group.deleted_at = timezone.now()
         group.deleted_by = user
-        group.status = Group.Status.ARCHIVE
+        group.status = Group.Status.ARCHIVED
         group.save(update_fields=["deleted_at", "deleted_by", "status", "updated_at"])
         return group
-        
-
 
     @transaction.atomic
     def invite(self, *, user, group: Group, phone_number: str, role: str = "", position_title: str = "") -> GroupInvitation:
@@ -160,7 +148,6 @@ class GroupService:
             raise ValidationError({"phone_number": "Phone number is required."})
         if phone == user.phone_number:
             raise ValidationError({"phone_number": "You cannot invite yourself."})
-        
 
         invite_role = role or GroupMember.Role.GUEST
         if invite_role not in INVITE_ROLES:
@@ -168,10 +155,19 @@ class GroupService:
         if GroupMember.objects.filter(
             group=group,
             user__phone_number=phone,
-            status=GroupMember.Status.ACTIVE).exists():
+            status=GroupMember.Status.ACTIVE,
+            deleted_at__isnull=True,
+        ).exists():
+            raise ValidationError({"phone_number": "This person is already in the group."})
+        if GroupInvitation.objects.filter(
+            group=group,
+            phone_number=phone,
+            status=GroupInvitation.Status.PENDING,
+        ).exists():
             raise ValidationError({"phone_number": "A pending invite already exists."})
+
         invited_user = User.objects.filter(phone_number=phone).first()
-        invitation = GroupInvitation.objects.create(
+        return GroupInvitation.objects.create(
             group=group,
             invited_by=user,
             invited_user=invited_user,
@@ -181,7 +177,6 @@ class GroupService:
             expires_at=timezone.now() + timedelta(days=INVITE_DAYS),
             created_by=user,
         )
-        return invitation
 
     def attach_pending_invites(self, user) -> int:
         pending = list(
@@ -196,9 +191,8 @@ class GroupService:
             invitation.updated_by = user
             invitation.save(update_fields=["invited_user", "updated_by", "updated_at"])
         return len(pending)
-    
 
-
+    @transaction.atomic
     def respond(self, *, user, invitation: GroupInvitation, accept: bool) -> GroupInvitation:
         if invitation.status != GroupInvitation.Status.PENDING:
             raise ValidationError({"status": "This invitation is no longer pending."})
@@ -208,11 +202,13 @@ class GroupService:
             raise ValidationError({"status": "Invitation expired."})
         if invitation.phone_number != user.phone_number and invitation.invited_user_id != user.id:
             raise PermissionDenied("This invitation is not for you.")
+
         invitation.invited_user = user
         if not accept:
             invitation.status = GroupInvitation.Status.REJECTED
             invitation.save(update_fields=["invited_user", "status", "updated_at"])
             return invitation
+
         invitation.status = GroupInvitation.Status.ACCEPTED
         invitation.save(update_fields=["invited_user", "status", "updated_at"])
         GroupMember.objects.update_or_create(
@@ -241,13 +237,13 @@ class GroupService:
         if "status" in fields and fields["status"] in GroupMember.Status.values:
             member.status = fields["status"]
         if "position_title" in fields:
-             member.position_title = (fields["position_title"] or "").strip()
+            member.position_title = (fields["position_title"] or "").strip()
         member.updated_by = user
         member.save()
         return member
-    
+
     def remove_member(self, *, user, group: Group, member: GroupMember) -> GroupMember:
-        if not self.can_manage_members(user, group):
+        if not self.can_manage_member(user, group):
             raise PermissionDenied("Only an owner or maintainer can remove members.")
         if member.user_id == group.owner_id:
             raise ValidationError({"member": "The group owner cannot be removed."})
@@ -256,5 +252,3 @@ class GroupService:
         member.deleted_by = user
         member.save(update_fields=["status", "deleted_at", "deleted_by", "updated_at"])
         return member
-
-

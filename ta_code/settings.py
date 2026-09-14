@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "user_management.apps.UserManagementConfig",
     "system_explanation_services",
     "team_manage_services.apps.TeamManageServicesConfig",
+    "meeting_minutes_servicesclear.apps.MeetingMinutesServicesclearConfig",
 ]
 
 MIDDLEWARE = [
