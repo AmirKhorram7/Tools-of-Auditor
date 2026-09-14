@@ -35,6 +35,13 @@ export default function TopBar() {
       available: true,
     },
     {
+      key: "minutes",
+      label: t("nav.minutes"),
+      description: t("nav.minutesDesc"),
+      href: "/minutes",
+      available: true,
+    },
+    {
       key: "audit-plan",
       label: t("nav.auditPlan"),
       description: t("nav.soon"),
@@ -226,6 +233,7 @@ export default function TopBar() {
             t("nav.explanation"),
             pathname.startsWith("/explanation"),
           )}
+          {navLink("/minutes", t("nav.minutes"), pathname.startsWith("/minutes"))}
           {navLink("/contact", t("nav.contact"), pathname.startsWith("/contact"))}
           {navLink("/profile", t("nav.profile"), pathname === "/profile")}
         </nav>

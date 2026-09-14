@@ -78,7 +78,7 @@ class MeetingService:
                     group__members__deleted_at__isnull=True,
                 )
             )
-            .select_related("group", "group__company", "created_by")
+            .select_related("group", "group__company", "created_by", "created_by__profile")
             .distinct()
             .order_by("-date", "-meeting_number")
         )
@@ -89,7 +89,7 @@ class MeetingService:
     def get_meeting(self, user, meeting_id: int) -> Meeting:
         meeting = (
             Meeting.objects.filter(pk=meeting_id, deleted_at__isnull=True)
-            .select_related("group", "group__company", "created_by")
+            .select_related("group", "group__company", "created_by", "created_by__profile")
             .first()
         )
         if meeting is None:
@@ -172,7 +172,7 @@ class MeetingService:
         self._require_view(user, meeting)
         return (
             meeting.items.filter(deleted_at__isnull=True)
-            .prefetch_related("assignees__user")
+            .prefetch_related("assignees__user__profile")
             .order_by("order", "id")
         )
 

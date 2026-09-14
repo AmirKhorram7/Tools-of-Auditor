@@ -174,7 +174,7 @@ class GroupViewSet(viewsets.ModelViewSet):
                 status=GroupMember.Status.ACTIVE,
                 deleted_at__isnull=True,
             )
-            .select_related("user")
+            .select_related("user", "user__profile")
             .order_by("role", "id")
         )
         return Response(GroupMemberSerializer(qs, many=True).data)

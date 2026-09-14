@@ -7,9 +7,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, cx } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import type { WorkCompany, WorkInvitation, WorkProject, WorkTeam } from "@/lib/work";
+import type { MinutesCompany, MinutesGroup, MinutesInvitation, MinutesMeeting } from "@/lib/minutes";
 
-const STORAGE_KEY = "ta_work_panel_open";
+const STORAGE_KEY = "ta_minutes_panel_open";
 
 function readOpenState(): boolean {
   if (typeof window === "undefined") return true;
@@ -18,15 +18,14 @@ function readOpenState(): boolean {
   return raw === "1";
 }
 
-export default function WorkSidePanel() {
+export default function MinutesSidePanel() {
   const pathname = usePathname();
   const { t, dir } = useI18n();
   const [open, setOpen] = useState(true);
-  const [companies, setCompanies] = useState<WorkCompany[]>([]);
-  const [projects, setProjects] = useState<WorkProject[]>([]);
-  const [teams, setTeams] = useState<WorkTeam[]>([]);
-  const [invites, setInvites] = useState<WorkInvitation[]>([]);
-  const [unread, setUnread] = useState(0);
+  const [companies, setCompanies] = useState<MinutesCompany[]>([]);
+  const [groups, setGroups] = useState<MinutesGroup[]>([]);
+  const [meetings, setMeetings] = useState<MinutesMeeting[]>([]);
+  const [invites, setInvites] = useState<MinutesInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -45,24 +44,21 @@ export default function WorkSidePanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [companyRows, projectRows, teamRows, inviteRows, count] = await Promise.all([
-        apiList<WorkCompany>("/work/companies/"),
-        apiList<WorkProject>("/work/projects/"),
-        apiList<WorkTeam>("/work/teams/"),
-        apiList<WorkInvitation>("/work/invitations/"),
-        apiFetch<{ unread: number }>("/work/notifications/unread_count/"),
+      const [companyRows, groupRows, meetingRows, inviteRows] = await Promise.all([
+        apiList<MinutesCompany>("/minutes/companies/"),
+        apiList<MinutesGroup>("/minutes/groups/"),
+        apiList<MinutesMeeting>("/minutes/meetings/"),
+        apiList<MinutesInvitation>("/minutes/invitations/"),
       ]);
       setCompanies(companyRows);
-      setProjects(projectRows);
-      setTeams(teamRows);
+      setGroups(groupRows);
+      setMeetings(meetingRows.slice(0, 8));
       setInvites(inviteRows.filter((row) => row.status === "pending"));
-      setUnread(count.unread || 0);
     } catch {
       setCompanies([]);
-      setProjects([]);
-      setTeams([]);
+      setGroups([]);
+      setMeetings([]);
       setInvites([]);
-      setUnread(0);
     } finally {
       setLoading(false);
     }
@@ -75,7 +71,7 @@ export default function WorkSidePanel() {
   const respond = async (id: number, accept: boolean) => {
     setBusyId(id);
     try {
-      await apiFetch(`/work/invitations/${id}/${accept ? "accept" : "reject"}/`, {
+      await apiFetch(`/minutes/invitations/${id}/${accept ? "accept" : "reject"}/`, {
         method: "POST",
       });
       await load();
@@ -85,8 +81,6 @@ export default function WorkSidePanel() {
       setBusyId(null);
     }
   };
-
-  const badgeCount = invites.length + unread;
 
   if (!open) {
     return (
@@ -98,9 +92,9 @@ export default function WorkSidePanel() {
         dir={dir}
       >
         <span className="text-sm leading-none">‹</span>
-        {badgeCount > 0 && (
+        {invites.length > 0 && (
           <span className="flex size-5 items-center justify-center rounded-full bg-brand-500 text-[10px] font-bold text-ink">
-            {badgeCount > 9 ? "9+" : badgeCount}
+            {invites.length > 9 ? "9+" : invites.length}
           </span>
         )}
         <span
@@ -121,7 +115,7 @@ export default function WorkSidePanel() {
       <div className="flex items-center justify-between border-b border-navy-700 px-3 py-3">
         <div>
           <p className="text-sm font-semibold text-white">{t("nav.tools")}</p>
-          <p className="text-[11px] text-gray-400">{t("brand.name")}</p>
+          <p className="text-[11px] text-gray-400">{t("minutes.title")}</p>
         </div>
         <button
           type="button"
@@ -139,14 +133,9 @@ export default function WorkSidePanel() {
           </p>
           <Link
             href="/work"
-            className={cx(
-              "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition",
-              pathname.startsWith("/work")
-                ? "bg-navy-700 font-medium text-white"
-                : "text-gray-200 hover:bg-navy-800",
-            )}
+            className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-gray-200 transition hover:bg-navy-800"
           >
-            <span className="flex size-6 items-center justify-center rounded-md bg-brand-500 text-[11px] font-bold text-ink">
+            <span className="flex size-6 items-center justify-center rounded-md bg-navy-700 text-[11px] font-bold">
               {t("work.workLetter")}
             </span>
             <span className="min-w-0 flex-1">{t("nav.work")}</span>
@@ -179,7 +168,7 @@ export default function WorkSidePanel() {
         <section>
           <div className="mb-1 flex items-center justify-between px-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-              {t("work.tab.invites")}
+              {t("minutes.inbox")}
             </p>
             {invites.length > 0 && (
               <span className="rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-ink">
@@ -190,17 +179,14 @@ export default function WorkSidePanel() {
           {loading ? (
             <p className="px-2 py-2 text-xs text-gray-500">{t("common.loading")}</p>
           ) : invites.length === 0 ? (
-            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noFreshInvite")}</p>
+            <p className="px-2 py-2 text-xs text-gray-500">{t("minutes.noInvites")}</p>
           ) : (
             <ul className="space-y-2">
               {invites.slice(0, 4).map((invite) => (
-                <li
-                  key={invite.id}
-                  className="rounded-lg bg-navy-800 px-2.5 py-2"
-                >
-                  <p className="text-xs font-semibold text-white">{invite.team_name}</p>
+                <li key={invite.id} className="rounded-lg bg-navy-800 px-2.5 py-2">
+                  <p className="text-xs font-semibold text-white">{invite.group_name}</p>
                   <p className="mt-0.5 text-[10px] text-gray-400">
-                    {t("work.fromBy", { name: invite.invited_by_name })}
+                    {t("minutes.fromBy", { name: invite.invited_by_name })}
                   </p>
                   <div className="mt-2 flex gap-1">
                     <Button
@@ -209,130 +195,82 @@ export default function WorkSidePanel() {
                       loading={busyId === invite.id}
                       onClick={() => respond(invite.id, true)}
                     >
-                      {t("work.accept")}
+                      {t("minutes.accept")}
                     </Button>
                     <Button
                       size="sm"
                       variant="secondary"
                       className="!px-2 !py-1 text-[11px]"
-                      loading={busyId === invite.id}
                       onClick={() => respond(invite.id, false)}
                     >
-                      {t("work.reject")}
+                      {t("minutes.reject")}
                     </Button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-          <Link
-            href="/work/inbox"
-            className={cx(
-              "mt-2 flex items-center justify-between rounded-lg px-2.5 py-2 text-xs transition",
-              pathname === "/work/inbox"
-                ? "bg-brand-500 font-medium text-ink"
-                : "text-gray-300 hover:bg-navy-700 hover:text-white",
-            )}
-          >
-            <span>{t("work.allInbox")}</span>
-            {unread > 0 && (
-              <span className="rounded-full bg-brand-500 px-1.5 text-[10px] font-bold text-ink">
-                {unread}
-              </span>
-            )}
-          </Link>
         </section>
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            {t("work.companies")}
+            {t("minutes.companies")}
           </p>
-          {companies.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noCompanyEmpty")}</p>
-          ) : (
-            <ul className="space-y-1">
-              {companies.map((company) => (
-                <li key={company.id}>
-                  <Link
-                    href={`/work/companies/${company.id}`}
-                    className={cx(
-                      "block truncate rounded-md px-2 py-1.5 text-xs font-medium transition",
-                      pathname === `/work/companies/${company.id}`
-                        ? "bg-brand-500 font-bold text-ink"
-                        : "text-gray-200 hover:bg-navy-700 hover:text-white",
-                    )}
-                  >
-                    {company.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          {companies.slice(0, 6).map((company) => (
+            <Link
+              key={company.id}
+              href={`/minutes/companies/${company.id}`}
+              className={cx(
+                "block truncate rounded-lg px-2.5 py-1.5 text-xs transition",
+                pathname === `/minutes/companies/${company.id}`
+                  ? "bg-brand-500 font-medium text-ink"
+                  : "text-gray-200 hover:bg-navy-800",
+              )}
+            >
+              {company.name}
+            </Link>
+          ))}
         </section>
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            {t("work.teams")}
+            {t("minutes.groups")}
           </p>
-          {teams.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noTeamEmpty")}</p>
-          ) : (
-            <ul className="space-y-0.5">
-              {teams.slice(0, 10).map((team) => (
-                <li key={team.id}>
-                  <Link
-                    href={`/work/teams/${team.id}`}
-                    className={cx(
-                      "block truncate rounded-md px-2 py-1.5 text-xs font-medium transition",
-                      pathname === `/work/teams/${team.id}`
-                        ? "bg-brand-500 font-bold text-ink"
-                        : "text-gray-200 hover:bg-navy-700 hover:text-white",
-                    )}
-                  >
-                    {team.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          {groups.slice(0, 8).map((group) => (
+            <Link
+              key={group.id}
+              href={`/minutes/groups/${group.id}`}
+              className={cx(
+                "flex items-center justify-between gap-1 rounded-lg px-2.5 py-1.5 text-xs transition",
+                pathname === `/minutes/groups/${group.id}`
+                  ? "bg-brand-500 font-medium text-ink"
+                  : "text-gray-200 hover:bg-navy-800",
+              )}
+            >
+              <span className="min-w-0 truncate">{group.name}</span>
+              {group.is_default ? <span>⭐</span> : null}
+            </Link>
+          ))}
         </section>
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            {t("work.projects")}
+            {t("minutes.meetings")}
           </p>
-          <Link
-            href="/work"
-            className={cx(
-              "mb-1 block rounded-lg px-2.5 py-2 text-xs transition",
-              pathname === "/work"
-                ? "bg-brand-500 font-medium text-ink"
-                : "text-gray-300 hover:bg-navy-700 hover:text-white",
-            )}
-          >
-            {t("nav.workHomeShort")}
-          </Link>
-          {projects.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noProjectEmpty")}</p>
-          ) : (
-            <ul className="space-y-0.5">
-              {projects.slice(0, 12).map((project) => (
-                <li key={project.id}>
-                  <Link
-                    href={`/work/projects/${project.id}`}
-                    className={cx(
-                      "block truncate rounded-md px-2 py-1.5 text-xs transition",
-                      pathname === `/work/projects/${project.id}`
-                        ? "bg-brand-500 font-medium text-ink"
-                        : "text-gray-200 hover:bg-navy-700 hover:text-white",
-                    )}
-                  >
-                    {project.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          {meetings.map((meeting) => (
+            <Link
+              key={meeting.id}
+              href={`/minutes/meetings/${meeting.id}`}
+              className={cx(
+                "block truncate rounded-lg px-2.5 py-1.5 text-xs transition",
+                pathname === `/minutes/meetings/${meeting.id}`
+                  ? "bg-brand-500 font-medium text-ink"
+                  : "text-gray-200 hover:bg-navy-800",
+              )}
+            >
+              {meeting.name} #{meeting.meeting_number}
+            </Link>
+          ))}
         </section>
       </div>
     </aside>

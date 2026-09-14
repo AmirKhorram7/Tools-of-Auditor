@@ -28,6 +28,17 @@ def remaining_days(due, status):
     return (due - date.today()).days
 
 
+def profile_image_url(user):
+    profile = getattr(user, "profile", None)
+    image = getattr(profile, "profile_image", None) if profile else None
+    if not image:
+        return None
+    try:
+        return image.url
+    except (AttributeError, ValueError):
+        return None
+
+
 class CompanySerializer(serializers.ModelSerializer):
     is_owner = serializers.SerializerMethodField(
         help_text="True when the current user owns this company."
@@ -120,6 +131,7 @@ class GroupSerializer(serializers.ModelSerializer):
 class GroupMemberSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     full_name = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
 
     class Meta:
         model = GroupMember
@@ -128,15 +140,19 @@ class GroupMemberSerializer(serializers.ModelSerializer):
             "user",
             "phone_number",
             "full_name",
+            "profile_image",
             "role",
             "position_title",
             "status",
             "joined_at",
         ]
-        read_only_fields = ["user", "phone_number", "full_name", "joined_at"]
+        read_only_fields = ["user", "phone_number", "full_name", "profile_image", "joined_at"]
 
     def get_full_name(self, obj):
         return obj.user.get_full_name().strip() or obj.user.phone_number
+
+    def get_profile_image(self, obj):
+        return profile_image_url(obj.user)
 
 
 class InviteSerializer(serializers.Serializer):
@@ -299,6 +315,7 @@ class MeetingSerializer(serializers.ModelSerializer):
     clerk_name = serializers.SerializerMethodField(
         help_text="Person who created these minutes."
     )
+    clerk_image = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
     open_item_count = serializers.SerializerMethodField(
         help_text="Lines still in created / in_progress / test."
@@ -322,6 +339,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             "description",
             "status",
             "clerk_name",
+            "clerk_image",
             "item_count",
             "open_item_count",
             "can_clerk",
@@ -336,6 +354,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             "company_id",
             "company_name",
             "clerk_name",
+            "clerk_image",
             "item_count",
             "open_item_count",
             "can_clerk",
@@ -355,6 +374,9 @@ class MeetingSerializer(serializers.ModelSerializer):
     def get_clerk_name(self, obj):
         user = obj.created_by
         return user.get_full_name().strip() or user.phone_number
+
+    def get_clerk_image(self, obj):
+        return profile_image_url(obj.created_by)
 
     def get_item_count(self, obj):
         return obj.items.filter(deleted_at__isnull=True).count()

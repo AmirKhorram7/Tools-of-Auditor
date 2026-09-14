@@ -101,6 +101,11 @@ export default function DashboardPage() {
               {t("dash.enterExplanation")}
             </Button>
           </Link>
+          <Link href="/minutes">
+            <Button variant="secondary" size="sm">
+              {t("dash.enterMinutes")}
+            </Button>
+          </Link>
           {profileIncomplete && (
             <Link href="/profile">
               <Button variant="ghost" size="sm" className="text-white hover:bg-white/15">
