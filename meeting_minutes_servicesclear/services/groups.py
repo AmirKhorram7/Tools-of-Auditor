@@ -68,7 +68,7 @@ class GroupService:
             )
             .select_related("company", "owner")
             .distinct()
-            .order_by("name")
+            .order_by("-is_default", "name")
         )
         if company:
             qs = qs.filter(company=company)
@@ -96,12 +96,18 @@ class GroupService:
         if not clean_name:
             raise ValidationError({"name": "Group name is required."})
 
+        has_default = Group.objects.filter(
+            company=company,
+            is_default=True,
+            deleted_at__isnull=True,
+        ).exists()
         group = Group(
             company=company,
             name=clean_name,
             owner=user,
             created_by=user,
             status=Group.Status.ACTIVE,
+            is_default=not has_default,
         )
         group.full_clean()
         group.save()
@@ -115,6 +121,7 @@ class GroupService:
         )
         return group
 
+    @transaction.atomic
     def update_group(self, *, user, group: Group, **fields) -> Group:
         if not self.is_company_owner(user, group.company):
             raise PermissionDenied("Only the company owner can update this group.")
@@ -125,6 +132,15 @@ class GroupService:
             group.name = clean_name
         if "status" in fields and fields["status"] in Group.Status.values:
             group.status = fields["status"]
+        if "is_default" in fields:
+            make_default = bool(fields["is_default"])
+            if make_default:
+                Group.objects.filter(
+                    company=group.company,
+                    is_default=True,
+                    deleted_at__isnull=True,
+                ).exclude(pk=group.pk).update(is_default=False)
+            group.is_default = make_default
         group.updated_by = user
         group.full_clean()
         group.save()
@@ -136,7 +152,8 @@ class GroupService:
         group.deleted_at = timezone.now()
         group.deleted_by = user
         group.status = Group.Status.ARCHIVED
-        group.save(update_fields=["deleted_at", "deleted_by", "status", "updated_at"])
+        group.is_default = False
+        group.save(update_fields=["deleted_at", "deleted_by", "status", "is_default", "updated_at"])
         return group
 
     @transaction.atomic

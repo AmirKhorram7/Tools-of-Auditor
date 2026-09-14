@@ -108,11 +108,15 @@ class CompanyViewSet(viewsets.ModelViewSet):
     retrieve=extend_schema(summary="Get a group"),
     create=extend_schema(
         summary="Create a group",
-        description="Company owner only. Body: `{company, name}`. Creator is added as group **owner**.",
+        description="Company owner only. Body: `{company, name}`. Creator is added as group **owner**. The first group in a company is set as `is_default` automatically.",
     ),
     partial_update=extend_schema(
         summary="Update a group",
-        description="Company owner only. Body: `{name?, status?}`.",
+        description=(
+            "Company owner only. Body: `{name?, status?, is_default?}`.\n\n"
+            "`is_default: true` makes this the default group for new meeting minutes "
+            "and turns the previous default **off**. Only one default per company."
+        ),
     ),
     destroy=extend_schema(
         summary="Delete a group",

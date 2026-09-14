@@ -79,6 +79,7 @@ class GroupSerializer(serializers.ModelSerializer):
             "name",
             "owner",
             "status",
+            "is_default",
             "my_role",
             "can_manage",
             "created_at",
@@ -96,6 +97,9 @@ class GroupSerializer(serializers.ModelSerializer):
             "company": {"help_text": "Company this group belongs to."},
             "name": {"help_text": "Unique group name inside the company."},
             "status": {"help_text": "`active` or `archived`."},
+            "is_default": {
+                "help_text": "On/off. Default group for new minutes in this company. Turning this on turns the previous default off."
+            },
         }
 
     def get_my_role(self, obj):

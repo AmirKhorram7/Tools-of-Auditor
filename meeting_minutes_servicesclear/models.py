@@ -90,12 +90,21 @@ class Group(BaseModel):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
+    is_default = models.BooleanField(
+        default=False,
+        help_text=_("Default group for new meeting minutes in this company. Only one per company."),
+    )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["company", "name"],
                 name="mm_unique_group_name_in_company",
+            ),
+            models.UniqueConstraint(
+                fields=["company"],
+                condition=Q(is_default=True, deleted_at__isnull=True),
+                name="mm_unique_default_group_per_company",
             ),
         ]
 
