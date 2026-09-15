@@ -5,6 +5,10 @@
 #   2. docker compose up -d --build
 #      If Docker Hub times out (python:3.13-slim ... EOF), start without rebuild:
 #        docker compose up -d --pull never
+#      If pip times out on pypi.org during backend build, set in .env:
+#        PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+#        PIP_TRUSTED_HOST=mirrors.aliyun.com
+#      then: docker compose up -d --build backend
 #   3. open http://YOUR_SERVER_IP  (or configure TLS in deploy/nginx/nginx.conf)
 #
 # Monitoring (Grafana is the only UI you open):
@@ -58,6 +62,9 @@ services:
       context: .
       dockerfile: Dockerfile
       pull: false
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.org}
     restart: unless-stopped
     logging: *default-logging
     env_file:
