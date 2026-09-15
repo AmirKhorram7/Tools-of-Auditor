@@ -56,6 +56,11 @@ class Company(BaseModel):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
+    logo = models.ImageField(
+        upload_to="minutes/companies/%Y/%m/",
+        blank=True,
+        null=True,
+    )
 
     def __str__(self):
         return self.name
@@ -93,6 +98,11 @@ class Group(BaseModel):
     is_default = models.BooleanField(
         default=False,
         help_text=_("Default group for new meeting minutes in this company. Only one per company."),
+    )
+    logo = models.ImageField(
+        upload_to="minutes/groups/%Y/%m/",
+        blank=True,
+        null=True,
     )
 
     class Meta:
@@ -197,6 +207,7 @@ class GroupInvitation(BaseModel):
     expires_at = models.DateTimeField()
 
     class Meta:
+        ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["group", "phone_number"],

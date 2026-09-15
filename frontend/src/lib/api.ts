@@ -77,7 +77,14 @@ export const tokens = {
 
 /** Turns DRF error payloads into a single readable Farsi-friendly message. */
 function extractMessage(status: number, data: unknown): string {
-  if (typeof data === "string" && data.trim()) return data;
+  if (typeof data === "string" && data.trim()) {
+    const trimmed = data.trim();
+    if (trimmed.startsWith("<") || trimmed.toLowerCase().includes("<!doctype")) {
+      if (status >= 500) return "خطای سرور رخ داد. دوباره تلاش کنید.";
+      return "خطایی رخ داد. دوباره تلاش کنید.";
+    }
+    return trimmed;
+  }
 
   if (data && typeof data === "object") {
     const obj = data as Record<string, unknown>;

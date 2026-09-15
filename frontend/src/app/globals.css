@@ -34,6 +34,14 @@ html.dark {
   html[lang="en"] body {
     font-family: var(--font-inter), "Segoe UI", Arial, sans-serif;
   }
+
+  /* Native controls otherwise keep the system UI font and look “off” next to Vazirmatn. */
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
 }
 
 /* Practical dark remap for existing light utilities — header navy stays. */

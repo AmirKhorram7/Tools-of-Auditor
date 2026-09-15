@@ -33,7 +33,7 @@ export default function MinutesLayout({ children }: { children: React.ReactNode 
               key={tab.href}
               href={tab.href}
               className={cx(
-                "flex-1 py-3 text-center text-sm",
+                "flex min-h-12 flex-1 items-center justify-center py-3 text-center text-sm",
                 active ? "font-semibold text-navy-900" : "text-gray-500",
               )}
             >
@@ -41,7 +41,7 @@ export default function MinutesLayout({ children }: { children: React.ReactNode 
             </Link>
           );
         })}
-        <Link href="/work" className="flex-1 py-3 text-center text-sm text-gray-500">
+        <Link href="/work" className="flex min-h-12 flex-1 items-center justify-center py-3 text-center text-sm text-gray-500">
           {t("nav.work")}
         </Link>
       </nav>

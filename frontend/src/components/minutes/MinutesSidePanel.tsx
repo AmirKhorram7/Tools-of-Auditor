@@ -128,7 +128,7 @@ export default function MinutesSidePanel() {
 
       <div className="flex-1 space-y-4 overflow-y-auto p-2">
         <section>
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+          <p className="mb-1 px-2 text-[10px] font-semibold text-gray-500">
             {t("nav.services")}
           </p>
           <Link
@@ -167,7 +167,7 @@ export default function MinutesSidePanel() {
 
         <section>
           <div className="mb-1 flex items-center justify-between px-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+            <p className="text-[10px] font-semibold text-gray-500">
               {t("minutes.inbox")}
             </p>
             {invites.length > 0 && (
@@ -213,8 +213,8 @@ export default function MinutesSidePanel() {
         </section>
 
         <section>
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            {t("minutes.companies")}
+          <p className="mb-1 px-2 text-[10px] font-semibold tracking-wide text-gray-500">
+            {t("minutes.settings")}
           </p>
           {companies.slice(0, 6).map((company) => (
             <Link
@@ -233,7 +233,7 @@ export default function MinutesSidePanel() {
         </section>
 
         <section>
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+          <p className="mb-1 px-2 text-[10px] font-semibold text-gray-500">
             {t("minutes.groups")}
           </p>
           {groups.slice(0, 8).map((group) => (
@@ -254,7 +254,7 @@ export default function MinutesSidePanel() {
         </section>
 
         <section>
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+          <p className="mb-1 px-2 text-[10px] font-semibold text-gray-500">
             {t("minutes.meetings")}
           </p>
           {meetings.map((meeting) => (

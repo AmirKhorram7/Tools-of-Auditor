@@ -1,8 +1,9 @@
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from meeting_minutes_servicesclear.models import Company
+from meeting_minutes_servicesclear.models import Company, GroupMember
 
 
 class CompanyService:
@@ -13,9 +14,18 @@ class CompanyService:
         return self.is_owner(user, company)
 
     def companies_for_user(self, user):
+        member_company_ids = GroupMember.objects.filter(
+            user=user,
+            status=GroupMember.Status.ACTIVE,
+            deleted_at__isnull=True,
+            group__deleted_at__isnull=True,
+            group__company__deleted_at__isnull=True,
+        ).values("group__company_id")
         return (
-            Company.objects.filter(owner=user, deleted_at__isnull=True)
+            Company.objects.filter(deleted_at__isnull=True)
+            .filter(Q(owner=user) | Q(id__in=member_company_ids))
             .select_related("owner", "parent")
+            .distinct()
             .order_by("name")
         )
 
@@ -27,12 +37,21 @@ class CompanyService:
         )
         if company is None:
             raise ValidationError({"company": "Company not found."})
-        if not self.is_owner(user, company):
+        if self.is_owner(user, company):
+            return company
+        is_member = GroupMember.objects.filter(
+            user=user,
+            group__company=company,
+            status=GroupMember.Status.ACTIVE,
+            deleted_at__isnull=True,
+            group__deleted_at__isnull=True,
+        ).exists()
+        if not is_member:
             raise PermissionDenied("You are not the owner of this company.")
         return company
 
     @transaction.atomic
-    def create_company(self, *, user, name: str, parent: Company | None = None) -> Company:
+    def create_company(self, *, user, name: str, parent: Company | None = None, logo=None) -> Company:
         clean_name = (name or "").strip()
         if not clean_name:
             raise ValidationError({"name": "Name is required."})
@@ -49,6 +68,8 @@ class CompanyService:
             created_by=user,
             status=Company.Status.ACTIVE,
         )
+        if logo is not None:
+            company.logo = logo
         company.full_clean()
         company.save()
         return company
@@ -68,6 +89,8 @@ class CompanyService:
             company.parent = parent
         if "status" in fields and fields["status"] in Company.Status.values:
             company.status = fields["status"]
+        if "logo" in fields and fields["logo"] is not None:
+            company.logo = fields["logo"]
 
         company.updated_by = user
         company.full_clean()

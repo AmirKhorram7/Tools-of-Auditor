@@ -28,6 +28,22 @@ def remaining_days(due, status):
     return (due - date.today()).days
 
 
+class RelativeImageField(serializers.ImageField):
+    """Return storage-relative URLs (/media/...) for Docker/nginx."""
+
+    def to_representation(self, value):
+        if not value:
+            return None
+        try:
+            return value.url
+        except (AttributeError, ValueError):
+            return None
+
+
+def person_name(user):
+    return user.get_full_name().strip() or user.phone_number
+
+
 def profile_image_url(user):
     profile = getattr(user, "profile", None)
     image = getattr(profile, "profile_image", None) if profile else None
@@ -39,10 +55,21 @@ def profile_image_url(user):
         return None
 
 
+MAX_LOGO_BYTES = 2 * 1024 * 1024
+
+
+def validate_logo_file(value):
+    if value and getattr(value, "size", 0) > MAX_LOGO_BYTES:
+        raise serializers.ValidationError("Image must be 2 MB or smaller.")
+    return value
+
+
 class CompanySerializer(serializers.ModelSerializer):
     is_owner = serializers.SerializerMethodField(
         help_text="True when the current user owns this company."
     )
+    owner_name = serializers.SerializerMethodField()
+    logo = RelativeImageField(required=False, allow_null=True)
 
     class Meta:
         model = Company
@@ -51,16 +78,19 @@ class CompanySerializer(serializers.ModelSerializer):
             "name",
             "parent",
             "owner",
+            "owner_name",
+            "logo",
             "status",
             "is_owner",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["owner", "is_owner", "created_at", "updated_at"]
+        read_only_fields = ["owner", "owner_name", "is_owner", "created_at", "updated_at"]
         extra_kwargs = {
             "name": {"help_text": "Company display name."},
             "parent": {"help_text": "Optional holding company. One level only.", "required": False},
             "status": {"help_text": "`active` or `inactive`."},
+            "logo": {"help_text": "Optional company logo."},
         }
 
     def get_is_owner(self, obj):
@@ -71,14 +101,25 @@ class CompanySerializer(serializers.ModelSerializer):
             and obj.owner_id == request.user.id
         )
 
+    def get_owner_name(self, obj):
+        return person_name(obj.owner)
+
+    def validate_logo(self, value):
+        return validate_logo_file(value)
+
 
 class GroupSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source="company.name", read_only=True)
+    owner_name = serializers.SerializerMethodField()
+    logo = RelativeImageField(required=False, allow_null=True)
     my_role = serializers.SerializerMethodField(
         help_text="Current user's role on this group: `owner`, `maintainer`, `guest`, or null."
     )
     can_manage = serializers.SerializerMethodField(
         help_text="True if the current user can invite, update, or remove members."
+    )
+    can_edit = serializers.SerializerMethodField(
+        help_text="True if the current user can rename, upload a logo, or delete this group."
     )
 
     class Meta:
@@ -89,18 +130,23 @@ class GroupSerializer(serializers.ModelSerializer):
             "company_name",
             "name",
             "owner",
+            "owner_name",
+            "logo",
             "status",
             "is_default",
             "my_role",
             "can_manage",
+            "can_edit",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "owner",
+            "owner_name",
             "company_name",
             "my_role",
             "can_manage",
+            "can_edit",
             "created_at",
             "updated_at",
         ]
@@ -108,10 +154,17 @@ class GroupSerializer(serializers.ModelSerializer):
             "company": {"help_text": "Company this group belongs to."},
             "name": {"help_text": "Unique group name inside the company."},
             "status": {"help_text": "`active` or `archived`."},
+            "logo": {"help_text": "Optional group picture."},
             "is_default": {
                 "help_text": "On/off. Default group for new minutes in this company. Turning this on turns the previous default off."
             },
         }
+
+    def get_owner_name(self, obj):
+        return person_name(obj.owner)
+
+    def validate_logo(self, value):
+        return validate_logo_file(value)
 
     def get_my_role(self, obj):
         request = self.context.get("request")
@@ -126,6 +179,12 @@ class GroupSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return group_service.can_manage_members(request.user, obj)
+
+    def get_can_edit(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return group_service.is_company_owner(request.user, obj.company)
 
 
 class GroupMemberSerializer(serializers.ModelSerializer):
@@ -312,6 +371,7 @@ class MeetingSerializer(serializers.ModelSerializer):
     company_id = serializers.IntegerField(source="group.company_id", read_only=True)
     company_name = serializers.CharField(source="group.company.name", read_only=True)
     group_name = serializers.CharField(source="group.name", read_only=True)
+    group_logo = RelativeImageField(source="group.logo", read_only=True)
     clerk_name = serializers.SerializerMethodField(
         help_text="Person who created these minutes."
     )
@@ -323,6 +383,9 @@ class MeetingSerializer(serializers.ModelSerializer):
     can_clerk = serializers.SerializerMethodField(
         help_text="True if the current user can add/edit/close minutes."
     )
+    can_delete = serializers.SerializerMethodField(
+        help_text="True if the current user can delete these minutes."
+    )
     items = MeetingItemSerializer(many=True, read_only=True)
 
     class Meta:
@@ -332,6 +395,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             "name",
             "group",
             "group_name",
+            "group_logo",
             "company_id",
             "company_name",
             "date",
@@ -343,6 +407,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             "item_count",
             "open_item_count",
             "can_clerk",
+            "can_delete",
             "items",
             "closed_at",
             "created_at",
@@ -351,6 +416,7 @@ class MeetingSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "meeting_number",
             "group_name",
+            "group_logo",
             "company_id",
             "company_name",
             "clerk_name",
@@ -358,6 +424,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             "item_count",
             "open_item_count",
             "can_clerk",
+            "can_delete",
             "items",
             "closed_at",
             "status",
@@ -389,6 +456,12 @@ class MeetingSerializer(serializers.ModelSerializer):
         if not request:
             return False
         return meeting_service.can_clerk(request.user, obj)
+
+    def get_can_delete(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return False
+        return obj.created_by_id == request.user.id or meeting_service.can_clerk(request.user, obj)
 
 
 class MeetingListSerializer(MeetingSerializer):

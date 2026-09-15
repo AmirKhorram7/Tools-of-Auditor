@@ -7,10 +7,12 @@ export default function DefaultSwitch({
   on,
   disabled,
   onToggle,
+  name,
 }: {
   on: boolean;
   disabled?: boolean;
   onToggle: () => void;
+  name?: string;
 }) {
   const { t } = useI18n();
   return (
@@ -30,7 +32,7 @@ export default function DefaultSwitch({
       <span
         className={cx(
           "relative h-6 w-11 shrink-0 rounded-full transition",
-          on ? "bg-brand-500" : "bg-gray-300",
+          on ? "bg-green-600" : "bg-gray-300",
           disabled && "opacity-50",
         )}
       >
@@ -41,8 +43,13 @@ export default function DefaultSwitch({
           )}
         />
       </span>
-      <span className="text-[11px] font-medium text-navy-800">
-        {on ? t("minutes.defaultOn") : t("minutes.defaultOff")}
+      <span
+        className={cx(
+          "text-xs font-medium leading-5",
+          on ? "font-bold text-green-700" : "text-navy-800",
+        )}
+      >
+        {on ? name || t("minutes.defaultOn") : t("minutes.defaultOff")}
       </span>
     </button>
   );

@@ -141,6 +141,8 @@ class GroupService:
                     deleted_at__isnull=True,
                 ).exclude(pk=group.pk).update(is_default=False)
             group.is_default = make_default
+        if "logo" in fields and fields["logo"] is not None:
+            group.logo = fields["logo"]
         group.updated_by = user
         group.full_clean()
         group.save()

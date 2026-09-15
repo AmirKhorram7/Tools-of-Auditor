@@ -4,6 +4,19 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
+  CalendarIcon,
+  ClerkIcon,
+  DuoAcceptIcon,
+  DuoEditIcon,
+  DuoRestoreIcon,
+  GroupIcon,
+  MinutesDocIcon,
+  MinutesIconTile,
+  PlusIcon,
+  StatusIcon,
+  TrashIcon,
+} from "@/components/minutes/MinutesIcons";
+import {
   Alert,
   Avatar,
   Button,
@@ -260,18 +273,19 @@ export default function MinutesMeetingPage() {
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-lg font-bold text-ink sm:text-xl">
-              📝 {meeting.name} #{n(meeting.meeting_number)}
+            <p className="text-lg font-bold leading-8 text-ink sm:text-xl">
+              {meeting.name} #{n(meeting.meeting_number)}
             </p>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs leading-5 text-gray-500">
               {meeting.company_name} · {meeting.group_name}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
             {meeting.can_clerk && (
               <Button
                 size="sm"
                 variant="secondary"
+                className="min-h-11 w-full sm:w-auto"
                 onClick={() => {
                   setEditName(meeting.name);
                   setEditDate(meeting.date);
@@ -279,17 +293,31 @@ export default function MinutesMeetingPage() {
                   setHeaderOpen(true);
                 }}
               >
-                ✏️ {t("minutes.editHeader")}
+                <DuoEditIcon className="size-5" />
+                {t("minutes.editHeader")}
               </Button>
             )}
             {meeting.can_clerk && meeting.status === "open" && (
-              <Button size="sm" variant="secondary" loading={saving} onClick={closeMeeting}>
-                ✅ {t("minutes.closeMeeting")}
+              <Button
+                size="sm"
+                variant="secondary"
+                className="min-h-11 w-full sm:w-auto"
+                loading={saving}
+                onClick={closeMeeting}
+              >
+                <DuoAcceptIcon className="size-5" />
+                {t("minutes.closeMeeting")}
               </Button>
             )}
             {meeting.can_clerk && meeting.open_item_count > 0 && (
-              <Button size="sm" loading={saving} onClick={carryOver}>
-                ➡️ {t("minutes.carryOver")}
+              <Button
+                size="sm"
+                className="min-h-11 w-full sm:w-auto"
+                loading={saving}
+                onClick={carryOver}
+              >
+                <DuoRestoreIcon className="size-5" />
+                {t("minutes.carryOver")}
               </Button>
             )}
           </div>
@@ -297,22 +325,34 @@ export default function MinutesMeetingPage() {
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <HeaderCell
-            icon="👤"
+            tone="brand"
+            icon={<ClerkIcon />}
             label={t("minutes.clerk")}
             value={
-              <span className="flex items-center gap-2">
+              <span className="flex items-center gap-2 leading-6">
                 <Avatar src={meeting.clerk_image} name={meeting.clerk_name} size={28} />
-                {meeting.clerk_name}
+                <span className="truncate">{meeting.clerk_name}</span>
               </span>
             }
           />
-          <HeaderCell icon="📅" label={t("minutes.meetingDate")} value={formatJalaliDisplay(meeting.date, latin)} />
-          <HeaderCell icon="👥" label={t("minutes.group")} value={meeting.group_name} />
           <HeaderCell
-            icon="📊"
+            tone="soft"
+            icon={<CalendarIcon />}
+            label={t("minutes.meetingDate")}
+            value={formatJalaliDisplay(meeting.date, latin)}
+          />
+          <HeaderCell
+            tone="navy"
+            icon={<GroupIcon />}
+            label={t("minutes.group")}
+            value={meeting.group_name}
+          />
+          <HeaderCell
+            tone="soft"
+            icon={<StatusIcon />}
             label={t("minutes.status")}
             value={
-              <span className={cx("rounded-full px-2 py-0.5 text-[11px] font-bold", meetingStatusClass(meeting.status))}>
+              <span className={cx("rounded-full px-2 py-0.5 text-[11px] font-bold leading-5", meetingStatusClass(meeting.status))}>
                 {t(`minutes.${meeting.status}`)}
               </span>
             }
@@ -325,11 +365,16 @@ export default function MinutesMeetingPage() {
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 className="text-base font-bold text-ink">📌 {t("minutes.lines")}</h2>
-            <p className="text-xs text-gray-500">
-              {t("minutes.linesMeta", { total: n(items.length), done: n(doneCount) })}
-            </p>
+          <div className="flex items-center gap-3">
+            <MinutesIconTile tone="brand" size="sm">
+              <MinutesDocIcon className="size-4" />
+            </MinutesIconTile>
+            <div>
+              <h2 className="text-base font-bold leading-7 text-ink">{t("minutes.lines")}</h2>
+              <p className="text-xs text-gray-500">
+                {t("minutes.linesMeta", { total: n(items.length), done: n(doneCount) })}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -342,14 +387,14 @@ export default function MinutesMeetingPage() {
             }}
           >
             <Input
-              autoFocus
               value={quickTitle}
               onChange={(e) => setQuickTitle(e.target.value)}
               placeholder={t("minutes.quickAdd")}
-              className="flex-1"
+              className="min-h-11 flex-1"
             />
-            <Button type="submit" loading={adding} className="sm:w-auto">
-              ＋ {t("minutes.addLine")}
+            <Button type="submit" loading={adding} className="min-h-11 w-full sm:w-auto">
+              <PlusIcon className="size-4" />
+              {t("minutes.addLine")}
             </Button>
           </form>
         )}
@@ -358,7 +403,7 @@ export default function MinutesMeetingPage() {
           <p className="py-8 text-center text-sm text-gray-500">{t("minutes.noLines")}</p>
         ) : (
           <>
-            <div className="mb-2 hidden grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_4.5rem] gap-2 px-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400 lg:grid">
+            <div className="mb-2 hidden grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_4.5rem] gap-2 px-2 text-xs font-semibold text-navy-800 lg:grid">
               <span>{t("minutes.subject")}</span>
               <span>{t("minutes.assignees")}</span>
               <span>{t("minutes.due")}</span>
@@ -394,7 +439,7 @@ export default function MinutesMeetingPage() {
                     )}
                   </div>
                   <p className="mt-2 text-xs text-ink lg:mt-0">
-                    {item.due_date ? `📅 ${formatJalaliDisplay(item.due_date, latin)}` : "—"}
+                    {item.due_date ? formatJalaliDisplay(item.due_date, latin) : "—"}
                   </p>
                   <div className="mt-2 lg:mt-0">
                     {item.can_set_status ? (
@@ -402,7 +447,7 @@ export default function MinutesMeetingPage() {
                         value={item.status}
                         onChange={(e) => setStatus(item, e.target.value as MinutesItemStatus)}
                         className={cx(
-                          "rounded-full border-0 px-2 py-1 text-[11px] font-bold",
+                          "rounded-full border-0 px-2 py-1 text-[11px] font-bold leading-5",
                           itemStatusClass(item.status),
                         )}
                       >
@@ -422,28 +467,28 @@ export default function MinutesMeetingPage() {
                     {item.remaining_days == null
                       ? "—"
                       : item.is_overdue
-                        ? `⌛ ${t("minutes.overdue")}`
-                        : `⏳ ${n(item.remaining_days)} ${t("minutes.daysUnit")}`}
+                        ? t("minutes.overdue")
+                        : `${n(item.remaining_days)} ${t("minutes.daysUnit")}`}
                   </p>
                   <div className="mt-2 flex gap-1 lg:mt-0">
                     {item.can_edit && (
                       <button
                         type="button"
-                        className="rounded-lg p-1.5 text-lg hover:bg-surface"
+                        className="flex size-10 items-center justify-center rounded-lg text-navy-800 hover:bg-surface"
                         onClick={() => openEdit(item)}
                         aria-label={t("common.edit")}
                       >
-                        ✏️
+                        <DuoEditIcon className="size-5" />
                       </button>
                     )}
                     {item.can_edit && (
                       <button
                         type="button"
-                        className="rounded-lg p-1.5 text-lg hover:bg-surface"
+                        className="flex size-10 items-center justify-center rounded-lg text-navy-800 hover:bg-red-50 hover:text-red-600"
                         onClick={() => setDeleteId(item.id)}
                         aria-label={t("common.delete")}
                       >
-                        🗑️
+                        <TrashIcon className="size-4" />
                       </button>
                     )}
                   </div>
@@ -457,9 +502,10 @@ export default function MinutesMeetingPage() {
           <button
             type="button"
             onClick={openNewLine}
-            className="mt-5 flex w-full items-center justify-center rounded-xl bg-brand-500 px-4 py-4 text-base font-bold text-ink shadow-sm transition hover:bg-brand-700 hover:text-white"
+            className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-3 text-base font-bold text-ink shadow-sm transition hover:bg-brand-700 hover:text-white"
           >
-            ＋ {t("minutes.addLine")}
+            <PlusIcon className="size-5" />
+            {t("minutes.addLine")}
           </button>
         )}
       </section>
@@ -479,12 +525,13 @@ export default function MinutesMeetingPage() {
           <Field label={t("minutes.description")}>
             <Textarea rows={3} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
           </Field>
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setHeaderOpen(false)}>
+          <div className="flex justify-end gap-2 pt-1 max-sm:flex-col-reverse">
+            <Button variant="secondary" className="min-h-11 max-sm:w-full" onClick={() => setHeaderOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button loading={saving} onClick={saveHeader}>
-              {t("minutes.saveHeader")}
+            <Button loading={saving} className="min-h-11 max-sm:w-full" onClick={saveHeader}>
+              <DuoAcceptIcon className="size-5" />
+              {t("common.save")}
             </Button>
           </div>
         </div>
@@ -499,7 +546,7 @@ export default function MinutesMeetingPage() {
           <Field label={t("minutes.subject")}>
             <Input autoFocus value={lineTitle} onChange={(e) => setLineTitle(e.target.value)} />
           </Field>
-          <Field label={t("minutes.description")}>
+          <Field label={t("minutes.lineNotes")}>
             <Textarea rows={3} value={lineDesc} onChange={(e) => setLineDesc(e.target.value)} />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -526,7 +573,7 @@ export default function MinutesMeetingPage() {
                     type="button"
                     onClick={() => toggleAssignee(member.id)}
                     className={cx(
-                      "flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs",
+                      "flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
                       selected
                         ? "border-brand-500 bg-brand-50 font-semibold text-ink"
                         : "border-gray-200 bg-white text-gray-600",
@@ -539,12 +586,18 @@ export default function MinutesMeetingPage() {
               })}
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setLineOpen(false)}>
+          <div className="flex justify-end gap-2 pt-1 max-sm:flex-col-reverse">
+            <Button variant="secondary" className="min-h-11 max-sm:w-full" onClick={() => setLineOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button loading={adding || saving} onClick={saveLine}>
-              {editing ? t("minutes.saveLine") : t("minutes.addLine")}
+            <Button
+              loading={adding || saving}
+              className="min-h-11 max-sm:w-full"
+              disabled={!lineTitle.trim()}
+              onClick={saveLine}
+            >
+              <DuoAcceptIcon className="size-5" />
+              {t("common.save")}
             </Button>
           </div>
         </div>
@@ -565,17 +618,19 @@ function HeaderCell({
   icon,
   label,
   value,
+  tone = "navy",
 }: {
-  icon: string;
+  icon: ReactNode;
   label: string;
   value: ReactNode;
+  tone?: "navy" | "brand" | "soft";
 }) {
   return (
-    <div className="flex items-start gap-2">
-      <span className="text-base">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-[11px] text-gray-400">{label}</p>
-        <div className="text-sm font-medium text-ink">{value}</div>
+    <div className="flex items-center gap-3">
+      <MinutesIconTile tone={tone}>{icon}</MinutesIconTile>
+      <div className="min-w-0 leading-6">
+        <p className="text-xs font-medium text-gray-500">{label}</p>
+        <div className="text-sm font-semibold text-ink">{value}</div>
       </div>
     </div>
   );

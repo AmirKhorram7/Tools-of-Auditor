@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  CheckIcon,
+  InboxIcon,
+  MinutesIconTile,
+} from "@/components/minutes/MinutesIcons";
+import {
   Alert,
   Badge,
   Button,
@@ -58,13 +63,18 @@ export default function MinutesInboxPage() {
 
   return (
     <div className="flex flex-col gap-3 pt-4">
-      <WorkBreadcrumb
-        fallbackHref="/minutes"
-        items={[
-          { href: "/minutes", label: t("minutes.crumb") },
-          { label: t("minutes.inboxTitle") },
-        ]}
-      />
+      <div className="flex items-center gap-3">
+        <MinutesIconTile tone="navy">
+          <InboxIcon />
+        </MinutesIconTile>
+        <WorkBreadcrumb
+          fallbackHref="/minutes"
+          items={[
+            { href: "/minutes", label: t("minutes.crumb") },
+            { label: t("minutes.inboxTitle") },
+          ]}
+        />
+      </div>
       {error && <Alert>{error}</Alert>}
       {invites.length === 0 ? (
         <EmptyState title={t("minutes.noInvites")} />
@@ -87,6 +97,7 @@ export default function MinutesInboxPage() {
                   loading={busyId === invite.id}
                   onClick={() => respond(invite.id, true)}
                 >
+                  <CheckIcon className="size-4" />
                   {t("minutes.accept")}
                 </Button>
                 <Button

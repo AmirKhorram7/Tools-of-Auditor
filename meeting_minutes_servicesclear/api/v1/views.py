@@ -4,6 +4,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -66,6 +67,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
     """Base: `/api/v1/minutes/companies/`"""
 
     permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
     serializer_class = CompanySerializer
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
@@ -79,6 +81,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
             user=request.user,
             name=serializer.validated_data["name"],
             parent=serializer.validated_data.get("parent"),
+            logo=serializer.validated_data.get("logo"),
         )
         return Response(self.get_serializer(company).data, status=status.HTTP_201_CREATED)
 
@@ -89,7 +92,11 @@ class CompanyViewSet(viewsets.ModelViewSet):
         company = company_service.update_company(
             user=request.user,
             company=company,
-            **serializer.validated_data,
+            **{
+                key: value
+                for key, value in serializer.validated_data.items()
+                if key in {"name", "parent", "status", "logo"}
+            },
         )
         return Response(self.get_serializer(company).data)
 
@@ -127,6 +134,7 @@ class GroupViewSet(viewsets.ModelViewSet):
     """Base: `/api/v1/minutes/groups/`"""
 
     permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
     serializer_class = GroupSerializer
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
@@ -154,7 +162,11 @@ class GroupViewSet(viewsets.ModelViewSet):
         group = group_service.update_group(
             user=request.user,
             group=group,
-            **serializer.validated_data,
+            **{
+                key: value
+                for key, value in serializer.validated_data.items()
+                if key in {"name", "status", "is_default", "logo"}
+            },
         )
         return Response(self.get_serializer(group).data)
 
@@ -263,8 +275,11 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
             "group", "group__company", "invited_by", "invited_user"
         )
         if scope == "sent":
-            return qs.filter(invited_by=user)
-        return qs.filter(Q(invited_user=user) | Q(phone_number=user.phone_number)).distinct()
+            return qs.filter(invited_by=user, group__deleted_at__isnull=True)
+        return qs.filter(
+            Q(invited_user=user) | Q(phone_number=user.phone_number),
+            group__deleted_at__isnull=True,
+        ).distinct()
 
     @extend_schema(
         summary="Accept invitation",

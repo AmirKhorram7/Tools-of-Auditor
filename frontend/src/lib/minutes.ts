@@ -5,6 +5,8 @@ export type MinutesCompany = {
   name: string;
   parent: number | null;
   owner: number;
+  owner_name?: string;
+  logo?: string | null;
   status: string;
   is_owner?: boolean;
   created_at: string;
@@ -17,10 +19,13 @@ export type MinutesGroup = {
   company_name?: string;
   name: string;
   owner: number;
+  owner_name?: string;
+  logo?: string | null;
   status: string;
   is_default: boolean;
   my_role?: string | null;
   can_manage?: boolean;
+  can_edit?: boolean;
   created_at: string;
   updated_at?: string;
 };
@@ -84,6 +89,7 @@ export type MinutesMeeting = {
   name: string;
   group: number;
   group_name: string;
+  group_logo?: string | null;
   company_id: number;
   company_name: string;
   date: string;
@@ -95,6 +101,7 @@ export type MinutesMeeting = {
   item_count: number;
   open_item_count: number;
   can_clerk: boolean;
+  can_delete?: boolean;
   items?: MinutesItem[];
   closed_at: string | null;
   created_at: string;
@@ -110,6 +117,15 @@ export const ITEM_STATUSES: MinutesItemStatus[] = [
 ];
 
 export const ASSIGNABLE_ROLES = ["maintainer", "guest"] as const;
+
+export function defaultMinutesPicture(kind: "group" | "company", id: number): string {
+  if (kind === "company") {
+    const index = ((Math.abs(id) - 1) % 2) + 1;
+    return `/minutes/defaults/company-${index}.svg`;
+  }
+  const index = ((Math.abs(id) - 1) % 4) + 1;
+  return `/minutes/defaults/group-${index}.svg`;
+}
 
 export function minutesCompanyPhoto(companyId: number): string {
   return workCompanyPhoto(companyId);
