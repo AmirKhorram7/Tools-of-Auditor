@@ -1,6 +1,7 @@
 from datetime import date
 
-from django.db import transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -97,12 +98,28 @@ class MeetingService:
         return self._require_view(user, meeting)
 
     def _next_number(self, group: Group) -> int:
+        # Include soft-deleted rows. UniqueConstraint is on (group, meeting_number)
+        # for every row, so skipping deleted numbers collides and 500s.
         current = (
-            Meeting.objects.filter(group=group, deleted_at__isnull=True)
+            Meeting.objects.filter(group=group)
             .aggregate(n=Max("meeting_number"))
             .get("n")
         )
         return (current or 0) + 1
+
+    def _save_meeting(self, meeting: Meeting) -> Meeting:
+        try:
+            with transaction.atomic():
+                meeting.full_clean()
+                meeting.save()
+        except DjangoValidationError as exc:
+            payload = getattr(exc, "message_dict", None) or {
+                "detail": getattr(exc, "messages", [str(exc)])
+            }
+            raise ValidationError(payload) from exc
+        except IntegrityError as exc:
+            raise ValidationError({"group": "Could not save the meeting. Try again."}) from exc
+        return meeting
 
     def create_meeting(
         self,
@@ -118,18 +135,30 @@ class MeetingService:
         if not self.can_clerk_group(user, group):
             raise PermissionDenied("Only an owner or maintainer can do this.")
 
-        meeting = Meeting(
-            group=group,
-            name=(name or "").strip() or group.name,
-            date=meeting_date or date.today(),
-            description=(description or "").strip(),
-            meeting_number=self._next_number(group),
-            status=Meeting.Status.OPEN,
-            created_by=user,
-        )
-        meeting.full_clean()
-        meeting.save()
-        return meeting
+        for attempt in range(3):
+            meeting = Meeting(
+                group=group,
+                name=(name or "").strip() or group.name,
+                date=meeting_date or date.today(),
+                description=(description or "").strip(),
+                meeting_number=self._next_number(group),
+                status=Meeting.Status.OPEN,
+                created_by=user,
+            )
+            try:
+                with transaction.atomic():
+                    meeting.full_clean()
+                    meeting.save()
+                return meeting
+            except DjangoValidationError as exc:
+                payload = getattr(exc, "message_dict", None) or {
+                    "detail": getattr(exc, "messages", [str(exc)])
+                }
+                raise ValidationError(payload) from exc
+            except IntegrityError:
+                if attempt == 2:
+                    raise ValidationError({"group": "Could not create the meeting. Try again."})
+        raise ValidationError({"group": "Could not create the meeting. Try again."})
 
     def update_meeting(self, *, user, meeting: Meeting, **fields) -> Meeting:
         self._require_clerk(user, meeting)
@@ -147,9 +176,7 @@ class MeetingService:
                 raise ValidationError({"group": "Group must belong to the same company."})
             meeting.group = new_group
         meeting.updated_by = user
-        meeting.full_clean()
-        meeting.save()
-        return meeting
+        return self._save_meeting(meeting)
 
     def close_meeting(self, *, user, meeting: Meeting) -> Meeting:
         self._require_clerk(user, meeting)
