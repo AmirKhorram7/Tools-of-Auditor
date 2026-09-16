@@ -26,10 +26,10 @@ const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://localhost";
 
 const titleDefault =
-  "تی‌ادیتور | ابزار حسابرسان داخلی و خارجی — تشریح سیستم، ریسک و کنترل";
+  "تی آدیتر | مدیریت کار، صورت جلسه و تشریح سیستم — ابزار حسابرسی داخلی و خارجی";
 
 const description =
-  "تی‌ادیتور (Tauditor) پلتفرم تخصصی حسابرسان داخلی و خارجی برای تشریح سیستم، مستندسازی فرایندها، ریسک‌ها و کنترل‌ها. مناسب ممیزی ISO و تیم‌های تضمین کیفیت (QA) و کنترل کیفیت (QC).";
+  "تی آدیتر (تی‌آدیتر، Tauditor) پلتفرم فارسی مدیریت کار و وظیفه، صورت جلسه و صورت‌جلسه، تشریح سیستم و مستندسازی فرایند است. پیگیری کار باز و عقب‌افتاده، دعوت همکار با شماره، بند جلسه با مسئول و موعد، ریسک و کنترل. مناسب حسابرس داخلی، حسابرس خارجی، ممیزی ISO، تضمین کیفیت (QA) و کنترل کیفیت (QC).";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -38,50 +38,129 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: "تی آدیتر",
+      alternateName: [
+        "تی‌آدیتر",
+        "تیادیتر",
+        "تی آدیتر",
+        "تی‌ادیتور",
+        "تی ادیتور",
+        "Tauditor",
+        "tauditor",
+      ],
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      inLanguage: "fa-IR",
+      description,
+      featureList: [
+        "مدیریت کار",
+        "مدیریت وظیفه",
+        "صورت جلسه",
+        "صورت‌جلسه",
+        "تشریح سیستم",
+        "مستندسازی فرایند",
+        "ریسک و کنترل",
+        "دعوت با شماره موبایل",
+      ],
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "IRR",
+      },
+    },
+    {
+      "@type": "WebSite",
+      name: "تی آدیتر",
+      alternateName: "Tauditor",
+      url: siteUrl,
+      inLanguage: "fa-IR",
+      description,
+    },
+  ],
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: titleDefault,
-    template: "%s | تی‌ادیتور",
+    template: "%s | تی آدیتر",
   },
   description,
-  applicationName: "تی‌ادیتور",
+  applicationName: "تی آدیتر",
   keywords: [
+    "تی آدیتر",
+    "تی‌آدیتر",
+    "تیادیتر",
+    "تی آدیتر Tauditor",
     "تی‌ادیتور",
     "تی ادیتور",
     "Tauditor",
+    "tauditor",
+    "مدیریت کار",
+    "مدیریت وظیفه",
+    "ارجاع کار",
+    "پیگیری کار",
+    "کار تیمی",
+    "نرم افزار مدیریت کار",
+    "نرم افزار تسک",
+    "موعد کار",
+    "کار باز",
+    "کار عقب افتاده",
+    "صورت جلسه",
+    "صورتجلسه",
+    "صورت‌جلسه",
+    "نرم افزار صورت جلسه",
+    "دستور جلسه",
+    "مصوبات جلسه",
+    "بند جلسه",
+    "پیگیری مصوبات",
+    "جلسه سازمانی",
+    "تشریح سیستم",
+    "مستندسازی فرایند",
+    "مستندسازی فرآیند",
+    "شرح فرآیند",
+    "دانش سازمانی",
+    "ریسک و کنترل",
+    "کنترل داخلی",
     "حسابرس داخلی",
     "حسابرس خارجی",
     "حسابرسی داخلی",
     "حسابرسی خارجی",
     "ابزار حسابرسی",
-    "تشریح سیستم",
-    "ریسک و کنترل",
-    "مستندسازی فرایند",
+    "نرم افزار حسابرسی",
     "ممیزی ISO",
+    "ممیزی ایزو",
     "تضمین کیفیت",
     "کنترل کیفیت",
     "QA",
     "QC",
+    "دعوت با شماره",
+    "نرم افزار فارسی حسابرسی",
+    "پلتفرم کار تیمی فارسی",
   ],
-  authors: [{ name: "تی‌ادیتور" }],
-  creator: "تی‌ادیتور",
-  publisher: "تی‌ادیتور",
+  authors: [{ name: "تی آدیتر" }],
+  creator: "تی آدیتر",
+  publisher: "تی آدیتر",
   category: "business software",
   openGraph: {
     type: "website",
     locale: "fa_IR",
     url: siteUrl,
-    siteName: "تی‌ادیتور",
-    title: "تی‌ادیتور | ابزار حسابرسان داخلی و خارجی",
+    siteName: "تی آدیتر",
+    title: "تی آدیتر | مدیریت کار، صورت جلسه و تشریح سیستم",
     description:
-      "تشریح سیستم و مستندسازی فرایند، ریسک و کنترل — برای حسابرسان داخلی و خارجی؛ قابل استفاده در ممیزی ISO و تیم‌های QA/QC.",
+      "تی آدیتر همان Tauditor است: مدیریت کار و وظیفه، صورت جلسه، تشریح سیستم و مستندسازی فرایند برای حسابرسان داخلی و خارجی، ممیزی ISO و تیم‌های QA/QC.",
   },
   twitter: {
     card: "summary",
-    title: "تی‌ادیتور | ابزار حسابرسان داخلی و خارجی",
+    title: "تی آدیتر | مدیریت کار، صورت جلسه و تشریح سیستم",
     description:
-      "پلتفرم Tauditor برای تشریح سیستم، ریسک و کنترل — حسابرسی داخلی و خارجی.",
+      "پلتفرم Tauditor (تی آدیتر) برای مدیریت کار، صورت‌جلسه، تشریح سیستم، ریسک و کنترل.",
   },
   robots: {
     index: true,
@@ -122,6 +201,10 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-screen antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var d=document.documentElement;var l=localStorage.getItem("ta_locale");if(l==="en"||l==="fa"){d.lang=l==="en"?"en":"fa";d.dir=l==="en"?"ltr":"rtl";document.cookie="ta_locale="+l+";path=/;max-age=31536000;SameSite=Lax";}var th=localStorage.getItem("ta_theme");if(th!=="light"&&th!=="dark"){th=(document.cookie.match(/(?:^|; )ta_theme=([^;]*)/)||[])[1];}if(th==="dark"||th==="light"){document.cookie="ta_theme="+th+";path=/;max-age=31536000;SameSite=Lax";d.style.colorScheme=th;if(th==="dark")d.classList.add("dark");else d.classList.remove("dark");}}catch(e){}`,

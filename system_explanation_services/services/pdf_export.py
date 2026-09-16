@@ -249,7 +249,7 @@ def build_project_pdf(project: Project) -> io.BytesIO:
     doc = _new_doc(buffer)
     width = _usable_width()
 
-    story = [Paragraph(_fa(f"تی‌ادیتور — {root.name}"), title)]
+    story = [Paragraph(_fa(f"تی آدیتر — {root.name}"), title)]
     if root.company_name:
         story.append(Paragraph(_fa(f"شرکت: {root.company_name}"), body))
     if root.description:

@@ -214,7 +214,7 @@ export default function ContactPage() {
             نظر، ایده یا مشکلتان را با ما در میان بگذارید
           </h1>
           <p className="mt-3 text-sm leading-7 text-gray-200">
-            پیشنهاد شما مسیر تی‌ادیتور را می‌سازد. پیشنهادهای بهبود، ایده‌های تازه و
+            پیشنهاد شما مسیر تی آدیتر را می‌سازد. پیشنهادهای بهبود، ایده‌های تازه و
             گزارش مشکلات را می‌خوانیم و به شما پاسخ می‌دهیم.
           </p>
         </div>
@@ -382,7 +382,7 @@ export default function ContactPage() {
                       >
                         <p className="mb-1 text-[11px] text-gray-500">
                           {item.is_admin_message
-                            ? "پشتیبانی تی‌ادیتور"
+                            ? "پشتیبانی تی آدیتر"
                             : "شما"}{" "}
                           · {formatDate(item.created_at)}
                         </p>

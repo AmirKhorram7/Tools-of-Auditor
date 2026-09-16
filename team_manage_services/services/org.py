@@ -113,7 +113,7 @@ def invite_to_team(
     )
     manager_name = user.get_full_name().strip() or user.phone_number
     message = (
-        f"{manager_name} شما را به تیم «{team.name}» در تی‌ادیتور دعوت کرد. "
+        f"{manager_name} شما را به تیم «{team.name}» در تی آدیتر دعوت کرد. "
         "وارد شوید و دعوت را بپذیرید."
     )
     if invited_user:

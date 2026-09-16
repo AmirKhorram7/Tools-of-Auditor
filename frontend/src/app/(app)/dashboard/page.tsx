@@ -14,7 +14,7 @@ import {
 import { Alert, Avatar, Button, Modal, Spinner } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { displayName, useAuth } from "@/lib/auth";
-import { CHARACTERS } from "@/lib/characters";
+import { HOME_CHARACTERS } from "@/lib/characters";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
 import type { MinutesInvitation } from "@/lib/minutes";
 import { ThemeToggle } from "@/lib/theme";
@@ -266,18 +266,21 @@ export default function DashboardPage() {
         <div className="mb-3">
           <h2 className="text-sm font-bold text-ink">{t("dash.peopleTitle")}</h2>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {CHARACTERS.map((card) => (
-            <article
+        <div className="grid grid-cols-2 gap-3 overflow-visible sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {HOME_CHARACTERS.map((card) => (
+            <Link
               key={card.id}
-              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+              href={card.href}
+              className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:z-10 hover:scale-[1.04] hover:shadow-lg"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={card.src}
-                alt=""
-                className="aspect-square w-full object-cover object-top"
-              />
+              <div className="overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={card.src}
+                  alt={t(card.nameKey)}
+                  className="aspect-square w-full object-cover object-top transition duration-300 group-hover:scale-110"
+                />
+              </div>
               <div className="p-3">
                 <h3 className="text-sm font-bold text-ink">{t(card.nameKey)}</h3>
                 <p className="mt-1 text-[11px] font-medium leading-5 text-navy-800">
@@ -285,7 +288,7 @@ export default function DashboardPage() {
                 </p>
                 <p className="mt-1 text-[11px] leading-5 text-gray-500">{t(card.blurbKey)}</p>
               </div>
-            </article>
+            </Link>
           ))}
         </div>
       </section>

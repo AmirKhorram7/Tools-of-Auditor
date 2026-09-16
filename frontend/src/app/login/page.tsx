@@ -331,6 +331,16 @@ export default function LoginPage() {
           )}
         </Card>
 
+        <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-start text-gray-200">
+          <h2 className="text-sm font-bold text-white">{t("login.seoTitle")}</h2>
+          <p className="mt-2 text-xs leading-6">{t("login.seoIntro")}</p>
+          <ul className="mt-3 list-disc space-y-2 ps-4 text-xs leading-6">
+            <li>{t("login.seoWork")}</li>
+            <li>{t("login.seoMinutes")}</li>
+            <li>{t("login.seoDocs")}</li>
+          </ul>
+        </section>
+
         <SocialFooter className="mt-6" />
       </div>
     </main>

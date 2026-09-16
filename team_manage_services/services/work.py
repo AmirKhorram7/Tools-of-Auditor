@@ -289,7 +289,7 @@ def _notify_assignment(actor, task: Task):
         title="کار جدید",
         message=(
             f"مدیر شما ({manager_name}) یک کار برای شما ساخت: «{task.title}». "
-            "وارد تی‌ادیتور شوید و کار را ببینید."
+            "وارد تی آدیتر شوید و کار را ببینید."
         ),
         reference_type="task",
         reference_id=task.id,

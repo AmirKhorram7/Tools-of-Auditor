@@ -63,7 +63,7 @@ export default function SocialFooter({
       } pt-5 ${className}`}
     >
       <p className={`text-center text-xs ${muted}`}>
-        ارتباط مستقیم با سازنده تی‌ادیتور
+        ارتباط مستقیم با سازنده تی آدیتر
       </p>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
         <a

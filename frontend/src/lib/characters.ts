@@ -9,27 +9,34 @@ export type Character = {
   nameKey: string;
   adjKeys: [string, string] | [string, string, string];
   blurbKey: string;
+  href: string;
 };
 
 export const CHARACTERS: Character[] = [
-  { id: "neda", gender: "woman", src: "/characters/neda.png", nameKey: "char.neda", adjKeys: ["char.adj.kind", "char.adj.smart"], blurbKey: "dash.person.workDesc" },
-  { id: "sara", gender: "woman", src: "/characters/sara.png", nameKey: "char.sara", adjKeys: ["char.adj.pretty", "char.adj.curious"], blurbKey: "dash.person.minutesDesc" },
-  { id: "maryam", gender: "woman", src: "/characters/maryam.png", nameKey: "char.maryam", adjKeys: ["char.adj.calm", "char.adj.wise"], blurbKey: "dash.person.docsDesc" },
-  { id: "leila", gender: "woman", src: "/characters/leila.png", nameKey: "char.leila", adjKeys: ["char.adj.warm", "char.adj.brave"], blurbKey: "dash.person.startDesc" },
-  { id: "yasmin", gender: "woman", src: "/characters/yasmin.png", nameKey: "char.yasmin", adjKeys: ["char.adj.patient", "char.adj.kind"], blurbKey: "dash.person.teamDesc" },
-  { id: "hasti", gender: "woman", src: "/characters/hasti.png", nameKey: "char.hasti", adjKeys: ["char.adj.hopeful", "char.adj.creative"], blurbKey: "dash.person.followDesc" },
-  { id: "parisa", gender: "woman", src: "/characters/parisa.png", nameKey: "char.parisa", adjKeys: ["char.adj.pretty", "char.adj.smart"], blurbKey: "dash.person.itemsDesc" },
-  { id: "roya", gender: "woman", src: "/characters/roya.png", nameKey: "char.roya", adjKeys: ["char.adj.warm", "char.adj.wise"], blurbKey: "dash.person.homeDesc" },
-  { id: "elahe", gender: "woman", src: "/characters/elahe.png", nameKey: "char.elahe", adjKeys: ["char.adj.creative", "char.adj.funny"], blurbKey: "dash.person.startDesc" },
-  { id: "arash", gender: "man", src: "/characters/arash.png", nameKey: "char.arash", adjKeys: ["char.adj.loyal", "char.adj.calm"], blurbKey: "dash.person.itemsDesc" },
-  { id: "reza", gender: "man", src: "/characters/reza.png", nameKey: "char.reza", adjKeys: ["char.adj.smart", "char.adj.honest"], blurbKey: "dash.person.homeDesc" },
-  { id: "milad", gender: "man", src: "/characters/milad.png", nameKey: "char.milad", adjKeys: ["char.adj.funny", "char.adj.humorous"], blurbKey: "dash.person.workDesc" },
-  { id: "kian", gender: "man", src: "/characters/kian.png", nameKey: "char.kian", adjKeys: ["char.adj.wise", "char.adj.honest"], blurbKey: "dash.person.minutesDesc" },
-  { id: "navid", gender: "man", src: "/characters/navid.png", nameKey: "char.navid", adjKeys: ["char.adj.hopeful", "char.adj.patient"], blurbKey: "dash.person.docsDesc" },
-  { id: "pouya", gender: "man", src: "/characters/pouya.png", nameKey: "char.pouya", adjKeys: ["char.adj.brave", "char.adj.loyal"], blurbKey: "dash.person.teamDesc" },
-  { id: "kasra", gender: "man", src: "/characters/kasra.png", nameKey: "char.kasra", adjKeys: ["char.adj.bold", "char.adj.stylish"], blurbKey: "dash.person.followDesc" },
-  { id: "soheil", gender: "man", src: "/characters/soheil.png", nameKey: "char.soheil", adjKeys: ["char.adj.energetic", "char.adj.honest"], blurbKey: "dash.person.workDesc" },
-  { id: "shayan", gender: "man", src: "/characters/shayan.png", nameKey: "char.shayan", adjKeys: ["char.adj.brave", "char.adj.curious"], blurbKey: "dash.person.minutesDesc" },
+  { id: "neda", gender: "woman", src: "/characters/neda.png", nameKey: "char.neda", adjKeys: ["char.adj.kind", "char.adj.smart"], blurbKey: "dash.person.workDesc", href: "/work" },
+  { id: "sara", gender: "woman", src: "/characters/sara.png", nameKey: "char.sara", adjKeys: ["char.adj.pretty", "char.adj.curious"], blurbKey: "dash.person.minutesDesc", href: "/minutes" },
+  { id: "maryam", gender: "woman", src: "/characters/maryam.png", nameKey: "char.maryam", adjKeys: ["char.adj.calm", "char.adj.wise"], blurbKey: "dash.person.docsDesc", href: "/explanation" },
+  { id: "leila", gender: "woman", src: "/characters/leila.png", nameKey: "char.leila", adjKeys: ["char.adj.warm", "char.adj.brave"], blurbKey: "dash.person.startDesc", href: "/dashboard" },
+  { id: "yasmin", gender: "woman", src: "/characters/yasmin.png", nameKey: "char.yasmin", adjKeys: ["char.adj.patient", "char.adj.kind"], blurbKey: "dash.person.teamDesc", href: "/work" },
+  { id: "hasti", gender: "woman", src: "/characters/hasti.png", nameKey: "char.hasti", adjKeys: ["char.adj.hopeful", "char.adj.creative"], blurbKey: "dash.person.followDesc", href: "/work" },
+  { id: "parisa", gender: "woman", src: "/characters/parisa.png", nameKey: "char.parisa", adjKeys: ["char.adj.pretty", "char.adj.smart"], blurbKey: "dash.person.itemsDesc", href: "/minutes" },
+  { id: "roya", gender: "woman", src: "/characters/roya.png", nameKey: "char.roya", adjKeys: ["char.adj.warm", "char.adj.wise"], blurbKey: "dash.person.homeDesc", href: "/dashboard" },
+  { id: "elahe", gender: "woman", src: "/characters/elahe.png", nameKey: "char.elahe", adjKeys: ["char.adj.creative", "char.adj.funny"], blurbKey: "dash.person.startDesc", href: "/dashboard" },
+  { id: "arash", gender: "man", src: "/characters/arash.png", nameKey: "char.arash", adjKeys: ["char.adj.loyal", "char.adj.calm"], blurbKey: "dash.person.itemsDesc", href: "/minutes" },
+  { id: "reza", gender: "man", src: "/characters/reza.png", nameKey: "char.reza", adjKeys: ["char.adj.smart", "char.adj.honest"], blurbKey: "dash.person.homeDesc", href: "/dashboard" },
+  { id: "milad", gender: "man", src: "/characters/milad.png", nameKey: "char.milad", adjKeys: ["char.adj.funny", "char.adj.humorous"], blurbKey: "dash.person.workDesc", href: "/work" },
+  { id: "kian", gender: "man", src: "/characters/kian.png", nameKey: "char.kian", adjKeys: ["char.adj.wise", "char.adj.honest"], blurbKey: "dash.person.minutesDesc", href: "/minutes" },
+  { id: "navid", gender: "man", src: "/characters/navid.png", nameKey: "char.navid", adjKeys: ["char.adj.hopeful", "char.adj.patient"], blurbKey: "dash.person.docsDesc", href: "/explanation" },
+  { id: "pouya", gender: "man", src: "/characters/pouya.png", nameKey: "char.pouya", adjKeys: ["char.adj.brave", "char.adj.loyal"], blurbKey: "dash.person.teamDesc", href: "/work" },
+  { id: "kasra", gender: "man", src: "/characters/kasra.png", nameKey: "char.kasra", adjKeys: ["char.adj.bold", "char.adj.stylish"], blurbKey: "dash.person.followDesc", href: "/work" },
+  { id: "soheil", gender: "man", src: "/characters/soheil.png", nameKey: "char.soheil", adjKeys: ["char.adj.energetic", "char.adj.honest"], blurbKey: "dash.person.workDesc", href: "/work" },
+  { id: "shayan", gender: "man", src: "/characters/shayan.png", nameKey: "char.shayan", adjKeys: ["char.adj.brave", "char.adj.curious"], blurbKey: "dash.person.minutesDesc", href: "/minutes" },
+];
+
+/** Home testimonials: original 12 faces (6 women + 6 men). Profile keeps all 18. */
+export const HOME_CHARACTERS = [
+  ...CHARACTERS.filter((row) => row.gender === "woman").slice(0, 6),
+  ...CHARACTERS.filter((row) => row.gender === "man").slice(0, 6),
 ];
 
 const WOMEN = CHARACTERS.filter((row) => row.gender === "woman");
