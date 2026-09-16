@@ -3,7 +3,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -213,6 +213,26 @@ class GroupViewSet(viewsets.ModelViewSet):
             **serializer.validated_data,
         )
         return Response(InvitationSerializer(invitation).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        summary="List invitations for this group",
+        description="Owner or maintainer. Pending and other non-accepted invites for this group.",
+        responses={200: InvitationSerializer(many=True)},
+    )
+    @action(detail=True, methods=["get"])
+    def invitations(self, request, pk=None):
+        group = self.get_object()
+        if not group_service.can_manage_members(request.user, group):
+            raise PermissionDenied("You cannot see invitations for this group.")
+        qs = (
+            GroupInvitation.objects.filter(group=group)
+            .exclude(status=GroupInvitation.Status.ACCEPTED)
+            .select_related("invited_by", "invited_user")
+            .order_by("-created_at")
+        )
+        return Response(InvitationSerializer(qs, many=True).data)
+
+    # Used by the group members page so owners can see pending invites.
 
     @extend_schema(
         methods=["PATCH"],

@@ -32,6 +32,7 @@ RUN pip install -r requirements.txt \
     || (sleep 8 && pip install -r requirements.txt) \
     || (sleep 15 && pip install -r requirements.txt)
 
+# App source, including the 18 character portrait ids on Profile.
 COPY . .
 
 RUN chmod +x /app/deploy/backend/entrypoint.sh \

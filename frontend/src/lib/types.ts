@@ -14,6 +14,7 @@ export type Profile = {
   birth_date: string | null;
   company_name: string;
   job_title: string;
+  character_id?: string;
   /** True when the user has set a usable login password. */
   has_password: boolean;
 };

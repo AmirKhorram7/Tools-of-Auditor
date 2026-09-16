@@ -50,6 +50,7 @@ export type MinutesInvitation = {
   invited_by: number;
   invited_by_name: string;
   invited_user: number | null;
+  invited_name?: string;
   phone_number: string;
   role: string;
   position_title: string;
@@ -150,4 +151,11 @@ export function priorityLabelKey(priority: number): string {
   if (priority === 3) return "minutes.priority.high";
   if (priority === 1) return "minutes.priority.low";
   return "minutes.priority.medium";
+}
+
+export function peopleStatusClass(status: string): string {
+  if (status === "pending") return "bg-amber-100 text-amber-900";
+  if (status === "rejected") return "bg-red-100 text-red-700";
+  if (status === "expired" || status === "cancelled") return "bg-gray-100 text-gray-500";
+  return "bg-green-100 text-green-800";
 }

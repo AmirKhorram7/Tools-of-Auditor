@@ -14,6 +14,7 @@ import {
 import { Alert, Avatar, Button, Modal, Spinner } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { displayName, useAuth } from "@/lib/auth";
+import { CHARACTERS } from "@/lib/characters";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
 import type { MinutesInvitation } from "@/lib/minutes";
 import { ThemeToggle } from "@/lib/theme";
@@ -26,17 +27,6 @@ type HomeInvite = {
   title: string;
   from: string;
 };
-
-const PEOPLE_CARDS = [
-  { id: "work", href: "/work", src: "/dashboard/people/work.png", titleKey: "dash.person.work", descKey: "dash.person.workDesc" },
-  { id: "minutes", href: "/minutes", src: "/dashboard/people/minutes.png", titleKey: "dash.person.minutes", descKey: "dash.person.minutesDesc" },
-  { id: "docs", href: "/explanation", src: "/dashboard/people/docs.png", titleKey: "dash.person.docs", descKey: "dash.person.docsDesc" },
-  { id: "start", href: "/work", src: "/dashboard/people/kid.png", titleKey: "dash.person.start", descKey: "dash.person.startDesc" },
-  { id: "team", href: "/work", src: "/dashboard/people/team.png", titleKey: "dash.person.team", descKey: "dash.person.teamDesc" },
-  { id: "follow", href: "/work", src: "/dashboard/people/follow.png", titleKey: "dash.person.follow", descKey: "dash.person.followDesc" },
-  { id: "items", href: "/minutes", src: "/dashboard/people/boy.png", titleKey: "dash.person.items", descKey: "dash.person.itemsDesc" },
-  { id: "home", href: "/dashboard", src: "/dashboard/people/home.png", titleKey: "dash.person.home", descKey: "dash.person.homeDesc" },
-] as const;
 
 export default function DashboardPage() {
   const { profile } = useAuth();
@@ -275,14 +265,12 @@ export default function DashboardPage() {
       <section>
         <div className="mb-3">
           <h2 className="text-sm font-bold text-ink">{t("dash.peopleTitle")}</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-500">{t("dash.peopleSubtitle")}</p>
         </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {PEOPLE_CARDS.map((card) => (
-            <Link
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {CHARACTERS.map((card) => (
+            <article
               key={card.id}
-              href={card.href}
-              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:border-brand-500 hover:shadow-md"
+              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -291,10 +279,13 @@ export default function DashboardPage() {
                 className="aspect-square w-full object-cover object-top"
               />
               <div className="p-3">
-                <h3 className="text-sm font-bold text-ink">{t(card.titleKey)}</h3>
-                <p className="mt-1 text-[11px] leading-5 text-gray-500">{t(card.descKey)}</p>
+                <h3 className="text-sm font-bold text-ink">{t(card.nameKey)}</h3>
+                <p className="mt-1 text-[11px] font-medium leading-5 text-navy-800">
+                  {card.adjKeys.map((key) => t(key)).join(" · ")}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-gray-500">{t(card.blurbKey)}</p>
               </div>
-            </Link>
+            </article>
           ))}
         </div>
       </section>

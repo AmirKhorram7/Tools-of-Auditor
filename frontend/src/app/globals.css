@@ -302,6 +302,35 @@ html.dark .rich-content a.step-mention:hover {
   opacity: 0;
 }
 
+@keyframes ta-shine {
+  0% {
+    transform: translateX(140%);
+  }
+  100% {
+    transform: translateX(-180%);
+  }
+}
+
+.ta-shine-bar {
+  animation: ta-shine 2.5s ease-in-out infinite;
+}
+
+@keyframes ta-spark {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgb(255 200 80 / 0.4));
+  }
+  50% {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 10px rgb(255 200 80 / 0.95));
+  }
+}
+
+.ta-spark {
+  animation: ta-spark 1.6s ease-in-out infinite;
+}
+
 /* Phone-only: keep the desktop layout; stop horizontal blow-out and iOS zoom. */
 @media (max-width: 767px) {
   html {

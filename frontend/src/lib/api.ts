@@ -32,6 +32,8 @@ export function mediaUrl(path: string | null | undefined): string | null {
     }
   }
 
+  if (path.startsWith("/characters/")) return path;
+
   if (path.startsWith("/media/") || path.startsWith("media/")) {
     return path.startsWith("/") ? path : `/${path}`;
   }

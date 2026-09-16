@@ -55,7 +55,6 @@ export default function MinutesMeetingPage() {
   const [members, setMembers] = useState<MinutesMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [quickTitle, setQuickTitle] = useState("");
   const [adding, setAdding] = useState(false);
   const [headerOpen, setHeaderOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -68,6 +67,7 @@ export default function MinutesMeetingPage() {
   const [lineDue, setLineDue] = useState("");
   const [linePriority, setLinePriority] = useState("2");
   const [lineAssignees, setLineAssignees] = useState<number[]>([]);
+  const [assigneeQuery, setAssigneeQuery] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -110,7 +110,6 @@ export default function MinutesMeetingPage() {
           assignee_ids: extra?.assignee_ids || [],
         },
       });
-      setQuickTitle("");
       setLineOpen(false);
       await load();
     } catch (err) {
@@ -222,11 +221,12 @@ export default function MinutesMeetingPage() {
 
   const openNewLine = () => {
     setEditing(null);
-    setLineTitle(quickTitle);
+    setLineTitle("");
     setLineDesc("");
     setLineDue("");
     setLinePriority("2");
     setLineAssignees([]);
+    setAssigneeQuery("");
     setLineOpen(true);
   };
 
@@ -237,6 +237,7 @@ export default function MinutesMeetingPage() {
     setLineDue(item.due_date || "");
     setLinePriority(String(item.priority));
     setLineAssignees(item.assignees.map((row) => row.id));
+    setAssigneeQuery("");
     setLineOpen(true);
   };
 
@@ -378,32 +379,11 @@ export default function MinutesMeetingPage() {
           </div>
         </div>
 
-        {canAdd && (
-          <form
-            className="mb-4 flex flex-col gap-2 sm:flex-row"
-            onSubmit={(event) => {
-              event.preventDefault();
-              addLine(quickTitle);
-            }}
-          >
-            <Input
-              value={quickTitle}
-              onChange={(e) => setQuickTitle(e.target.value)}
-              placeholder={t("minutes.quickAdd")}
-              className="min-h-11 flex-1"
-            />
-            <Button type="submit" loading={adding} className="min-h-11 w-full sm:w-auto">
-              <PlusIcon className="size-4" />
-              {t("minutes.addLine")}
-            </Button>
-          </form>
-        )}
-
         {items.length === 0 ? (
           <p className="py-8 text-center text-sm text-gray-500">{t("minutes.noLines")}</p>
         ) : (
           <>
-            <div className="mb-2 hidden grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_4.5rem] gap-2 px-2 text-xs font-semibold text-navy-800 lg:grid">
+            <div className="mb-2 hidden grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_8.5rem] gap-2 px-2 text-xs font-semibold text-navy-800 lg:grid">
               <span>{t("minutes.subject")}</span>
               <span>{t("minutes.assignees")}</span>
               <span>{t("minutes.due")}</span>
@@ -413,7 +393,7 @@ export default function MinutesMeetingPage() {
             </div>
             <ul className="divide-y divide-gray-100">
               {items.map((item) => (
-                <li key={item.id} className="py-3 lg:grid lg:grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_4.5rem] lg:items-center lg:gap-2">
+                <li key={item.id} className="py-3 lg:grid lg:grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_8.5rem] lg:items-center lg:gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-ink">{item.title}</p>
                     {item.description ? (
@@ -471,6 +451,16 @@ export default function MinutesMeetingPage() {
                         : `${n(item.remaining_days)} ${t("minutes.daysUnit")}`}
                   </p>
                   <div className="mt-2 flex gap-1 lg:mt-0">
+                    {canAdd && (
+                      <button
+                        type="button"
+                        className="flex size-10 items-center justify-center rounded-lg bg-brand-500 text-ink shadow-sm transition hover:bg-brand-700 hover:text-white"
+                        onClick={openNewLine}
+                        aria-label={t("minutes.addLine")}
+                      >
+                        <PlusIcon className="size-4" />
+                      </button>
+                    )}
                     {item.can_edit && (
                       <button
                         type="button"
@@ -564,8 +554,24 @@ export default function MinutesMeetingPage() {
           </div>
           <div>
             <p className="mb-1.5 text-sm font-medium text-ink">{t("minutes.pickAssignees")}</p>
-            <div className="flex flex-wrap gap-2">
-              {members.map((member) => {
+            <Input
+              value={assigneeQuery}
+              onChange={(e) => setAssigneeQuery(e.target.value)}
+              placeholder={t("minutes.searchAssignees")}
+              className="mb-2 min-h-10"
+            />
+            <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
+              {members
+                .filter((member) => {
+                  const query = assigneeQuery.trim().toLowerCase();
+                  if (!query) return true;
+                  if (lineAssignees.includes(member.id)) return true;
+                  return (
+                    member.full_name.toLowerCase().includes(query) ||
+                    member.phone_number.includes(query)
+                  );
+                })
+                .map((member) => {
                 const selected = lineAssignees.includes(member.id);
                 return (
                   <button

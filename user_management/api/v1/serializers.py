@@ -173,6 +173,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source="user.last_name", required=False, allow_blank=True)
     has_password = serializers.SerializerMethodField()
     profile_image = RelativeImageField(required=False, allow_null=True)
+    character_id = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = Profile
@@ -182,6 +183,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "last_name",
             "bio",
             "profile_image",
+            "character_id",
             "birth_date",
             "company_name",
             "job_title",
@@ -192,12 +194,30 @@ class ProfileSerializer(serializers.ModelSerializer):
     def get_has_password(self, obj):
         return obj.user.has_login_password()
 
+    def validate_character_id(self, value):
+        value = (value or "").strip()
+        if value and value not in Profile.CHARACTER_IDS:
+            raise serializers.ValidationError(_("Unknown character."))
+        return value
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["profile_image"] = instance.avatar_url()
+        return data
+
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", {})
         user = instance.user
         for attr, value in user_data.items():
             setattr(user, attr, value)
         user.save()
+
+        if validated_data.get("profile_image"):
+            validated_data["character_id"] = ""
+        elif validated_data.get("character_id"):
+            if instance.profile_image:
+                instance.profile_image.delete(save=False)
+            instance.profile_image = None
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

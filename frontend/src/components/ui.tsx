@@ -3,6 +3,7 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 import { mediaUrl } from "@/lib/api";
+import { characterForName } from "@/lib/characters";
 import { useI18n } from "@/lib/i18n";
 
 export function cx(...values: Array<string | false | null | undefined>) {
@@ -256,7 +257,7 @@ export function ConfirmDialog({
   );
 }
 
-/** Profile picture with an initial-letter fallback. */
+/** Profile picture, or a named character portrait when the user has no photo. */
 export function Avatar({
   src,
   name,
@@ -269,35 +270,21 @@ export function Avatar({
   className?: string;
 }) {
   const resolved = mediaUrl(src);
-  const initial = name.trim().slice(0, 1) || "؟";
-
-  if (resolved) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={resolved}
-        alt={name}
-        width={size}
-        height={size}
-        style={{ width: size, height: size }}
-        className={cx(
-          "shrink-0 rounded-full border border-gray-200 bg-white object-cover",
-          className,
-        )}
-      />
-    );
-  }
+  const portrait = resolved || characterForName(name).src;
 
   return (
-    <span
-      style={{ width: size, height: size, fontSize: Math.max(11, size * 0.4) }}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={portrait}
+      alt={name}
+      width={size}
+      height={size}
+      style={{ width: size, height: size }}
       className={cx(
-        "flex shrink-0 items-center justify-center rounded-full bg-brand-500 font-semibold text-ink",
+        "shrink-0 rounded-full border border-gray-200 bg-white object-cover object-top",
         className,
       )}
-    >
-      {initial}
-    </span>
+    />
   );
 }
 

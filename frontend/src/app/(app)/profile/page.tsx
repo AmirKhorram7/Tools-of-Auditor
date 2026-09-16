@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { Alert, Avatar, Badge, Button, Card, EmptyState, Field, Input, Textarea } from "@/components/ui";
+import { Alert, Avatar, Badge, Button, Card, EmptyState, Field, Input, Textarea, cx } from "@/components/ui";
 import JalaliDateField from "@/components/work/JalaliDateField";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { CHARACTERS, characterById } from "@/lib/characters";
 import { useI18n } from "@/lib/i18n";
 import type { Profile } from "@/lib/types";
 import {
@@ -42,6 +43,9 @@ export default function ProfilePage() {
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageKey, setImageKey] = useState(0);
+  const [characterId, setCharacterId] = useState("");
+  const [showCharacters, setShowCharacters] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -74,6 +78,7 @@ export default function ProfilePage() {
       job_title: profile.job_title ?? "",
     });
     setHasPassword(profile.has_password === true);
+    setCharacterId(profile.character_id ?? "");
   }, [profile, refreshProfile]);
 
   useEffect(() => {
@@ -92,6 +97,7 @@ export default function ProfilePage() {
     () => (imageFile ? URL.createObjectURL(imageFile) : null),
     [imageFile],
   );
+  const pickedCharacter = !imageFile ? characterById(characterId) : null;
 
   useEffect(() => {
     return () => {
@@ -114,12 +120,13 @@ export default function ProfilePage() {
           payload.append(key, value);
         });
         payload.append("profile_image", imageFile);
+        payload.append("character_id", "");
         updated = await apiFetch<Profile>("/profile/", {
           method: "PATCH",
           formData: payload,
         });
       } else {
-        const body: Record<string, string | null> = { ...form };
+        const body: Record<string, string | null> = { ...form, character_id: characterId };
         if (!body.birth_date) body.birth_date = null;
         updated = await apiFetch<Profile>("/profile/", {
           method: "PATCH",
@@ -320,7 +327,7 @@ export default function ProfilePage() {
       <Card>
         <div className="flex flex-wrap items-center gap-4">
           <Avatar
-            src={previewUrl ?? profile?.profile_image}
+            src={previewUrl ?? characterById(characterId)?.src ?? profile?.profile_image}
             name={`${form.first_name} ${form.last_name}`.trim() || t("common.user")}
             size={64}
           />
@@ -330,9 +337,13 @@ export default function ProfilePage() {
               {t("profile.photoHint")}
             </p>
             <input
+              key={imageKey}
               type="file"
               accept="image/*"
-              onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                setImageFile(event.target.files?.[0] ?? null);
+                setCharacterId("");
+              }}
               className="text-xs text-gray-600"
             />
           </div>
@@ -348,6 +359,73 @@ export default function ProfilePage() {
             )}
           </div>
         </div>
+      </Card>
+
+      <Card>
+        <button
+          type="button"
+          onClick={() => setShowCharacters((open) => !open)}
+          className="group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-l from-brand-500 via-amber-300 to-orange-400 px-4 py-3.5 text-start shadow-md ring-2 ring-brand-300 transition hover:brightness-110"
+        >
+          <span className="pointer-events-none absolute inset-0 overflow-hidden">
+            <span className="ta-shine-bar absolute inset-y-0 w-1/3 bg-gradient-to-l from-transparent via-white/70 to-transparent" />
+          </span>
+          <span className="ta-spark relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-navy-900 text-brand-400 shadow-inner ring-2 ring-white/70">
+            {pickedCharacter ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={pickedCharacter.src}
+                alt=""
+                className="size-full object-cover object-top"
+              />
+            ) : (
+              <SparkleIcon className="size-6" />
+            )}
+          </span>
+          <span className="relative min-w-0 flex-1">
+            <span className="block text-base font-extrabold text-navy-900">
+              {t("profile.character")}
+            </span>
+            <span className="mt-0.5 block text-xs font-bold text-navy-800">
+              {showCharacters ? t("profile.characterHide") : t("profile.characterShow")}
+            </span>
+          </span>
+          <span className="relative text-lg font-black text-navy-900">
+            {showCharacters ? "▴" : "▾"}
+          </span>
+        </button>
+        {showCharacters ? (
+          <>
+            <p className="mt-3 text-xs text-gray-500">{t("profile.characterHint")}</p>
+            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+              {CHARACTERS.map((card) => {
+                const selected = characterId === card.id && !imageFile;
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => {
+                      setCharacterId(card.id);
+                      setImageFile(null);
+                      setImageKey((value) => value + 1);
+                    }}
+                    className={cx(
+                      "overflow-hidden rounded-xl border bg-white transition",
+                      selected ? "border-brand-500 ring-2 ring-brand-200" : "border-gray-200 hover:border-brand-500",
+                    )}
+                    title={t(card.nameKey)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={card.src} alt="" className="aspect-square w-full object-cover object-top" />
+                    <span className="block truncate px-1 py-1 text-[11px] font-medium text-ink">
+                      {t(card.nameKey)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
       </Card>
 
       <Card>
@@ -480,6 +558,15 @@ export default function ProfilePage() {
         </>
       )}
     </div>
+  );
+}
+
+function SparkleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 2.2l1.55 5.9 5.9 1.55-5.9 1.55L12 17.1l-1.55-5.9-5.9-1.55 5.9-1.55L12 2.2z" />
+      <path d="M18.2 13.4l.72 2.2 2.2.72-2.2.72-.72 2.2-.72-2.2-2.2-.72 2.2-.72.72-2.2z" />
+    </svg>
   );
 }
 

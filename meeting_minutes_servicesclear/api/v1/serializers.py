@@ -46,13 +46,9 @@ def person_name(user):
 
 def profile_image_url(user):
     profile = getattr(user, "profile", None)
-    image = getattr(profile, "profile_image", None) if profile else None
-    if not image:
+    if not profile:
         return None
-    try:
-        return image.url
-    except (AttributeError, ValueError):
-        return None
+    return profile.avatar_url()
 
 
 MAX_LOGO_BYTES = 2 * 1024 * 1024
@@ -261,6 +257,7 @@ class InvitationSerializer(serializers.ModelSerializer):
     group_name = serializers.CharField(source="group.name", read_only=True)
     company_id = serializers.IntegerField(source="group.company_id", read_only=True)
     invited_by_name = serializers.SerializerMethodField()
+    invited_name = serializers.SerializerMethodField()
 
     class Meta:
         model = GroupInvitation
@@ -272,6 +269,7 @@ class InvitationSerializer(serializers.ModelSerializer):
             "invited_by",
             "invited_by_name",
             "invited_user",
+            "invited_name",
             "phone_number",
             "role",
             "position_title",
@@ -283,6 +281,11 @@ class InvitationSerializer(serializers.ModelSerializer):
 
     def get_invited_by_name(self, obj):
         return obj.invited_by.get_full_name().strip() or obj.invited_by.phone_number
+
+    def get_invited_name(self, obj):
+        if obj.invited_user:
+            return person_name(obj.invited_user)
+        return ""
 
 
 class MeetingItemSerializer(serializers.ModelSerializer):

@@ -231,13 +231,8 @@ class UserLookupAPIView(APIView):
         )
         payload = []
         for user in users:
-            image = None
             profile = getattr(user, "profile", None)
-            if profile and profile.profile_image:
-                try:
-                    image = profile.profile_image.url
-                except (AttributeError, ValueError):
-                    image = None
+            image = profile.avatar_url() if profile else None
             payload.append(
                 {
                     "id": user.id,

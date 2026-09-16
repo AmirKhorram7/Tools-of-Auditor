@@ -80,6 +80,30 @@ class CustomUser(AbstractUser):
 class Profile(models.Model):
     """Optional profile completed after phone OTP sign-in."""
 
+    CHARACTER_IDS = frozenset(
+        # 18 original portraits: 9 women, 9 men.
+        {
+            "neda",
+            "sara",
+            "maryam",
+            "leila",
+            "yasmin",
+            "hasti",
+            "parisa",
+            "roya",
+            "elahe",
+            "arash",
+            "reza",
+            "milad",
+            "kian",
+            "navid",
+            "pouya",
+            "kasra",
+            "soheil",
+            "shayan",
+        }
+    )
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -96,6 +120,12 @@ class Profile(models.Model):
     birth_date = models.DateField(_("Birth date"), blank=True, null=True)
     company_name = models.CharField(_("Company name"), max_length=255, blank=True, default="")
     job_title = models.CharField(_("Job title"), max_length=255, blank=True, default="")
+    character_id = models.CharField(
+        _("Character"),
+        max_length=20,
+        blank=True,
+        default="",
+    )
     created_at = models.DateTimeField(_("Created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Updated at"), auto_now=True)
 
@@ -105,6 +135,18 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.get_full_name() or self.user.phone_number
+
+    def avatar_url(self) -> str | None:
+        """Uploaded photo first, then a chosen character portrait."""
+        image = self.profile_image
+        if image:
+            try:
+                return image.url
+            except (AttributeError, ValueError):
+                pass
+        if self.character_id:
+            return f"/characters/{self.character_id}.png"
+        return None
 
 
 class TicketStatus(models.TextChoices):

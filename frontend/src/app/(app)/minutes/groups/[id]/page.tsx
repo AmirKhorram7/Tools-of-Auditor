@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import DefaultSwitch from "@/components/minutes/DefaultSwitch";
 import {
@@ -9,6 +9,7 @@ import {
   MinutesIconTile,
   PencilIcon,
   PlusIcon,
+  SearchIcon,
   TrashIcon,
   UserPlusIcon,
 } from "@/components/minutes/MinutesIcons";
@@ -32,7 +33,9 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
   ASSIGNABLE_ROLES,
+  peopleStatusClass,
   type MinutesGroup,
+  type MinutesInvitation,
   type MinutesMember,
 } from "@/lib/minutes";
 
@@ -45,6 +48,9 @@ export default function MinutesGroupPage() {
 
   const [group, setGroup] = useState<MinutesGroup | null>(null);
   const [members, setMembers] = useState<MinutesMember[]>([]);
+  const [invites, setInvites] = useState<MinutesInvitation[]>([]);
+  const [peopleQuery, setPeopleQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -66,12 +72,16 @@ export default function MinutesGroupPage() {
     setLoading(true);
     setError(null);
     try {
-      const [row, memberRows] = await Promise.all([
+      const [row, memberRows, inviteRows] = await Promise.all([
         apiFetch<MinutesGroup>(`/minutes/groups/${groupId}/`),
         apiFetch<MinutesMember[]>(`/minutes/groups/${groupId}/members/`),
+        apiFetch<MinutesInvitation[]>(`/minutes/groups/${groupId}/invitations/`).catch(
+          () => [] as MinutesInvitation[],
+        ),
       ]);
       setGroup(row);
       setMembers(Array.isArray(memberRows) ? memberRows : []);
+      setInvites(Array.isArray(inviteRows) ? inviteRows : []);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("minutes.loadGroupFail"));
     } finally {
@@ -198,6 +208,37 @@ export default function MinutesGroupPage() {
     }
   };
 
+  const peopleRows = useMemo(() => {
+    const query = peopleQuery.trim().toLowerCase();
+    const memberRows = members.map((member) => ({
+      key: `m-${member.id}`,
+      kind: "member" as const,
+      name: member.full_name,
+      phone: member.phone_number,
+      image: member.profile_image,
+      role: member.role,
+      status: "active",
+      date: member.joined_at,
+      member,
+    }));
+    const inviteRows = invites.map((invite) => ({
+      key: `i-${invite.id}`,
+      kind: "invite" as const,
+      name: invite.invited_name || invite.phone_number,
+      phone: invite.phone_number,
+      image: null as string | null,
+      role: invite.role,
+      status: invite.status,
+      date: invite.created_at,
+      member: null as MinutesMember | null,
+    }));
+    return [...memberRows, ...inviteRows].filter((row) => {
+      if (statusFilter !== "all" && row.status !== statusFilter) return false;
+      if (!query) return true;
+      return row.name.toLowerCase().includes(query) || row.phone.includes(query);
+    });
+  }, [members, invites, peopleQuery, statusFilter]);
+
   if (loading) return <PageLoader />;
   if (!group) return <Alert>{t("minutes.notFound")}</Alert>;
 
@@ -221,12 +262,6 @@ export default function MinutesGroupPage() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canManage && (
-            <Button size="sm" variant="secondary" onClick={() => setInviteOpen(true)}>
-              <UserPlusIcon className="size-4" />
-              {t("minutes.invite")}
-            </Button>
-          )}
           {canEdit && (
             <button
               type="button"
@@ -298,17 +333,67 @@ export default function MinutesGroupPage() {
       </section>
 
       <section className="overflow-x-auto rounded-2xl border border-navy-800/10 bg-white shadow-sm">
-        <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 py-3">
           <MinutesIconTile tone="navy" size="sm">
             <GroupIcon className="size-4" />
           </MinutesIconTile>
           <h2 className="text-sm font-bold text-ink">{t("minutes.members")}</h2>
+          {invites.some((row) => row.status === "pending") ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+              {t("minutes.inviteStatus.pending")}
+            </span>
+          ) : null}
+          <div className="ms-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            {canManage ? (
+              <Button size="sm" variant="secondary" onClick={() => setInviteOpen(true)}>
+                <UserPlusIcon className="size-4" />
+                {t("minutes.invite")}
+              </Button>
+            ) : null}
+            <form
+              className="flex min-w-[14rem] flex-1 overflow-hidden rounded-lg border border-gray-300 bg-white focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-200 sm:w-72"
+              onSubmit={(event) => {
+                event.preventDefault();
+              }}
+            >
+              <div className="relative min-w-0 flex-1">
+                <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <SearchIcon className="size-4" />
+                </span>
+                <input
+                  value={peopleQuery}
+                  onChange={(e) => setPeopleQuery(e.target.value)}
+                  placeholder={t("minutes.searchPeople")}
+                  className="min-h-9 w-full border-0 bg-transparent ps-9 pe-2 text-sm text-ink outline-none placeholder:text-gray-400"
+                />
+              </div>
+              <button
+                type="submit"
+                className="inline-flex min-h-9 shrink-0 items-center justify-center border-s border-gray-300 bg-gray-50 px-3 text-gray-600 transition hover:bg-gray-100 hover:text-navy-800"
+                aria-label={t("common.search")}
+              >
+                <SearchIcon className="size-4" />
+              </button>
+            </form>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="min-h-9 w-40"
+            >
+              <option value="all">{t("common.all")}</option>
+              <option value="active">{t("minutes.inviteStatus.active")}</option>
+              <option value="pending">{t("minutes.inviteStatus.pending")}</option>
+              <option value="rejected">{t("minutes.inviteStatus.rejected")}</option>
+              <option value="expired">{t("minutes.inviteStatus.expired")}</option>
+            </Select>
+          </div>
         </div>
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-navy-900 text-white">
             <tr>
               <th className="px-3 py-3 text-start text-xs font-semibold">{t("minutes.members")}</th>
               <th className="px-3 py-3 text-start text-xs font-semibold">{t("minutes.inviteRole")}</th>
+              <th className="px-3 py-3 text-start text-xs font-semibold">{t("common.status")}</th>
               <th className="px-3 py-3 text-start text-xs font-semibold">{t("minutes.joinedAt")}</th>
               {canManage ? (
                 <th className="px-3 py-3 text-start text-xs font-semibold">{t("minutes.actions")}</th>
@@ -316,20 +401,20 @@ export default function MinutesGroupPage() {
             </tr>
           </thead>
           <tbody>
-            {members.map((member, index) => {
-              const isOwner = member.role === "owner";
+            {peopleRows.map((row, index) => {
+              const isOwner = row.role === "owner";
               return (
                 <tr
-                  key={member.id}
+                  key={row.key}
                   className={index % 2 === 0 ? "bg-white" : "bg-[#f4f7f9]"}
                 >
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-3">
-                      <Avatar src={member.profile_image} name={member.full_name} size={40} />
+                      <Avatar src={row.image} name={row.name} size={40} />
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-ink">{member.full_name}</p>
+                        <p className="truncate font-semibold text-ink">{row.name}</p>
                         <p className="text-[11px] text-gray-500" dir="ltr">
-                          {member.phone_number}
+                          {row.phone}
                         </p>
                       </div>
                     </div>
@@ -338,30 +423,41 @@ export default function MinutesGroupPage() {
                     <span
                       className={cx(
                         "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold",
-                        member.role === "owner"
+                        row.role === "owner"
                           ? "bg-navy-900 text-white"
-                          : member.role === "maintainer"
+                          : row.role === "maintainer"
                             ? "bg-brand-500 text-ink"
                             : "bg-green-100 text-green-800",
                       )}
                     >
-                      {t(`minutes.role.${member.role}`)}
+                      {t(`minutes.role.${row.role}`)}
                     </span>
-                    {member.position_title ? (
-                      <p className="mt-1 text-[11px] text-gray-500">{member.position_title}</p>
-                    ) : null}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span
+                      className={cx(
+                        "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold",
+                        peopleStatusClass(row.status),
+                      )}
+                    >
+                      {t(
+                        row.status === "active"
+                          ? "minutes.inviteStatus.active"
+                          : `minutes.inviteStatus.${row.status}`,
+                      )}
+                    </span>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-ink">
-                    {formatJalaliDisplay(member.joined_at, latin) || "—"}
+                    {formatJalaliDisplay(row.date, latin) || "—"}
                   </td>
                   {canManage ? (
                     <td className="px-3 py-3">
-                      {!isOwner ? (
+                      {row.kind === "member" && row.member && !isOwner ? (
                         <button
                           type="button"
                           className="flex size-10 items-center justify-center rounded-lg text-navy-800 hover:bg-red-50 hover:text-red-600"
                           aria-label={t("minutes.removeMember")}
-                          onClick={() => setRemoveMember(member)}
+                          onClick={() => setRemoveMember(row.member)}
                         >
                           <TrashIcon className="size-4" />
                         </button>
@@ -375,8 +471,12 @@ export default function MinutesGroupPage() {
             })}
           </tbody>
         </table>
-        {members.length === 0 ? (
-          <p className="px-3 py-6 text-center text-sm text-gray-500">{t("minutes.noMembers")}</p>
+        {peopleRows.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-gray-500">
+            {members.length === 0 && invites.length === 0
+              ? t("minutes.noMembers")
+              : t("minutes.noPeopleMatch")}
+          </p>
         ) : null}
       </section>
 
