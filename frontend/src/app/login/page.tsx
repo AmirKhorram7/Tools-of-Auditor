@@ -331,15 +331,30 @@ export default function LoginPage() {
           )}
         </Card>
 
-        <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-start text-gray-200">
-          <h2 className="text-sm font-bold text-white">{t("login.seoTitle")}</h2>
-          <p className="mt-2 text-xs leading-6">{t("login.seoIntro")}</p>
-          <ul className="mt-3 list-disc space-y-2 ps-4 text-xs leading-6">
-            <li>{t("login.seoWork")}</li>
-            <li>{t("login.seoMinutes")}</li>
-            <li>{t("login.seoDocs")}</li>
-          </ul>
-        </section>
+        <details className="group mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-start text-gray-200">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-white [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="block">{t("login.seoTitle")}</span>
+              <span className="mt-0.5 block text-xs font-medium text-gray-300 group-open:hidden">
+                {t("login.seoOpen")}
+              </span>
+            </span>
+            <span aria-hidden className="text-lg leading-none text-gray-300 group-open:hidden">
+              ▾
+            </span>
+            <span aria-hidden className="hidden text-lg leading-none text-gray-300 group-open:inline">
+              ▴
+            </span>
+          </summary>
+          <div className="mt-3">
+            <p className="text-xs leading-6">{t("login.seoIntro")}</p>
+            <ul className="mt-3 list-disc space-y-2 ps-4 text-xs leading-6">
+              <li>{t("login.seoWork")}</li>
+              <li>{t("login.seoMinutes")}</li>
+              <li>{t("login.seoDocs")}</li>
+            </ul>
+          </div>
+        </details>
 
         <SocialFooter className="mt-6" />
       </div>
