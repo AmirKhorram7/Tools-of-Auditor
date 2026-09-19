@@ -7,7 +7,16 @@ import { Alert, Avatar, Badge, Button, Card, EmptyState, Field, Input, Textarea,
 import JalaliDateField from "@/components/work/JalaliDateField";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { CHARACTERS, characterById } from "@/lib/characters";
+import {
+  CHARACTERS,
+  ageBandFromBirthDate,
+  ageFromBirthDate,
+  characterById,
+  characterFitsBand,
+  characterForName,
+  guessGender,
+  hasPersonName,
+} from "@/lib/characters";
 import { useI18n } from "@/lib/i18n";
 import type { Profile } from "@/lib/types";
 import {
@@ -39,7 +48,7 @@ const emptyForm: FormState = {
 
 export default function ProfilePage() {
   const { profile, setProfile, refreshProfile } = useAuth();
-  const { t } = useI18n();
+  const { t, n } = useI18n();
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -78,7 +87,32 @@ export default function ProfilePage() {
       job_title: profile.job_title ?? "",
     });
     setHasPassword(profile.has_password === true);
-    setCharacterId(profile.character_id ?? "");
+    const loadedId = profile.character_id ?? "";
+    const fullName = `${profile.first_name} ${profile.last_name}`.trim();
+    const canSuggest = hasPersonName(fullName) && Boolean(guessGender(fullName));
+    const band = ageBandFromBirthDate(profile.birth_date);
+    const current = characterById(loadedId);
+    if (
+      canSuggest &&
+      profile.birth_date &&
+      !profile.profile_image &&
+      (!current || !characterFitsBand(current, band))
+    ) {
+      const next = characterForName(fullName, profile.birth_date);
+      if (next) {
+        setCharacterId(next.id);
+        void apiFetch<Profile>("/profile/", {
+          method: "PATCH",
+          body: { character_id: next.id },
+        })
+          .then(setProfile)
+          .catch(() => undefined);
+      } else {
+        setCharacterId(loadedId);
+      }
+    } else {
+      setCharacterId(loadedId);
+    }
   }, [profile, refreshProfile]);
 
   useEffect(() => {
@@ -98,6 +132,11 @@ export default function ProfilePage() {
     [imageFile],
   );
   const pickedCharacter = !imageFile ? characterById(characterId) : null;
+  const age = ageFromBirthDate(form.birth_date);
+  const ageBand = ageBandFromBirthDate(form.birth_date);
+  const adultFaces = CHARACTERS.filter((row) => row.ageBand === "adult");
+  const matureFaces = CHARACTERS.filter((row) => row.ageBand === "mature");
+  const named = hasPersonName(`${form.first_name} ${form.last_name}`);
 
   useEffect(() => {
     return () => {
@@ -396,34 +435,37 @@ export default function ProfilePage() {
         </button>
         {showCharacters ? (
           <>
-            <p className="mt-3 text-xs text-gray-500">{t("profile.characterHint")}</p>
-            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
-              {CHARACTERS.map((card) => {
-                const selected = characterId === card.id && !imageFile;
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    onClick={() => {
-                      setCharacterId(card.id);
-                      setImageFile(null);
-                      setImageKey((value) => value + 1);
-                    }}
-                    className={cx(
-                      "overflow-hidden rounded-xl border bg-white transition",
-                      selected ? "border-brand-500 ring-2 ring-brand-200" : "border-gray-200 hover:border-brand-500",
-                    )}
-                    title={t(card.nameKey)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={card.src} alt="" className="aspect-square w-full object-cover object-top" />
-                    <span className="block truncate px-1 py-1 text-[11px] font-medium text-ink">
-                      {t(card.nameKey)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <p className="mt-3 text-xs text-gray-500">
+              {named ? t("profile.characterHint") : t("profile.needNameForFace")}
+            </p>
+            <p className="mt-3 text-xs font-bold text-ink">
+              {t("profile.ageBand.adult")}
+              {ageBand === "adult" || ageBand === "child" ? ` · ${t("profile.ageBand.suggested")}` : ""}
+            </p>
+            <CharacterGrid
+              cards={adultFaces}
+              characterId={characterId}
+              imageFile={imageFile}
+              onPick={(id) => {
+                setCharacterId(id);
+                setImageFile(null);
+                setImageKey((value) => value + 1);
+              }}
+            />
+            <p className="mt-4 text-xs font-bold text-ink">
+              {t("profile.ageBand.mature")}
+              {ageBand === "mature" ? ` · ${t("profile.ageBand.suggested")}` : ""}
+            </p>
+            <CharacterGrid
+              cards={matureFaces}
+              characterId={characterId}
+              imageFile={imageFile}
+              onPick={(id) => {
+                setCharacterId(id);
+                setImageFile(null);
+                setImageKey((value) => value + 1);
+              }}
+            />
           </>
         ) : null}
       </Card>
@@ -467,9 +509,27 @@ export default function ProfilePage() {
             </Field>
             <Field label={t("profile.birth")}>
               <JalaliDateField
+                kind="birth"
                 value={form.birth_date}
-                onChange={(iso) => update("birth_date", iso)}
+                onChange={(iso) => {
+                  update("birth_date", iso);
+                  const nextBand = ageBandFromBirthDate(iso);
+                  const current = characterById(characterId);
+                  if (imageFile) return;
+                  if (current && characterFitsBand(current, nextBand)) return;
+                  const fullName = `${form.first_name} ${form.last_name}`.trim();
+                  if (!hasPersonName(fullName) || !guessGender(fullName)) return;
+                  const next = characterForName(fullName, iso);
+                  if (next) setCharacterId(next.id);
+                }}
               />
+              {age != null ? (
+                <p className="mt-1 text-xs text-gray-500">
+                  {t("profile.ageHint", { age: n(age) })}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500">{t("profile.birthHint")}</p>
+              )}
             </Field>
           </div>
 
@@ -557,6 +617,45 @@ export default function ProfilePage() {
       </Card>
         </>
       )}
+    </div>
+  );
+}
+
+function CharacterGrid({
+  cards,
+  characterId,
+  imageFile,
+  onPick,
+}: {
+  cards: typeof CHARACTERS;
+  characterId: string;
+  imageFile: File | null;
+  onPick: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+      {cards.map((card) => {
+        const selected = characterId === card.id && !imageFile;
+        return (
+          <button
+            key={card.id}
+            type="button"
+            onClick={() => onPick(card.id)}
+            className={cx(
+              "overflow-hidden rounded-xl border bg-white transition",
+              selected ? "border-brand-500 ring-2 ring-brand-200" : "border-gray-200 hover:border-brand-500",
+            )}
+            title={t(card.nameKey)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={card.src} alt="" className="aspect-square w-full object-cover object-top" />
+            <span className="block truncate px-1 py-1 text-[11px] font-medium text-ink">
+              {t(card.nameKey)}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

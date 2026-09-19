@@ -45,10 +45,12 @@ export default function JalaliDateField({
   value,
   onChange,
   placeholder,
+  kind = "default",
 }: {
   value: string;
   onChange: (iso: string) => void;
   placeholder?: string;
+  kind?: "default" | "birth";
 }) {
   const { t, locale } = useI18n();
   const latin = locale === "en";
@@ -58,6 +60,19 @@ export default function JalaliDateField({
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState({ jy: today.jy, jm: today.jm });
   const rootRef = useRef<HTMLDivElement>(null);
+  const yearMin = kind === "birth" ? today.jy - 100 : today.jy - 20;
+  const yearMax = kind === "birth" ? today.jy - 5 : today.jy + 5;
+  const years = useMemo(() => {
+    const rows: number[] = [];
+    for (let year = yearMax; year >= yearMin; year -= 1) rows.push(year);
+    return rows;
+  }, [yearMax, yearMin]);
+
+  const openingCursor = () => {
+    if (selected) return { jy: selected.jy, jm: selected.jm };
+    if (kind === "birth") return { jy: today.jy - 40, jm: 1 };
+    return { jy: today.jy, jm: today.jm };
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -76,6 +91,22 @@ export default function JalaliDateField({
     return { length, offset };
   }, [cursor]);
 
+  const setYear = (jy: number) => {
+    const length = jalaaliMonthLength(jy, cursor.jm);
+    setCursor({ jy, jm: cursor.jm });
+    if (selected && selected.jy === cursor.jy && selected.jm === cursor.jm && selected.jd > length) {
+      pick(length, { jy, jm: cursor.jm });
+    }
+  };
+
+  const setMonth = (jm: number) => {
+    const length = jalaaliMonthLength(cursor.jy, jm);
+    setCursor({ jy: cursor.jy, jm });
+    if (selected && selected.jy === cursor.jy && selected.jm === cursor.jm && selected.jd > length) {
+      pick(length, { jy: cursor.jy, jm });
+    }
+  };
+
   const shiftMonth = (delta: number) => {
     let { jy, jm } = cursor;
     jm += delta;
@@ -87,11 +118,12 @@ export default function JalaliDateField({
       jm = 1;
       jy += 1;
     }
+    jy = Math.min(yearMax, Math.max(yearMin, jy));
     setCursor({ jy, jm });
   };
 
-  const pick = (day: number) => {
-    const gregorian = toGregorian(cursor.jy, cursor.jm, day);
+  const pick = (day: number, at = cursor) => {
+    const gregorian = toGregorian(at.jy, at.jm, day);
     onChange(isoFromGregorian(gregorian.gy, gregorian.gm, gregorian.gd));
     setOpen(false);
   };
@@ -101,8 +133,7 @@ export default function JalaliDateField({
       <button
         type="button"
         onClick={() => {
-          const now = todayJalali();
-          setCursor({ jy: now.jy, jm: now.jm });
+          setCursor(openingCursor());
           setOpen((current) => !current);
         }}
         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-start text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
@@ -115,7 +146,37 @@ export default function JalaliDateField({
       </button>
 
       {open && (
-        <div className="absolute bottom-full z-[70] mb-1 w-72 rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+        <div className="absolute bottom-full z-[70] mb-1 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium text-gray-500">{t("work.year")}</span>
+              <select
+                value={cursor.jy}
+                onChange={(event) => setYear(Number(event.target.value))}
+                className="w-full rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm font-semibold text-ink outline-none focus:border-brand-500"
+              >
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {show(year)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium text-gray-500">{t("work.monthLabel")}</span>
+              <select
+                value={cursor.jm}
+                onChange={(event) => setMonth(Number(event.target.value))}
+                className="w-full rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm font-semibold text-ink outline-none focus:border-brand-500"
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
+                  <option key={month} value={month}>
+                    {t(`work.month.${month}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
@@ -184,18 +245,22 @@ export default function JalaliDateField({
             >
               {t("work.clearDate")}
             </button>
-            <button
-              type="button"
-              className="text-xs font-medium text-link"
-              onClick={() => {
-                const today = todayJalali();
-                const gregorian = toGregorian(today.jy, today.jm, today.jd);
-                onChange(isoFromGregorian(gregorian.gy, gregorian.gm, gregorian.gd));
-                setOpen(false);
-              }}
-            >
-              {t("work.today")}
-            </button>
+            {kind === "birth" ? (
+              <span className="text-[11px] text-gray-500">{t("work.pickYearFirst")}</span>
+            ) : (
+              <button
+                type="button"
+                className="text-xs font-medium text-link"
+                onClick={() => {
+                  const now = todayJalali();
+                  const gregorian = toGregorian(now.jy, now.jm, now.jd);
+                  onChange(isoFromGregorian(gregorian.gy, gregorian.gm, gregorian.gd));
+                  setOpen(false);
+                }}
+              >
+                {t("work.today")}
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -56,9 +56,9 @@ export default function MinutesMeetingsTable({
                   open ? "border-s-brand-500" : "border-s-navy-800",
                   open
                     ? "bg-brand-50/80 hover:bg-brand-100"
-                    : index % 2 === 0
+                      : index % 2 === 0
                       ? "bg-white hover:bg-surface"
-                      : "bg-[#f4f7f9] hover:bg-surface",
+                      : "bg-gray-50 hover:bg-surface",
                 )}
               >
                 <Td>

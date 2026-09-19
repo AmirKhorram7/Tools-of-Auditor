@@ -3,7 +3,7 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 import { mediaUrl } from "@/lib/api";
-import { characterForName } from "@/lib/characters";
+import { characterForName, hasPersonName, normalizeName } from "@/lib/characters";
 import { useI18n } from "@/lib/i18n";
 
 export function cx(...values: Array<string | false | null | undefined>) {
@@ -270,21 +270,41 @@ export function Avatar({
   className?: string;
 }) {
   const resolved = mediaUrl(src);
-  const portrait = resolved || characterForName(name).src;
+  const portrait = resolved || characterForName(name)?.src;
+  if (portrait) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={portrait}
+        alt={name}
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        className={cx(
+          "shrink-0 rounded-full border border-gray-200 bg-white object-cover object-top",
+          className,
+        )}
+      />
+    );
+  }
 
+  const letter = hasPersonName(name) ? normalizeName(name).slice(0, 1) : "";
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={portrait}
-      alt={name}
-      width={size}
-      height={size}
-      style={{ width: size, height: size }}
+    <span
+      aria-hidden={!name}
+      title={name}
+      style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.38)) }}
       className={cx(
-        "shrink-0 rounded-full border border-gray-200 bg-white object-cover object-top",
+        "inline-flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-navy-900 font-bold text-brand-400",
         className,
       )}
-    />
+    >
+      {letter || (
+        <svg viewBox="0 0 24 24" className="size-1/2" fill="currentColor" aria-hidden>
+          <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z" />
+        </svg>
+      )}
+    </span>
   );
 }
 

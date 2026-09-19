@@ -81,7 +81,7 @@ class Profile(models.Model):
     """Optional profile completed after phone OTP sign-in."""
 
     CHARACTER_IDS = frozenset(
-        # 18 original portraits: 9 women, 9 men.
+        # Adult (15–39) + mature (40+) portraits.
         {
             "neda",
             "sara",
@@ -101,6 +101,18 @@ class Profile(models.Model):
             "kasra",
             "soheil",
             "shayan",
+            "shahnaz",
+            "parvin",
+            "fariba",
+            "sima",
+            "mahin",
+            "soheila",
+            "bahram",
+            "dariush",
+            "mansour",
+            "parviz",
+            "kamran",
+            "farhad",
         }
     )
 

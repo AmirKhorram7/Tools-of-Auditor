@@ -107,8 +107,70 @@ html.dark .shadow-xl {
 
 /* Orange CTAs keep Amazon dark ink — never invert the T / primary buttons. */
 html.dark .bg-brand-500.text-ink,
-html.dark .bg-brand-500 .text-ink {
+html.dark .bg-brand-500.text-navy-900,
+html.dark .bg-brand-500 .text-ink,
+html.dark .bg-brand-500 .text-navy-900 {
   color: #0f1111;
+}
+
+/* Minutes / profile chips: pale light fills become dark surfaces so remapped text stays readable. */
+html.dark .bg-brand-50,
+html.dark .bg-brand-50\/80 {
+  background-color: #3e4a32;
+}
+html.dark .bg-brand-100,
+html.dark .hover\:bg-brand-100:hover {
+  background-color: #4a5738;
+}
+html.dark .bg-gray-100,
+html.dark .bg-\[\#f4f7f9\] {
+  background-color: #2f3c4a;
+}
+html.dark .bg-green-50,
+html.dark .bg-green-100 {
+  background-color: #1f3d2e;
+}
+html.dark .text-green-700,
+html.dark .text-green-800 {
+  color: #86efac;
+}
+html.dark .bg-amber-100 {
+  background-color: #4a3b16;
+}
+html.dark .text-amber-900 {
+  color: #fcd34d;
+}
+html.dark .bg-red-100 {
+  background-color: rgb(127 29 29 / 0.38);
+}
+html.dark .text-red-600,
+html.dark .text-red-700 {
+  color: #fca5a5;
+}
+html.dark .text-brand-800 {
+  color: #ffd089;
+}
+html.dark .border-brand-200,
+html.dark .border-green-200,
+html.dark .border-red-200 {
+  border-color: var(--ta-border);
+}
+html.dark .bg-\[\#e7f3f5\] {
+  background-color: #2a4450;
+}
+html.dark .bg-gray-300 {
+  background-color: #4d5d70;
+}
+html.dark select option,
+html.dark select optgroup {
+  background-color: #354454;
+  color: #f3f4f6;
+}
+html.dark .placeholder\:text-gray-400::placeholder {
+  color: #9aa3ad;
+}
+html.dark .ring-white {
+  --tw-ring-color: #354454;
 }
 html.dark .hover\:bg-red-50:hover,
 html.dark .bg-red-50 {

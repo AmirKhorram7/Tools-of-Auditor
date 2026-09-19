@@ -406,7 +406,7 @@ export default function MinutesGroupPage() {
               return (
                 <tr
                   key={row.key}
-                  className={index % 2 === 0 ? "bg-white" : "bg-[#f4f7f9]"}
+                  className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
                 >
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-3">
