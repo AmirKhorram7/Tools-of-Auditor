@@ -1076,6 +1076,16 @@ const FA: Dict = {
   "minutes.notFound": "پیدا نشد.",
   "minutes.groupCardMeta": "{members} عضو",
   "minutes.meetingCardMeta": "شماره {n} · {items} بند",
+  "minutes.comment": "یادداشت",
+  "minutes.comments": "یادداشت‌های بند",
+  "minutes.addComment": "ثبت یادداشت",
+  "minutes.commentPlaceholder": "مثلاً: این هفته در مرحله آزمایش هستم، نمونه آماده است.",
+  "minutes.commentHint": "فقط مسئول بند و دبیر جلسه می‌توانند یادداشت بگذارند.",
+  "minutes.noComments": "هنوز یادداشتی نیست.",
+  "minutes.commentFail": "ثبت یادداشت ناموفق بود.",
+  "minutes.year": "سال",
+  "minutes.yearAll": "همه سال‌ها",
+  "minutes.yearHint": "شماره صورت جلسه هر سال از ۱ شروع می‌شود.",
 };
 
 const EN: Dict = {
@@ -2195,6 +2205,16 @@ const EN: Dict = {
   "minutes.notFound": "Not found.",
   "minutes.groupCardMeta": "{members} members",
   "minutes.meetingCardMeta": "No. {n} · {items} items",
+  "minutes.comment": "Comment",
+  "minutes.comments": "Line comments",
+  "minutes.addComment": "Add comment",
+  "minutes.commentPlaceholder": "e.g. I am in test this week; the sample is ready.",
+  "minutes.commentHint": "Only the assignee and the meeting secretary can comment.",
+  "minutes.noComments": "No comments yet.",
+  "minutes.commentFail": "Could not save the comment.",
+  "minutes.year": "Year",
+  "minutes.yearAll": "All years",
+  "minutes.yearHint": "Meeting numbers restart at 1 each year.",
 };
 
 const MESSAGES: Record<Locale, Dict> = { fa: FA, en: EN };

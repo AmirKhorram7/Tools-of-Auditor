@@ -16,6 +16,7 @@ from meeting_minutes_servicesclear.api.v1.serializers import (
     GroupSerializer,
     InvitationSerializer,
     InviteSerializer,
+    MeetingItemCommentSerializer,
     MeetingItemSerializer,
     MeetingListSerializer,
     MeetingSerializer,
@@ -337,7 +338,10 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
             "Minutes in groups you can see. List returns the **header** only "
             "(no item lines). Use retrieve for the full board."
         ),
-        parameters=[_q("group", "Filter by group id.", OpenApiTypes.INT)],
+        parameters=[
+            _q("group", "Filter by group id.", OpenApiTypes.INT),
+            _q("year", "Jalali year (e.g. 1405). Omit for all years.", OpenApiTypes.INT),
+        ],
     ),
     retrieve=extend_schema(
         summary="Get meeting minutes (header + items)",
@@ -380,7 +384,14 @@ class MeetingViewSet(viewsets.ModelViewSet):
         group_id = self.request.query_params.get("group")
         if group_id:
             group = Group.objects.filter(pk=group_id, deleted_at__isnull=True).first()
-        return meeting_service.meetings_for_user(self.request.user, group=group)
+        year = None
+        raw_year = self.request.query_params.get("year")
+        if raw_year and raw_year != "all":
+            try:
+                year = int(raw_year)
+            except (TypeError, ValueError):
+                year = None
+        return meeting_service.meetings_for_user(self.request.user, group=group, year=year)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -511,6 +522,44 @@ class MeetingViewSet(viewsets.ModelViewSet):
             **serializer.validated_data,
         )
         return Response(MeetingItemSerializer(item, context=ctx).data)
+
+    def _meeting_item(self, request, pk, item_id):
+        meeting = meeting_service.get_meeting(request.user, pk)
+        item = meeting.items.filter(pk=item_id, deleted_at__isnull=True).first()
+        if item is None:
+            raise ValidationError({"item_id": "Item not found."})
+        return meeting, item
+
+    @extend_schema(
+        methods=["GET"],
+        summary="List comments on a meeting item",
+        responses={200: MeetingItemCommentSerializer(many=True)},
+    )
+    @extend_schema(
+        methods=["POST"],
+        summary="Add a comment on a meeting item",
+        description="Assignee of the line, or a clerk (owner/maintainer). Body: `{body}`.",
+        request=MeetingItemCommentSerializer,
+        responses={201: MeetingItemCommentSerializer},
+    )
+    @action(detail=True, methods=["get", "post"], url_path=r"items/(?P<item_id>[^/.]+)/comments")
+    def item_comments(self, request, pk=None, item_id=None):
+        _meeting, item = self._meeting_item(request, pk, item_id)
+        ctx = self.get_serializer_context()
+        if request.method == "GET":
+            rows = meeting_service.comments_for_item(request.user, item)
+            return Response(MeetingItemCommentSerializer(rows, many=True, context=ctx).data)
+        serializer = MeetingItemCommentSerializer(data=request.data, context=ctx)
+        serializer.is_valid(raise_exception=True)
+        comment = meeting_service.add_comment(
+            user=request.user,
+            item=item,
+            body=serializer.validated_data["body"],
+        )
+        return Response(
+            MeetingItemCommentSerializer(comment, context=ctx).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @extend_schema(
         summary="Carry unfinished items to the next meeting",

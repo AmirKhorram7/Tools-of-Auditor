@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import {
   CalendarIcon,
   ClerkIcon,
+  CommentIcon,
   DuoAcceptIcon,
   DuoEditIcon,
   DuoRestoreIcon,
@@ -34,11 +35,13 @@ import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
+  formatJalaliYear,
   ITEM_STATUSES,
   itemStatusClass,
   meetingStatusClass,
   priorityLabelKey,
   type MinutesItem,
+  type MinutesItemComment,
   type MinutesItemStatus,
   type MinutesMeeting,
   type MinutesMember,
@@ -70,6 +73,11 @@ export default function MinutesMeetingPage() {
   const [assigneeQuery, setAssigneeQuery] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [commentItem, setCommentItem] = useState<MinutesItem | null>(null);
+  const [comments, setComments] = useState<MinutesItemComment[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentSaving, setCommentSaving] = useState(false);
 
   const items = meeting?.items ?? [];
   const doneCount = items.filter((item) => item.status === "completed").length;
@@ -241,6 +249,51 @@ export default function MinutesMeetingPage() {
     setLineOpen(true);
   };
 
+  const openComments = async (item: MinutesItem) => {
+    setCommentItem(item);
+    setCommentText("");
+    setCommentsLoading(true);
+    try {
+      const rows = await apiFetch<MinutesItemComment[]>(
+        `/minutes/meetings/${meetingId}/items/${item.id}/comments/`,
+      );
+      setComments(rows);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("minutes.commentFail"));
+      setComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const saveComment = async () => {
+    if (!commentItem || !commentText.trim()) return;
+    setCommentSaving(true);
+    try {
+      const created = await apiFetch<MinutesItemComment>(
+        `/minutes/meetings/${meetingId}/items/${commentItem.id}/comments/`,
+        { method: "POST", body: { body: commentText.trim() } },
+      );
+      setComments((current) => [...current, created]);
+      setCommentText("");
+      setMeeting((current) => {
+        if (!current?.items) return current;
+        return {
+          ...current,
+          items: current.items.map((row) =>
+            row.id === commentItem.id
+              ? { ...row, comment_count: (row.comment_count ?? 0) + 1 }
+              : row,
+          ),
+        };
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("minutes.commentFail"));
+    } finally {
+      setCommentSaving(false);
+    }
+  };
+
   const toggleAssignee = (id: number) => {
     setLineAssignees((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
@@ -275,7 +328,7 @@ export default function MinutesMeetingPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-lg font-bold leading-8 text-ink sm:text-xl">
-              {meeting.name} #{n(meeting.meeting_number)}
+              {meeting.name} #{meeting.year ? `${formatJalaliYear(meeting.year, latin)}/${n(meeting.meeting_number)}` : n(meeting.meeting_number)}
             </p>
             <p className="mt-1 text-xs leading-5 text-gray-500">
               {meeting.company_name} · {meeting.group_name}
@@ -383,7 +436,7 @@ export default function MinutesMeetingPage() {
           <p className="py-8 text-center text-sm text-gray-500">{t("minutes.noLines")}</p>
         ) : (
           <>
-            <div className="mb-2 hidden grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_8.5rem] gap-2 px-2 text-xs font-semibold text-navy-800 lg:grid">
+            <div className="mb-2 hidden grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_10.5rem] gap-2 px-2 text-xs font-semibold text-navy-800 lg:grid">
               <span>{t("minutes.subject")}</span>
               <span>{t("minutes.assignees")}</span>
               <span>{t("minutes.due")}</span>
@@ -393,7 +446,7 @@ export default function MinutesMeetingPage() {
             </div>
             <ul className="divide-y divide-gray-100">
               {items.map((item) => (
-                <li key={item.id} className="py-3 lg:grid lg:grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_8.5rem] lg:items-center lg:gap-2">
+                <li key={item.id} className="py-3 lg:grid lg:grid-cols-[minmax(0,1.4fr)_7rem_6.5rem_7rem_5.5rem_10.5rem] lg:items-center lg:gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-ink">{item.title}</p>
                     {item.description ? (
@@ -451,6 +504,22 @@ export default function MinutesMeetingPage() {
                         : `${n(item.remaining_days)} ${t("minutes.daysUnit")}`}
                   </p>
                   <div className="mt-2 flex gap-1 lg:mt-0">
+                    <button
+                      type="button"
+                      className={cx(
+                        "relative flex size-10 items-center justify-center rounded-lg hover:bg-surface",
+                        (item.comment_count ?? 0) > 0 ? "text-navy-800" : "text-gray-500",
+                      )}
+                      onClick={() => openComments(item)}
+                      aria-label={t("minutes.comment")}
+                    >
+                      <CommentIcon className="size-5" />
+                      {(item.comment_count ?? 0) > 0 ? (
+                        <span className="absolute -top-0.5 end-0 min-w-4 rounded-full bg-brand-500 px-1 text-[10px] font-bold leading-4 text-ink">
+                          {n(item.comment_count)}
+                        </span>
+                      ) : null}
+                    </button>
                     {canAdd && (
                       <button
                         type="button"
@@ -606,6 +675,62 @@ export default function MinutesMeetingPage() {
               {t("common.save")}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={commentItem !== null}
+        title={commentItem ? `${t("minutes.comments")} · ${commentItem.title}` : t("minutes.comments")}
+        onClose={() => {
+          setCommentItem(null);
+          setCommentText("");
+        }}
+      >
+        <div className="space-y-3">
+          {commentsLoading ? (
+            <p className="py-6 text-center text-sm text-gray-500">{t("common.loading")}</p>
+          ) : comments.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-500">{t("minutes.noComments")}</p>
+          ) : (
+            <ul className="max-h-64 space-y-2 overflow-y-auto">
+              {comments.map((row) => (
+                <li key={row.id} className="rounded-xl border border-gray-200 bg-surface px-3 py-2">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Avatar src={row.author_image} name={row.author_name} size={22} />
+                    <span className="text-xs font-semibold text-ink">{row.author_name}</span>
+                    <span className="text-[10px] text-gray-400">
+                      {formatJalaliDisplay(row.created_at.slice(0, 10), latin)}
+                    </span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-ink">{row.body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {commentItem?.can_comment ? (
+            <div className="space-y-2">
+              <Field label={t("minutes.comment")} hint={t("minutes.commentHint")}>
+                <Textarea
+                  rows={3}
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder={t("minutes.commentPlaceholder")}
+                />
+              </Field>
+              <div className="flex justify-end">
+                <Button
+                  className="min-h-11 max-sm:w-full"
+                  loading={commentSaving}
+                  disabled={!commentText.trim()}
+                  onClick={saveComment}
+                >
+                  {t("minutes.addComment")}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">{t("minutes.commentHint")}</p>
+          )}
         </div>
       </Modal>
 

@@ -2,16 +2,18 @@ from datetime import date
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
+from meeting_minutes_servicesclear.jalali import jalali_year
 from meeting_minutes_servicesclear.models import (
     Company,
     Group,
     GroupMember,
     Meeting,
     MeetingItem,
+    MeetingItemComment,
 )
 
 MANAGE_ROLES = {GroupMember.Role.OWNER, GroupMember.Role.MAINTAINER}
@@ -65,7 +67,7 @@ class MeetingService:
             raise PermissionDenied("Only an owner or maintainer can do this.")
         return meeting
 
-    def meetings_for_user(self, user, group: Group | None = None):
+    def meetings_for_user(self, user, group: Group | None = None, year: int | None = None):
         owned_company_ids = Company.objects.filter(
             owner=user, deleted_at__isnull=True
         ).values("id")
@@ -81,10 +83,12 @@ class MeetingService:
             )
             .select_related("group", "group__company", "created_by", "created_by__profile")
             .distinct()
-            .order_by("-date", "-meeting_number")
+            .order_by("-year", "-meeting_number", "-date")
         )
         if group:
             qs = qs.filter(group=group)
+        if year:
+            qs = qs.filter(year=year)
         return qs
 
     def get_meeting(self, user, meeting_id: int) -> Meeting:
@@ -97,11 +101,9 @@ class MeetingService:
             raise ValidationError({"meeting": "Meeting not found."})
         return self._require_view(user, meeting)
 
-    def _next_number(self, group: Group) -> int:
-        # Include soft-deleted rows. UniqueConstraint is on (group, meeting_number)
-        # for every row, so skipping deleted numbers collides and 500s.
+    def _next_number(self, group: Group, year: int) -> int:
         current = (
-            Meeting.objects.filter(group=group)
+            Meeting.objects.filter(group=group, year=year, deleted_at__isnull=True)
             .aggregate(n=Max("meeting_number"))
             .get("n")
         )
@@ -135,13 +137,16 @@ class MeetingService:
         if not self.can_clerk_group(user, group):
             raise PermissionDenied("Only an owner or maintainer can do this.")
 
+        meeting_date = meeting_date or date.today()
+        year = jalali_year(meeting_date)
         for attempt in range(3):
             meeting = Meeting(
                 group=group,
                 name=(name or "").strip() or group.name,
-                date=meeting_date or date.today(),
+                date=meeting_date,
+                year=year,
                 description=(description or "").strip(),
-                meeting_number=self._next_number(group),
+                meeting_number=self._next_number(group, year),
                 status=Meeting.Status.OPEN,
                 created_by=user,
             )
@@ -162,10 +167,13 @@ class MeetingService:
 
     def update_meeting(self, *, user, meeting: Meeting, **fields) -> Meeting:
         self._require_clerk(user, meeting)
+        old_group_id = meeting.group_id
+        old_year = meeting.year
         if "name" in fields:
             meeting.name = (fields["name"] or "").strip() or meeting.name
         if "date" in fields and fields["date"]:
             meeting.date = fields["date"]
+            meeting.year = jalali_year(fields["date"])
         if "description" in fields:
             meeting.description = (fields["description"] or "").strip()
         if "group" in fields and fields["group"] and fields["group"].id != meeting.group_id:
@@ -175,6 +183,8 @@ class MeetingService:
             if new_group.company_id != meeting.group.company_id:
                 raise ValidationError({"group": "Group must belong to the same company."})
             meeting.group = new_group
+        if meeting.group_id != old_group_id or meeting.year != old_year:
+            meeting.meeting_number = self._next_number(meeting.group, meeting.year)
         meeting.updated_by = user
         return self._save_meeting(meeting)
 
@@ -200,6 +210,12 @@ class MeetingService:
         return (
             meeting.items.filter(deleted_at__isnull=True)
             .prefetch_related("assignees__user__profile")
+            .annotate(
+                comment_count=Count(
+                    "comments",
+                    filter=Q(comments__deleted_at__isnull=True),
+                )
+            )
             .order_by("order", "id")
         )
 
@@ -301,6 +317,29 @@ class MeetingService:
         item.updated_by = user
         item.save()
         return item
+
+    def can_comment(self, user, item: MeetingItem) -> bool:
+        return self.can_clerk(user, item.meeting) or self.is_assignee(user, item)
+
+    def comments_for_item(self, user, item: MeetingItem):
+        self._require_view(user, item.meeting)
+        return (
+            item.comments.filter(deleted_at__isnull=True)
+            .select_related("created_by", "created_by__profile")
+            .order_by("created_at", "id")
+        )
+
+    def add_comment(self, *, user, item: MeetingItem, body: str) -> MeetingItemComment:
+        self._require_view(user, item.meeting)
+        if not self.can_comment(user, item):
+            raise PermissionDenied("Only the assignee or a clerk can comment on this line.")
+        text = (body or "").strip()
+        if not text:
+            raise ValidationError({"body": "Comment cannot be empty."})
+        comment = MeetingItemComment(item=item, body=text, created_by=user)
+        comment.full_clean()
+        comment.save()
+        return comment
 
     def delete_item(self, *, user, item: MeetingItem) -> MeetingItem:
         self._require_clerk(user, item.meeting)

@@ -1,3 +1,5 @@
+import { toJalaali } from "jalaali-js";
+
 import { workCompanyPhoto } from "@/lib/work";
 
 export type MinutesCompany = {
@@ -81,8 +83,18 @@ export type MinutesItem = {
   completed_at: string | null;
   can_edit: boolean;
   can_set_status: boolean;
+  can_comment: boolean;
+  comment_count: number;
   created_at: string;
   updated_at?: string;
+};
+
+export type MinutesItemComment = {
+  id: number;
+  body: string;
+  author_name: string;
+  author_image?: string | null;
+  created_at: string;
 };
 
 export type MinutesMeeting = {
@@ -94,6 +106,7 @@ export type MinutesMeeting = {
   company_id: number;
   company_name: string;
   date: string;
+  year: number;
   meeting_number: number;
   description: string;
   status: "open" | "closed" | "archived";
@@ -118,6 +131,15 @@ export const ITEM_STATUSES: MinutesItemStatus[] = [
 ];
 
 export const ASSIGNABLE_ROLES = ["maintainer", "guest"] as const;
+
+export function currentJalaliYear(): number {
+  const now = new Date();
+  return toJalaali(now.getFullYear(), now.getMonth() + 1, now.getDate()).jy;
+}
+
+export function formatJalaliYear(year: number, latin = false): string {
+  return year.toLocaleString(latin ? "en-US" : "fa-IR", { useGrouping: false });
+}
 
 export function defaultMinutesPicture(kind: "group" | "company", id: number): string {
   if (kind === "company") {

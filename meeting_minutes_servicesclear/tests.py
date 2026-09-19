@@ -246,6 +246,44 @@ class MinutesAPISmokeTests(APITestCase):
         self.assertEqual(guest_status.status_code, status.HTTP_200_OK, guest_status.data)
         self.assertEqual(guest_status.data["status"], "in_progress")
 
+        guest_comment = self.guest_c.post(
+            f"{MM}/meetings/{meeting_id}/items/{item_id}/comments/",
+            {"body": "در مرحله آزمایش هستم، نمونه آماده است."},
+            format="json",
+        )
+        self.assertEqual(guest_comment.status_code, status.HTTP_201_CREATED, guest_comment.data)
+        self.assertIn("نمونه", guest_comment.data["body"])
+
+        guest_empty = self.guest_c.post(
+            f"{MM}/meetings/{meeting_id}/items/{item_id}/comments/",
+            {"body": "   "},
+            format="json",
+        )
+        self.assertEqual(guest_empty.status_code, status.HTTP_400_BAD_REQUEST)
+
+        guest_other = self.guest_c.post(
+            f"{MM}/meetings/{meeting_id}/items/{open_item_id}/comments/",
+            {"body": "این بند مال من نیست"},
+            format="json",
+        )
+        self.assertEqual(guest_other.status_code, status.HTTP_403_FORBIDDEN)
+
+        clerk_comment = self.owner_c.post(
+            f"{MM}/meetings/{meeting_id}/items/{open_item_id}/comments/",
+            {"body": "دبیر یادداشت گذاشت"},
+            format="json",
+        )
+        self.assertEqual(clerk_comment.status_code, status.HTTP_201_CREATED, clerk_comment.data)
+
+        comments = self.guest_c.get(f"{MM}/meetings/{meeting_id}/items/{item_id}/comments/")
+        self.assertEqual(comments.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(comments.data), 1)
+
+        detail_after = self.guest_c.get(f"{MM}/meetings/{meeting_id}/")
+        commented = next(row for row in detail_after.data["items"] if row["id"] == item_id)
+        self.assertEqual(commented["comment_count"], 1)
+        self.assertTrue(commented["can_comment"])
+
         guest_cancel = self.guest_c.patch(
             f"{MM}/meetings/{meeting_id}/items/{item_id}/",
             {"status": "cancelled"},
@@ -307,7 +345,7 @@ class MinutesAPISmokeTests(APITestCase):
 
 
 class MinutesMeetingNumberTests(APITestCase):
-    """The production 500: next number must skip past soft-deleted meetings."""
+    """Live meetings only: next number is last existing + 1, and resets each Jalali year."""
 
     def setUp(self):
         self.owner = User.objects.create_user(
@@ -320,18 +358,22 @@ class MinutesMeetingNumberTests(APITestCase):
         token = str(RefreshToken.for_user(self.owner).access_token)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
-    def test_create_after_delete_does_not_reuse_number(self):
+    def _group(self):
         company = self.client.post(f"{MM}/companies/", {"name": "شرکت شماره"}, format="json")
         group = self.client.post(
             f"{MM}/groups/",
             {"company": company.data["id"], "name": "گروه شماره"},
             format="json",
         )
-        group_id = group.data["id"]
+        return group.data["id"]
+
+    def test_create_after_delete_reuses_next_live_number(self):
+        group_id = self._group()
 
         first = self.client.post(f"{MM}/meetings/", {"group": group_id}, format="json")
         self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
         self.assertEqual(first.data["meeting_number"], 1)
+        self.assertIn("year", first.data)
 
         second = self.client.post(f"{MM}/meetings/", {"group": group_id}, format="json")
         self.assertEqual(second.status_code, status.HTTP_201_CREATED, second.data)
@@ -342,8 +384,44 @@ class MinutesMeetingNumberTests(APITestCase):
 
         third = self.client.post(f"{MM}/meetings/", {"group": group_id}, format="json")
         self.assertEqual(third.status_code, status.HTTP_201_CREATED, third.data)
-        self.assertEqual(third.data["meeting_number"], 3)
+        self.assertEqual(third.data["meeting_number"], 2)
         self.assertNotEqual(third.data["id"], second.data["id"])
+
+    def test_delete_all_starts_from_one(self):
+        group_id = self._group()
+        first = self.client.post(f"{MM}/meetings/", {"group": group_id}, format="json")
+        self.client.delete(f"{MM}/meetings/{first.data['id']}/")
+        again = self.client.post(f"{MM}/meetings/", {"group": group_id}, format="json")
+        self.assertEqual(again.status_code, status.HTTP_201_CREATED, again.data)
+        self.assertEqual(again.data["meeting_number"], 1)
+
+    def test_new_jalali_year_starts_from_one(self):
+        group_id = self._group()
+        old = self.client.post(
+            f"{MM}/meetings/",
+            {"group": group_id, "date": "2025-06-01"},
+            format="json",
+        )
+        self.assertEqual(old.status_code, status.HTTP_201_CREATED, old.data)
+        self.assertEqual(old.data["year"], 1404)
+        self.assertEqual(old.data["meeting_number"], 1)
+
+        new = self.client.post(
+            f"{MM}/meetings/",
+            {"group": group_id, "date": "2026-06-01"},
+            format="json",
+        )
+        self.assertEqual(new.status_code, status.HTTP_201_CREATED, new.data)
+        self.assertEqual(new.data["year"], 1405)
+        self.assertEqual(new.data["meeting_number"], 1)
+
+        listed_old = self.client.get(f"{MM}/meetings/?group={group_id}&year=1404")
+        self.assertEqual(len(_results(listed_old.data)), 1)
+        self.assertEqual(_results(listed_old.data)[0]["id"], old.data["id"])
+
+        listed_new = self.client.get(f"{MM}/meetings/?group={group_id}&year=1405")
+        self.assertEqual(len(_results(listed_new.data)), 1)
+        self.assertEqual(_results(listed_new.data)[0]["id"], new.data["id"])
 
 
 class MinutesManyManagersTests(APITestCase):

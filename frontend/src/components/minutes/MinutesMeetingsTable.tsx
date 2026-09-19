@@ -9,7 +9,7 @@ import { TrashIcon } from "@/components/minutes/MinutesIcons";
 import { MinutesLogo } from "@/components/minutes/MinutesLogo";
 import { formatJalaliDisplay } from "@/components/work/JalaliDateField";
 import { useI18n } from "@/lib/i18n";
-import { meetingStatusClass, type MinutesMeeting } from "@/lib/minutes";
+import { formatJalaliYear, meetingStatusClass, type MinutesMeeting } from "@/lib/minutes";
 
 export default function MinutesMeetingsTable({
   meetings,
@@ -63,7 +63,7 @@ export default function MinutesMeetingsTable({
               >
                 <Td>
                   <span className="inline-flex min-w-8 items-center justify-center rounded-lg bg-navy-900 px-2 py-1 text-xs font-bold text-brand-500">
-                    {n(meeting.meeting_number)}
+                    {meeting.year ? `${formatJalaliYear(meeting.year, latin)}/${n(meeting.meeting_number)}` : n(meeting.meeting_number)}
                   </span>
                 </Td>
                 <Td>

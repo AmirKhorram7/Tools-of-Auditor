@@ -9,6 +9,7 @@ from meeting_minutes_servicesclear.models import (
     GroupMember,
     Meeting,
     MeetingItem,
+    MeetingItemComment,
 )
 from meeting_minutes_servicesclear.services.groups import GroupService
 from meeting_minutes_servicesclear.services.meetings_minutes import (
@@ -306,6 +307,10 @@ class MeetingItemSerializer(serializers.ModelSerializer):
     can_set_status = serializers.SerializerMethodField(
         help_text="True if the current user can change this line's status."
     )
+    can_comment = serializers.SerializerMethodField(
+        help_text="True if the current user can add a comment on this line."
+    )
+    comment_count = serializers.SerializerMethodField()
 
     class Meta:
         model = MeetingItem
@@ -325,6 +330,8 @@ class MeetingItemSerializer(serializers.ModelSerializer):
             "completed_at",
             "can_edit",
             "can_set_status",
+            "can_comment",
+            "comment_count",
             "created_at",
             "updated_at",
         ]
@@ -337,6 +344,8 @@ class MeetingItemSerializer(serializers.ModelSerializer):
             "is_overdue",
             "can_edit",
             "can_set_status",
+            "can_comment",
+            "comment_count",
             "created_at",
             "updated_at",
         ]
@@ -368,6 +377,43 @@ class MeetingItemSerializer(serializers.ModelSerializer):
         return meeting_service.can_clerk(request.user, obj.meeting) or meeting_service.is_assignee(
             request.user, obj
         )
+
+    def get_can_comment(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return False
+        return meeting_service.can_comment(request.user, obj)
+
+    def get_comment_count(self, obj):
+        count = getattr(obj, "comment_count", None)
+        if count is not None:
+            return count
+        return obj.comments.filter(deleted_at__isnull=True).count()
+
+
+class MeetingItemCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    author_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MeetingItemComment
+        fields = [
+            "id",
+            "body",
+            "author_name",
+            "author_image",
+            "created_at",
+        ]
+        read_only_fields = ["author_name", "author_image", "created_at"]
+        extra_kwargs = {
+            "body": {"help_text": "Short note from the assignee about this line."},
+        }
+
+    def get_author_name(self, obj):
+        return person_name(obj.created_by)
+
+    def get_author_image(self, obj):
+        return profile_image_url(obj.created_by)
 
 
 class MeetingSerializer(serializers.ModelSerializer):
@@ -402,6 +448,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             "company_id",
             "company_name",
             "date",
+            "year",
             "meeting_number",
             "description",
             "status",
@@ -417,6 +464,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = [
+            "year",
             "meeting_number",
             "group_name",
             "group_logo",

@@ -234,6 +234,9 @@ class Meeting(BaseModel):
     )
     is_default_group_meeting = models.BooleanField(default=False)
     meeting_number = models.PositiveBigIntegerField()
+    year = models.PositiveIntegerField(
+        help_text=_("Jalali year of the meeting date. Numbers restart at 1 each year."),
+    )
     manual_number_generating = models.BooleanField(default=False)
     date = models.DateField()
     description = models.TextField(blank=True, default="")
@@ -247,8 +250,9 @@ class Meeting(BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["group", "meeting_number"],
-                name="mm_unique_meeting_number_in_group",
+                fields=["group", "year", "meeting_number"],
+                condition=Q(deleted_at__isnull=True),
+                name="mm_unique_meeting_number_per_group_year",
             ),
         ]
 
@@ -312,3 +316,18 @@ class MeetingItem(BaseModel):
 
     def __str__(self):
         return f"{self.title} - {self.meeting}"
+
+
+class MeetingItemComment(BaseModel):
+    item = models.ForeignKey(
+        MeetingItem,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    body = models.TextField(max_length=2000)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"comment on {self.item_id}"

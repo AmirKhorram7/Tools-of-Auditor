@@ -29,11 +29,13 @@ import {
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import type {
-  MinutesCompany,
-  MinutesGroup,
-  MinutesInvitation,
-  MinutesMeeting,
+import {
+  currentJalaliYear,
+  formatJalaliYear,
+  type MinutesCompany,
+  type MinutesGroup,
+  type MinutesInvitation,
+  type MinutesMeeting,
 } from "@/lib/minutes";
 
 const CONTEXT_KEY = "ta_minutes_context";
@@ -59,7 +61,7 @@ function writeContext(companyId: number | null, groupId: number | null) {
 
 export default function MinutesHomePage() {
   const router = useRouter();
-  const { t, n } = useI18n();
+  const { t, n, locale } = useI18n();
   const [companies, setCompanies] = useState<MinutesCompany[]>([]);
   const [groups, setGroups] = useState<MinutesGroup[]>([]);
   const [meetings, setMeetings] = useState<MinutesMeeting[]>([]);
@@ -77,6 +79,7 @@ export default function MinutesHomePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [deleteMeeting, setDeleteMeeting] = useState<MinutesMeeting | null>(null);
+  const [yearFilter, setYearFilter] = useState(() => String(currentJalaliYear()));
 
   const companyGroups = useMemo(
     () => groups.filter((row) => (companyId ? row.company === companyId : true)),
@@ -87,6 +90,17 @@ export default function MinutesHomePage() {
     () => (groupId ? meetings.filter((row) => row.group === groupId) : []),
     [meetings, groupId],
   );
+  const thisYear = currentJalaliYear();
+  const yearOptions = useMemo(() => {
+    const years = new Set(groupMeetings.map((row) => row.year).filter(Boolean));
+    years.add(thisYear);
+    return [...years].sort((a, b) => b - a);
+  }, [groupMeetings, thisYear]);
+  const visibleMeetings = useMemo(() => {
+    if (yearFilter === "all") return groupMeetings;
+    const year = Number(yearFilter);
+    return groupMeetings.filter((row) => row.year === year);
+  }, [groupMeetings, yearFilter]);
   const canCreate = Boolean(selectedGroup?.can_manage);
 
   const applyContext = useCallback(
@@ -400,11 +414,28 @@ export default function MinutesHomePage() {
                 {selectedGroup.company_name} · {selectedGroup.name}
               </p>
             </div>
-            <div className="w-full sm:w-auto">{createButton}</div>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <label className="flex min-w-[10rem] flex-1 items-center gap-2 sm:flex-none">
+                <span className="whitespace-nowrap text-xs font-semibold text-navy-800">{t("minutes.year")}</span>
+                <Select
+                  value={yearFilter}
+                  onChange={(e) => setYearFilter(e.target.value)}
+                  className="min-h-10 min-w-[8rem]"
+                >
+                  <option value="all">{t("minutes.yearAll")}</option>
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {formatJalaliYear(year, locale === "en")}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <div className="w-full sm:w-auto">{createButton}</div>
+            </div>
           </div>
 
           <MinutesMeetingsTable
-            meetings={groupMeetings}
+            meetings={visibleMeetings}
             onDelete={(meeting) => setDeleteMeeting(meeting)}
             empty={
               <EmptyState
@@ -415,7 +446,7 @@ export default function MinutesHomePage() {
             }
           />
 
-          {groupMeetings.length > 4 && createButton ? (
+          {visibleMeetings.length > 4 && createButton ? (
             <div className="flex justify-end">{createButton}</div>
           ) : null}
         </section>

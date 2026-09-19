@@ -108,6 +108,15 @@ export function TrashIcon({ className }: { className?: string }) {
   );
 }
 
+export function CommentIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M5 6.2h14v9.2H9.4L5 19.2V6.2Z" />
+      <path d="M8.4 9.4h7.2M8.4 12.2h5" />
+    </Svg>
+  );
+}
+
 export function PlusIcon({ className }: { className?: string }) {
   return (
     <Svg className={className}>
