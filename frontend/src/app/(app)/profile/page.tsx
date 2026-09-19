@@ -133,10 +133,27 @@ export default function ProfilePage() {
   );
   const pickedCharacter = !imageFile ? characterById(characterId) : null;
   const age = ageFromBirthDate(form.birth_date);
-  const ageBand = ageBandFromBirthDate(form.birth_date);
-  const adultFaces = CHARACTERS.filter((row) => row.ageBand === "adult");
-  const matureFaces = CHARACTERS.filter((row) => row.ageBand === "mature");
   const named = hasPersonName(`${form.first_name} ${form.last_name}`);
+  const mixedFaces = useMemo(() => {
+    const zip = (first: typeof CHARACTERS, second: typeof CHARACTERS) => {
+      const rows = [];
+      const count = Math.max(first.length, second.length);
+      for (let index = 0; index < count; index += 1) {
+        if (first[index]) rows.push(first[index]);
+        if (second[index]) rows.push(second[index]);
+      }
+      return rows;
+    };
+    const women = zip(
+      CHARACTERS.filter((row) => row.gender === "woman" && row.ageBand === "adult"),
+      CHARACTERS.filter((row) => row.gender === "woman" && row.ageBand === "mature"),
+    );
+    const men = zip(
+      CHARACTERS.filter((row) => row.gender === "man" && row.ageBand === "adult"),
+      CHARACTERS.filter((row) => row.gender === "man" && row.ageBand === "mature"),
+    );
+    return [...women, ...men];
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -438,26 +455,8 @@ export default function ProfilePage() {
             <p className="mt-3 text-xs text-gray-500">
               {named ? t("profile.characterHint") : t("profile.needNameForFace")}
             </p>
-            <p className="mt-3 text-xs font-bold text-ink">
-              {t("profile.ageBand.adult")}
-              {ageBand === "adult" || ageBand === "child" ? ` · ${t("profile.ageBand.suggested")}` : ""}
-            </p>
             <CharacterGrid
-              cards={adultFaces}
-              characterId={characterId}
-              imageFile={imageFile}
-              onPick={(id) => {
-                setCharacterId(id);
-                setImageFile(null);
-                setImageKey((value) => value + 1);
-              }}
-            />
-            <p className="mt-4 text-xs font-bold text-ink">
-              {t("profile.ageBand.mature")}
-              {ageBand === "mature" ? ` · ${t("profile.ageBand.suggested")}` : ""}
-            </p>
-            <CharacterGrid
-              cards={matureFaces}
+              cards={mixedFaces}
               characterId={characterId}
               imageFile={imageFile}
               onPick={(id) => {
