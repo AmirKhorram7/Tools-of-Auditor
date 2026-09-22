@@ -14,7 +14,7 @@ import {
 import { Alert, Avatar, Button, Modal, Spinner } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { displayName, useAuth } from "@/lib/auth";
-import { HOME_CHARACTERS } from "@/lib/characters";
+import { HOME_CHARACTERS, profileCharacterSrc } from "@/lib/characters";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
 import type { MinutesInvitation } from "@/lib/minutes";
 import { ThemeToggle } from "@/lib/theme";
@@ -276,7 +276,7 @@ export default function DashboardPage() {
               <div className="overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={card.src}
+                  src={profileCharacterSrc(card)}
                   alt={t(card.nameKey)}
                   className="aspect-square w-full object-cover object-top transition duration-300 group-hover:scale-110"
                 />

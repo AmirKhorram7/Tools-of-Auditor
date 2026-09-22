@@ -217,7 +217,7 @@ export function characterById(id: string | null | undefined): Character | null {
   return CHARACTERS.find((row) => row.id === id) ?? null;
 }
 
-/** Profile avatars use the realistic set; home cards keep the original artwork. */
+/** Profile avatars and the home people cards use the realistic portraits. */
 export function profileCharacterSrc(character: Character): string {
   return `/characters/realistic-${character.id}.png`;
 }
