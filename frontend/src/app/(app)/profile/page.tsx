@@ -16,6 +16,7 @@ import {
   characterForName,
   guessGender,
   hasPersonName,
+  profileCharacterSrc,
 } from "@/lib/characters";
 import { useI18n } from "@/lib/i18n";
 import type { Profile } from "@/lib/types";
@@ -383,7 +384,12 @@ export default function ProfilePage() {
       <Card>
         <div className="flex flex-wrap items-center gap-4">
           <Avatar
-            src={previewUrl ?? characterById(characterId)?.src ?? profile?.profile_image}
+            src={
+              previewUrl ??
+              (pickedCharacter
+                ? profileCharacterSrc(pickedCharacter)
+                : profile?.profile_image)
+            }
             name={`${form.first_name} ${form.last_name}`.trim() || t("common.user")}
             size={64}
           />
@@ -430,7 +436,7 @@ export default function ProfilePage() {
             {pickedCharacter ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={pickedCharacter.src}
+                src={profileCharacterSrc(pickedCharacter)}
                 alt=""
                 className="size-full object-cover object-top"
               />
@@ -648,7 +654,11 @@ function CharacterGrid({
             title={t(card.nameKey)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={card.src} alt="" className="aspect-square w-full object-cover object-top" />
+            <img
+              src={profileCharacterSrc(card)}
+              alt=""
+              className="aspect-square w-full object-cover object-top"
+            />
             <span className="block truncate px-1 py-1 text-[11px] font-medium text-ink">
               {t(card.nameKey)}
             </span>

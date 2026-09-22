@@ -157,7 +157,7 @@ class Profile(models.Model):
             except (AttributeError, ValueError):
                 pass
         if self.character_id:
-            return f"/characters/{self.character_id}.png"
+            return f"/characters/realistic-{self.character_id}.png"
         return None
 
 

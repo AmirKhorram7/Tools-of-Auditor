@@ -217,6 +217,11 @@ export function characterById(id: string | null | undefined): Character | null {
   return CHARACTERS.find((row) => row.id === id) ?? null;
 }
 
+/** Profile avatars use the realistic set; home cards keep the original artwork. */
+export function profileCharacterSrc(character: Character): string {
+  return `/characters/realistic-${character.id}.png`;
+}
+
 export function characterForName(name: string, birthDate?: string | null): Character | null {
   if (!hasPersonName(name)) return null;
   const gender = guessGender(name);
