@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import ServiceLauncher from "@/components/ServiceLauncher";
 import { Avatar, cx } from "@/components/ui";
 import { displayName, useAuth } from "@/lib/auth";
 import { LanguageSwitch, useI18n } from "@/lib/i18n";
@@ -18,44 +19,6 @@ export default function TopBar() {
   const [servicesOpen, setServicesOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const services = [
-    {
-      key: "work",
-      label: t("nav.work"),
-      description: t("nav.workDesc"),
-      href: "/work",
-      available: true,
-    },
-    {
-      key: "system-explanation",
-      label: t("nav.explanation"),
-      description: t("nav.explanationDesc"),
-      href: "/explanation",
-      available: true,
-    },
-    {
-      key: "minutes",
-      label: t("nav.minutes"),
-      description: t("nav.minutesDesc"),
-      href: "/minutes",
-      available: true,
-    },
-    {
-      key: "audit-plan",
-      label: t("nav.auditPlan"),
-      description: t("nav.soon"),
-      href: "#",
-      available: false,
-    },
-    {
-      key: "working-papers",
-      label: t("nav.workingPapers"),
-      description: t("nav.soon"),
-      href: "#",
-      available: false,
-    },
-  ];
 
   useEffect(() => {
     const onClickOutside = (event: PointerEvent) => {
@@ -110,6 +73,13 @@ export default function TopBar() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
+            <ServiceLauncher
+              open={servicesOpen}
+              onToggle={() => {
+                setServicesOpen((open) => !open);
+                setUserOpen(false);
+              }}
+            />
             <ThemeToggle />
             <LanguageSwitch />
             <div className="relative">
@@ -177,56 +147,6 @@ export default function TopBar() {
       <div className="bg-navy-800">
         <nav className="mx-auto flex h-11 max-w-screen-2xl items-center gap-1 overflow-x-auto px-2.5 md:h-10 md:overflow-visible">
           {navLink("/dashboard", t("nav.home"), pathname === "/dashboard")}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                setServicesOpen((open) => !open);
-                setUserOpen(false);
-              }}
-              className={cx(
-                "flex items-center gap-1.5 rounded px-3 py-1.5 text-sm whitespace-nowrap transition max-md:px-2.5 max-md:py-2",
-                servicesOpen
-                  ? "bg-navy-700 font-medium text-white"
-                  : "text-gray-200 hover:bg-navy-700 hover:text-white",
-              )}
-            >
-              {t("nav.services")}
-              <span className="text-[10px] text-brand-400">▾</span>
-            </button>
-            {servicesOpen && (
-              <div className="absolute start-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg max-md:fixed max-md:inset-x-2.5 max-md:top-[calc(5.75rem+env(safe-area-inset-top))] max-md:mt-0 max-md:w-auto">
-                {services.map((service) =>
-                  service.available ? (
-                    <Link
-                      key={service.key}
-                      href={service.href}
-                      className="block rounded-lg px-3 py-2.5 transition hover:bg-surface"
-                    >
-                      <span className="block text-sm font-medium text-ink">
-                        {service.label}
-                      </span>
-                      <span className="block text-xs text-gray-500">
-                        {service.description}
-                      </span>
-                    </Link>
-                  ) : (
-                    <span
-                      key={service.key}
-                      className="block cursor-not-allowed rounded-lg px-3 py-2.5 opacity-55"
-                    >
-                      <span className="block text-sm font-medium text-ink">
-                        {service.label}
-                      </span>
-                      <span className="block text-xs text-gray-500">
-                        {service.description}
-                      </span>
-                    </span>
-                  ),
-                )}
-              </div>
-            )}
-          </div>
           {navLink("/work", t("nav.work"), pathname.startsWith("/work"))}
           {navLink(
             "/explanation",
@@ -234,6 +154,7 @@ export default function TopBar() {
             pathname.startsWith("/explanation"),
           )}
           {navLink("/minutes", t("nav.minutes"), pathname.startsWith("/minutes"))}
+          {navLink("/education", t("nav.education"), pathname.startsWith("/education"))}
           {navLink("/contact", t("nav.contact"), pathname.startsWith("/contact"))}
           {navLink("/profile", t("nav.profile"), pathname === "/profile")}
         </nav>

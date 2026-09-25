@@ -31,6 +31,9 @@ PY
 echo "[entrypoint] applying migrations..."
 python manage.py migrate --noinput
 
+echo "[entrypoint] preparing Wagtail course root..."
+python manage.py ensure_course_root
+
 echo "[entrypoint] collecting static files..."
 python manage.py collectstatic --noinput
 

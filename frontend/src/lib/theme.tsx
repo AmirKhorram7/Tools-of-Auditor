@@ -102,7 +102,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       title={dark ? t("theme.toLight") : t("theme.toDark")}
       aria-label={dark ? t("theme.toLight") : t("theme.toDark")}
-      className={`flex size-9 items-center justify-center rounded-lg bg-navy-800 text-brand-400 transition hover:bg-navy-700 hover:text-brand-300 ${
+      className={`flex size-9 shrink-0 items-center justify-center rounded-lg bg-navy-800 text-brand-400 transition hover:bg-navy-700 hover:text-brand-300 ${
         dark ? "ring-1 ring-brand-500/80" : ""
       }`}
     >

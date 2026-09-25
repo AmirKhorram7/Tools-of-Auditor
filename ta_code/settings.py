@@ -36,17 +36,41 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
+
+    
     # third-party
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "corsheaders",
+    "modelcluster",
+    "taggit",
+    "wagtail.contrib.forms",
+    "wagtail.contrib.redirects",
+    "wagtail.embeds",
+    "wagtail.sites",
+    "wagtail.users",
+    "wagtail.snippets",
+    "wagtail.documents",
+    "wagtail.images",
+    "wagtail.search",
+    "wagtail.admin",
+    "wagtail.api.v2",
+    "wagtail",
+
+
+
+
+
     # local
     "user_management.apps.UserManagementConfig",
     "system_explanation_services",
     "team_manage_services.apps.TeamManageServicesConfig",
     "meeting_minutes_servicesclear.apps.MeetingMinutesServicesclearConfig",
+    "cms",
+    "education",
 ]
 
 MIDDLEWARE = [
@@ -59,6 +83,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
 ]
 
 # Compressed + cached static files in production (WhiteNoise).
@@ -140,6 +165,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "user_management.CustomUser"
 
+# First Wagtail login for a new teacher. They change it in profile after login.
+TEACHER_DEFAULT_PASSWORD = config("TEACHER_DEFAULT_PASSWORD", default="Teacher#2026")
+
+WAGTAIL_SITE_NAME = "Tauditor"
+WAGTAILADMIN_BASE_URL = config("WAGTAILADMIN_BASE_URL", default="http://localhost:8080")
+WAGTAILDOCS_EXTENSIONS = ["pdf", "txt", "docx"]
+
 # Cache — Redis in production; LocMem fallback for local/dev without Redis.
 REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")
 USE_REDIS_CACHE = config("USE_REDIS_CACHE", default=not DEBUG, cast=bool)
@@ -202,7 +234,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
-    default="http://localhost,http://127.0.0.1",
+    default="http://localhost,http://127.0.0.1,http://localhost:8080,http://127.0.0.1:8080",
     cast=Csv(),
 )
 

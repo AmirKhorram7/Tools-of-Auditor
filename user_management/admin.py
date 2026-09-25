@@ -81,6 +81,13 @@ class CustomUserAdmin(BaseUserAdmin):
     )
     inlines = [ProfileInline]
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.is_staff or obj.is_superuser:
+            from education.services.teachers import provision_teacher
+
+            provision_teacher(obj)
+
     def get_queryset(self, request):
         return (
             super()

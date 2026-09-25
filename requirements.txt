@@ -21,6 +21,7 @@ typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.7.0
 whitenoise==6.9.0
+wagtail==7.1.2
 gunicorn==23.0.0
 argon2-cffi==23.1.0
 argon2-cffi-bindings==25.1.0

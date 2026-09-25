@@ -11,6 +11,8 @@ import {
   MinutesIconTile,
   StatusIcon,
 } from "@/components/minutes/MinutesIcons";
+import { ServiceGlyph } from "@/components/ServiceIcons";
+import { APP_SERVICES } from "@/lib/services";
 import { Alert, Avatar, Button, Modal, Spinner } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { displayName, useAuth } from "@/lib/auth";
@@ -216,7 +218,7 @@ export default function DashboardPage() {
           </div>
         </aside>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <ProductTile
             href="/work"
             tone="brand"
@@ -237,6 +239,18 @@ export default function DashboardPage() {
             icon={<CompanyIcon />}
             title={t("dash.enterExplanation")}
             blurb={t("dash.explanationBlurb")}
+          />
+          <ProductTile
+            href="/education"
+            tone="brand"
+            icon={
+              <ServiceGlyph
+                service={APP_SERVICES.find((row) => row.key === "education")!}
+                size="sm"
+              />
+            }
+            title={t("dash.enterEducation")}
+            blurb={t("dash.educationBlurb")}
           />
         </div>
       </section>
