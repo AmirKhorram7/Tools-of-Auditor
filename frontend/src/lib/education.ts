@@ -1,5 +1,14 @@
 import { tokens } from "@/lib/api";
 
+export type CourseLevel = "basic" | "advanced" | "professional";
+
+export type EduTeacherCard = {
+  id: number;
+  name: string;
+  headline?: string;
+  photo_url?: string;
+};
+
 export type EduCourseCard = {
   id: number;
   title: string;
@@ -7,13 +16,32 @@ export type EduCourseCard = {
   summary: string;
   author_id: number | null;
   like_count: number;
+  thumbnail_url?: string;
+  level?: CourseLevel | string;
+  teacher?: EduTeacherCard | null;
+};
+
+export function courseLevel(level?: string): CourseLevel {
+  if (level === "advanced" || level === "professional") return level;
+  return "basic";
+}
+
+export type EduLessonBlock = {
+  type: "heading" | "paragraph" | "image" | "document" | "quote" | "code" | "video_embed" | string;
+  value: string | { url?: string; title?: string };
 };
 
 export type EduLesson = {
   id: number;
   title: string;
+  short_description?: string;
   body: string;
   video_url?: string;
+  video_file_url?: string;
+  featured_image_url?: string;
+  document_url?: string;
+  document_title?: string;
+  content?: EduLessonBlock[];
   has_quiz?: boolean;
   has_exam?: boolean;
 };
@@ -59,7 +87,17 @@ export type EduMe = {
 
 export type EduTeacher = {
   user: number;
+  name?: string;
+  display_name?: string;
+  headline?: string;
   bio: string;
+  photo_url?: string;
+  website?: string;
+  linkedin_url?: string;
+  telegram_url?: string;
+  instagram_url?: string;
+  projects?: string[];
+  projects_text?: string;
   courses: EduCourseCard[];
 };
 

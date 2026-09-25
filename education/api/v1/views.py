@@ -6,7 +6,6 @@ from rest_framework.views import APIView
 from education.api.v1.serializers import (
     CommentSerializer,
     ExamSubmissionSerializer,
-    TeacherProfileSerializer,
 )
 from education.services import learning_service
 from education.services.access import EducationAccessService
@@ -33,14 +32,7 @@ class PublishedLessonView(APIView):
 
     def get(self, request, lesson_id):
         lesson = learning_service.published_lesson(lesson_id)
-        return Response(
-            {
-                "id": lesson.id,
-                "title": lesson.title,
-                "body": lesson.body,
-                "video_url": lesson.video_url,
-            }
-        )
+        return Response(learning_service.lesson_public(lesson))
 
 
 class QuizView(APIView):
@@ -137,9 +129,11 @@ class CourseLikeView(APIView):
 class TeacherProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        return Response(learning_service.own_teacher_profile(request.user))
+
     def put(self, request):
-        profile = learning_service.save_teacher_profile(request.user, request.data.get("bio") or "")
-        return Response(TeacherProfileSerializer(profile).data)
+        return Response(learning_service.save_teacher_profile(request.user, request.data))
 
 
 class TeacherPublicView(APIView):

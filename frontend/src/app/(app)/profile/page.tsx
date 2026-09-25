@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import TeacherProfileEditor from "@/components/education/TeacherProfileEditor";
 import { Alert, Avatar, Badge, Button, Card, EmptyState, Field, Input, Textarea, cx } from "@/components/ui";
 import JalaliDateField from "@/components/work/JalaliDateField";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
@@ -19,6 +20,7 @@ import {
   profileCharacterSrc,
 } from "@/lib/characters";
 import { useI18n } from "@/lib/i18n";
+import type { EduMe } from "@/lib/education";
 import type { Profile } from "@/lib/types";
 import {
   notificationHref,
@@ -27,7 +29,7 @@ import {
   type WorkTimelineItem,
 } from "@/lib/work";
 
-type Tab = "info" | "invites" | "activity";
+type Tab = "info" | "teacher" | "invites" | "activity";
 
 type FormState = {
   first_name: string;
@@ -69,6 +71,7 @@ export default function ProfilePage() {
   // Only true after the API explicitly says the user already set a password.
   const [hasPassword, setHasPassword] = useState(false);
   const [tab, setTab] = useState<Tab>("info");
+  const [eduMe, setEduMe] = useState<EduMe | null>(null);
   const [invites, setInvites] = useState<WorkInvitation[]>([]);
   const [activity, setActivity] = useState<WorkTimelineItem[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -123,6 +126,9 @@ export default function ProfilePage() {
     apiFetch<WorkTimeline>("/work/dashboard/timeline/")
       .then((data) => setActivity(data.activity || data.items || []))
       .catch(() => setActivity([]));
+    apiFetch<EduMe>("/education/me/")
+      .then(setEduMe)
+      .catch(() => setEduMe(null));
   }, []);
 
   const update = (key: keyof FormState, value: string) =>
@@ -284,6 +290,9 @@ export default function ProfilePage() {
 
       <div className="flex gap-2 overflow-x-auto">
         <TabBtn active={tab === "info"} label={t("profile.tabInfo")} onClick={() => setTab("info")} />
+        {eduMe?.is_teacher || eduMe?.is_admin ? (
+          <TabBtn active={tab === "teacher"} label={t("profile.tabTeacher")} onClick={() => setTab("teacher")} />
+        ) : null}
         <TabBtn
           active={tab === "invites"}
           label={
@@ -299,6 +308,22 @@ export default function ProfilePage() {
           onClick={() => setTab("activity")}
         />
       </div>
+
+      {tab === "teacher" && (eduMe?.is_teacher || eduMe?.is_admin) ? (
+        <section className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {eduMe.user_id ? (
+              <Link href={`/education/teachers/${eduMe.user_id}`}>
+                <Button variant="secondary" size="sm">{t("edu.previewTeacherPage")}</Button>
+              </Link>
+            ) : null}
+            <Link href="/education/studio">
+              <Button variant="secondary" size="sm">{t("edu.studio")}</Button>
+            </Link>
+          </div>
+          <TeacherProfileEditor />
+        </section>
+      ) : null}
 
       {tab === "invites" && (
         <section className="space-y-3">

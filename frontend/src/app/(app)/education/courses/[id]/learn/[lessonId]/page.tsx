@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import EduProgressBar from "@/components/education/ProgressBar";
+import CourseOutline from "@/components/education/CourseOutline";
+import LessonStream from "@/components/education/LessonStream";
 import { Alert, Button, PageLoader } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
 import {
   doneLessonIds,
   flattenLessons,
   markLessonDone,
-  safeHtml,
   type EduComment,
   type EduCourse,
   type EduLesson,
@@ -138,66 +138,15 @@ export default function LessonPlayerPage() {
   if (!course || !lesson) return <Alert>{error || t("edu.notFound")}</Alert>;
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(16rem,19rem)_minmax(0,1fr)]">
-      <aside className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm lg:sticky lg:top-24">
-        <Link href={`/education/courses/${course.id}`} className="text-xs font-medium text-navy-800 hover:text-link">
-          {course.title}
-        </Link>
-        <div className="mt-3">
-          <EduProgressBar done={done.length} total={lessons.length} label={t("edu.yourProgress")} />
-        </div>
-        <div className="mt-3 max-h-[28rem] space-y-3 overflow-y-auto">
-          {course.modules.map((module) => (
-            <div key={module.id}>
-              <p className="px-1 text-[11px] font-bold text-gray-500">{module.title}</p>
-              <ul className="mt-1 space-y-0.5">
-                {module.lessons.map((item) => {
-                  const active = item.id === currentId;
-                  const complete = done.includes(item.id);
-                  return (
-                    <li key={item.id}>
-                      <Link
-                        href={`/education/courses/${course.id}/learn/${item.id}`}
-                        className={
-                          active
-                            ? "flex items-center gap-2 rounded-lg bg-navy-800 px-2 py-1.5 text-xs font-medium text-white"
-                            : "flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-ink hover:bg-gray-50"
-                        }
-                      >
-                        <span
-                          className={
-                            complete
-                              ? "size-2 shrink-0 rounded-full bg-brand-500"
-                              : "size-2 shrink-0 rounded-full border border-gray-300"
-                          }
-                        />
-                        <span className="line-clamp-2">{item.title}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </aside>
+    <div className="grid items-start gap-4 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <CourseOutline course={course} done={done} activeLessonId={currentId} />
 
-      <section className="space-y-4">
+      <section className="min-w-0 space-y-4">
         {error ? <Alert>{error}</Alert> : null}
         <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <p className="text-[11px] font-semibold text-brand-800">{t("edu.lesson")}</p>
           <h1 className="mt-1 text-lg font-bold text-ink">{lesson.title}</h1>
-          {lesson.video_url ? (
-            <p className="mt-3">
-              <a href={lesson.video_url} className="text-sm text-navy-800 hover:text-link" target="_blank" rel="noreferrer">
-                {t("edu.watchVideo")}
-              </a>
-            </p>
-          ) : null}
-          <div
-            className="mt-4 space-y-3 text-sm leading-7 text-ink [&_a]:text-navy-800 [&_li]:ms-5 [&_ol]:list-decimal [&_ul]:list-disc"
-            dangerouslySetInnerHTML={{ __html: safeHtml(lesson.body) }}
-          />
+          <LessonStream lesson={lesson} />
 
           {quiz ? (
             <div className="mt-5 rounded-xl border border-gray-200 p-3">

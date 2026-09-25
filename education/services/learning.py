@@ -15,6 +15,7 @@ from education.models import (
     LessonProgress,
     QuizAttempt,
     TeacherProfile,
+    clean_http_url,
     plain_text,
 )
 from education.services.access import EducationAccessService
@@ -38,21 +39,15 @@ class LearningService:
         except LessonPage.DoesNotExist:
             raise NotFound("Lesson is not published.")
 
+    def lesson_public(self, lesson):
+        return catalog.lesson_payload(lesson)
+
     def course_payload(self, course):
         modules = []
         for module in catalog.modules_for(course):
             lessons = []
             for lesson in catalog.lessons_for(module):
-                lessons.append(
-                    {
-                        "id": lesson.id,
-                        "title": lesson.title,
-                        "body": lesson.body,
-                        "video_url": lesson.video_url,
-                        "has_quiz": catalog.quiz_for(lesson) is not None,
-                        "has_exam": catalog.exam_for(lesson) is not None,
-                    }
-                )
+                lessons.append(catalog.lesson_payload(lesson))
             modules.append(
                 {
                     "id": module.id,
@@ -62,29 +57,12 @@ class LearningService:
                 }
             )
         return {
-            "id": course.id,
-            "title": course.title,
-            "slug": course.slug,
-            "summary": course.summary,
-            "author_id": course.author_id,
-            "like_count": course.likes.count(),
+            **catalog.course_card_payload(course),
             "modules": modules,
         }
 
     def list_published(self):
-        rows = []
-        for course in catalog.published_courses():
-            rows.append(
-                {
-                    "id": course.id,
-                    "title": course.title,
-                    "slug": course.slug,
-                    "summary": course.summary,
-                    "author_id": course.author_id,
-                    "like_count": course.likes.count(),
-                }
-            )
-        return rows
+        return [catalog.course_card_payload(course) for course in catalog.published_courses()]
 
     def quiz_for_student(self, lesson_id: int):
         lesson = self.published_lesson(lesson_id)
@@ -231,30 +209,60 @@ class LearningService:
         course = self.published_course(course_id)
         CourseLike.objects.filter(course=course, student=user).delete()
 
-    @transaction.atomic
-    def save_teacher_profile(self, user, bio: str):
+    def own_teacher_profile(self, user):
         if not (access.is_active_teacher(user) or access.is_platform_admin(user)):
             raise PermissionDenied("Not allowed.")
         profile, _created = TeacherProfile.objects.get_or_create(user=user)
+        from education.services.teachers import teacher_profile_payload
+
+        return teacher_profile_payload(user, profile)
+
+    @transaction.atomic
+    def save_teacher_profile(self, user, data):
+        if not (access.is_active_teacher(user) or access.is_platform_admin(user)):
+            raise PermissionDenied("Not allowed.")
+        profile, _created = TeacherProfile.objects.get_or_create(user=user)
+        from education.services.teachers import teacher_profile_payload
+
         try:
-            profile.bio = plain_text(bio, max_length=TeacherProfile.MAX_BIO) if bio else ""
+            profile.display_name = plain_text(
+                data.get("display_name") or "",
+                max_length=TeacherProfile.MAX_NAME,
+            ) if data.get("display_name") else ""
+            profile.headline = plain_text(
+                data.get("headline") or "",
+                max_length=TeacherProfile.MAX_HEADLINE,
+            ) if data.get("headline") else ""
+            profile.bio = plain_text(data.get("bio") or "", max_length=TeacherProfile.MAX_BIO) if data.get("bio") else ""
+            profile.website = clean_http_url(data.get("website") or "")
+            profile.linkedin_url = clean_http_url(data.get("linkedin_url") or "")
+            profile.telegram_url = clean_http_url(data.get("telegram_url") or "")
+            profile.instagram_url = clean_http_url(data.get("instagram_url") or "")
+            projects = data.get("projects_text")
+            if projects is None:
+                projects = data.get("projects") or ""
+            if isinstance(projects, list):
+                projects = "\n".join(str(item) for item in projects)
+            profile.projects = (
+                plain_text(projects, max_length=TeacherProfile.MAX_PROJECTS) if projects else ""
+            )
+            photo = data.get("photo")
+            if photo and hasattr(photo, "read"):
+                profile.photo = photo
             profile.full_clean()
             profile.save()
         except DjangoValidationError as exc:
             raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
-        return profile
+        return teacher_profile_payload(user, profile)
 
     def teacher_page(self, user_id: int):
-        profile = get_object_or_404(TeacherProfile, user_id=user_id)
-        courses = [
-            {
-                "id": course.id,
-                "title": course.title,
-                "slug": course.slug,
-                "summary": course.summary,
-                "author_id": course.author_id,
-                "like_count": course.likes.count(),
-            }
-            for course in catalog.courses_by_author(user_id)
+        from django.contrib.auth import get_user_model
+        from education.services.teachers import teacher_profile_payload
+
+        user = get_object_or_404(get_user_model(), pk=user_id)
+        profile, _created = TeacherProfile.objects.get_or_create(user=user)
+        payload = teacher_profile_payload(user, profile)
+        payload["courses"] = [
+            catalog.course_card_payload(course) for course in catalog.courses_by_author(user_id)
         ]
-        return {"user": profile.user_id, "bio": profile.bio, "courses": courses}
+        return payload

@@ -32,7 +32,12 @@ class TeacherGroupMemberAdmin(admin.ModelAdmin):
     autocomplete_fields = ("member", "teacher_group")
 
 
-admin.site.register(TeacherProfile)
+@admin.register(TeacherProfile)
+class TeacherProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "display_name", "headline")
+    search_fields = ("user__phone_number", "display_name", "headline")
+
+
 admin.site.register(QuizAttempt)
 admin.site.register(ExamSubmission)
 admin.site.register(LessonProgress)

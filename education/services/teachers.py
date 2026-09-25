@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.exceptions import ObjectDoesNotExist
 
 from education.models import TeacherGroup, TeacherGroupMember, TeacherProfile
 
@@ -56,3 +57,74 @@ def can_build_course(user) -> bool:
         is_active=True,
         teacher_group__is_active=True,
     ).exists()
+
+
+def _file_url(file_field) -> str:
+    if not file_field:
+        return ""
+    try:
+        return file_field.url
+    except ValueError:
+        return ""
+
+
+def _related(user, name):
+    try:
+        return getattr(user, name)
+    except ObjectDoesNotExist:
+        return None
+
+
+def teacher_name(user, profile=None) -> str:
+    row = profile if profile is not None else _related(user, "teacher_profile")
+    if row and row.display_name:
+        return row.display_name
+    name = (user.get_full_name() or "").strip()
+    return name
+
+
+def teacher_photo_url(user, profile=None) -> str:
+    row = profile if profile is not None else _related(user, "teacher_profile")
+    url = _file_url(getattr(row, "photo", None))
+    if url:
+        return url
+    user_profile = _related(user, "profile")
+    if user_profile is None:
+        return ""
+    return user_profile.avatar_url() or ""
+
+
+def teacher_projects(profile) -> list[str]:
+    if not profile or not profile.projects:
+        return []
+    return [line.strip() for line in profile.projects.splitlines() if line.strip()]
+
+
+def teacher_card_payload(user) -> dict | None:
+    if user is None:
+        return None
+    profile = _related(user, "teacher_profile")
+    return {
+        "id": user.id,
+        "name": teacher_name(user, profile),
+        "headline": (profile.headline if profile else "") or "",
+        "photo_url": teacher_photo_url(user, profile),
+    }
+
+
+def teacher_profile_payload(user, profile=None) -> dict:
+    row = profile if profile is not None else _related(user, "teacher_profile")
+    return {
+        "user": user.id,
+        "name": teacher_name(user, row),
+        "display_name": (row.display_name if row else "") or "",
+        "headline": (row.headline if row else "") or "",
+        "bio": (row.bio if row else "") or "",
+        "photo_url": teacher_photo_url(user, row),
+        "website": (row.website if row else "") or "",
+        "linkedin_url": (row.linkedin_url if row else "") or "",
+        "telegram_url": (row.telegram_url if row else "") or "",
+        "instagram_url": (row.instagram_url if row else "") or "",
+        "projects": teacher_projects(row),
+        "projects_text": (row.projects if row else "") or "",
+    }

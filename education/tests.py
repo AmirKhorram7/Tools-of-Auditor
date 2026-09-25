@@ -54,6 +54,8 @@ class EducationProcessSmokeTests(EducationBase):
         listed = self.client.get(f"{API}/courses/")
         self.assertEqual(len(listed.data), 1)
         self.assertEqual(listed.data[0]["title"], "Python 101")
+        self.assertIn("thumbnail_url", listed.data[0])
+        self.assertEqual(listed.data[0]["level"], "basic")
         detail = self.client.get(f"{API}/courses/{self.course.id}/")
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(len(detail.data["modules"]), 1)
@@ -61,6 +63,11 @@ class EducationProcessSmokeTests(EducationBase):
         lesson = self.client.get(f"{API}/lessons/{self.lesson.id}/")
         self.assertEqual(lesson.status_code, 200)
         self.assertIn("Lesson 1.1", lesson.data["title"])
+        self.assertTrue(lesson.data["content"])
+        self.assertEqual(lesson.data["content"][0]["type"], "paragraph")
+        self.assertIn("Body for module", lesson.data["body"])
+        self.assertIn("video_file_url", lesson.data)
+        self.assertEqual(lesson.data["video_file_url"], "")
 
     def test_five_by_five_course_is_listed_with_all_lessons(self):
         big = CourseTree(self.teacher, title="Python Track", slug="python-track", modules=5, lessons=5)
@@ -142,10 +149,27 @@ class EducationProcessSmokeTests(EducationBase):
         )
         self.assertEqual(graded.status_code, 200)
         self.assertEqual(ExamSubmission.objects.get(student=self.student).score, 80)
-        self.teacher_c.put(f"{API}/teacher-profile/", {"bio": "Python teacher"}, format="json")
+        saved = self.teacher_c.put(
+            f"{API}/teacher-profile/",
+            {
+                "display_name": "Sara Teacher",
+                "headline": "Python mentor",
+                "bio": "Python teacher",
+                "website": "https://example.com",
+                "projects": "Bank audit\nTax workshop",
+            },
+            format="json",
+        )
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertEqual(saved.data["name"], "Sara Teacher")
+        self.assertEqual(saved.data["projects"], ["Bank audit", "Tax workshop"])
         page = self.client.get(f"{API}/teachers/{self.teacher.id}/")
         self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.data["headline"], "Python mentor")
         self.assertGreaterEqual(len(page.data["courses"]), 1)
+        course = self.client.get(f"{API}/courses/{other.course.id}/")
+        self.assertEqual(course.data["teacher"]["name"], "Sara Teacher")
+        self.assertEqual(course.data["teacher"]["headline"], "Python mentor")
 
 
 class EducationPermissionTests(EducationBase):
@@ -186,6 +210,14 @@ class EducationPermissionTests(EducationBase):
             access_service.require_create(self.teacher, home, CategoryPage)
         with self.assertRaises(PermissionDenied):
             access_service.require_edit(self.teacher, category)
+
+    def test_teachers_group_can_upload_lesson_video(self):
+        from django.contrib.auth.models import Group
+
+        access_service.grant_teachers_admin_access()
+        codes = set(Group.objects.get(name="Teachers").permissions.values_list("codename", flat=True))
+        self.assertIn("add_media", codes)
+        self.assertIn("change_media", codes)
 
     def test_inactive_teacher_cannot_grade_and_student_cannot_open_cms(self):
         membership = self.teacher.teacher_group_memberships.get()
@@ -316,6 +348,12 @@ class EducationSecurityAttackTests(EducationBase):
             format="json",
         )
         self.assertEqual(bio.status_code, 400)
+        bad_link = self.teacher_c.put(
+            f"{API}/teacher-profile/",
+            {"website": "javascript:alert(1)"},
+            format="json",
+        )
+        self.assertEqual(bad_link.status_code, 400)
 
     def test_student_cannot_set_own_score_or_complete_locked_exam(self):
         from cms.models import LessonExam

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import CourseCard from "@/components/education/CourseCard";
-import { Alert, Button } from "@/components/ui";
-import { ApiError, apiFetch } from "@/lib/api";
+import TeacherProfileEditor from "@/components/education/TeacherProfileEditor";
+import { Button } from "@/components/ui";
+import { apiFetch } from "@/lib/api";
 import { currentUserId, type EduMe, type EduTeacher } from "@/lib/education";
 import { useI18n } from "@/lib/i18n";
 
@@ -14,9 +15,6 @@ export default function EducationStudioPage() {
   const teacherId = currentUserId();
   const [me, setMe] = useState<EduMe | null>(null);
   const [page, setPage] = useState<EduTeacher | null>(null);
-  const [bio, setBio] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     apiFetch<EduMe>("/education/me/")
@@ -24,27 +22,9 @@ export default function EducationStudioPage() {
       .catch(() => setMe(null));
     if (!teacherId) return;
     apiFetch<EduTeacher>(`/education/teachers/${teacherId}/`)
-      .then((row) => {
-        setPage(row);
-        setBio(row.bio);
-      })
+      .then(setPage)
       .catch(() => setPage({ user: teacherId, bio: "", courses: [] }));
   }, [teacherId]);
-
-  const saveBio = async () => {
-    setError(null);
-    setSaved(false);
-    try {
-      const row = await apiFetch<{ user: number; bio: string }>("/education/teacher-profile/", {
-        method: "PUT",
-        body: { bio },
-      });
-      setBio(row.bio);
-      setSaved(true);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("edu.studioDenied"));
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -58,32 +38,25 @@ export default function EducationStudioPage() {
           >
             {t("edu.makeCourse")}
           </a>
+          {teacherId ? (
+            <Link href={`/education/teachers/${teacherId}`}>
+              <Button variant="secondary">{t("edu.previewTeacherPage")}</Button>
+            </Link>
+          ) : null}
           <Link href="/education">
             <Button variant="secondary">{t("edu.previewStudent")}</Button>
           </Link>
         </div>
       </section>
-      {error ? <Alert>{error}</Alert> : null}
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-bold text-ink">{t("edu.teacherBio")}</h2>
-        <textarea
-          value={bio}
-          onChange={(event) => setBio(event.target.value)}
-          rows={4}
-          className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-        />
-        <div className="mt-2 flex items-center gap-2">
-          <Button size="sm" onClick={saveBio}>
-            {t("common.save")}
-          </Button>
-          {saved ? <span className="text-xs text-green-700">{t("edu.saved")}</span> : null}
-        </div>
-      </section>
+      <TeacherProfileEditor />
       {page?.courses.length ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {page.courses.map((course) => (
-            <CourseCard key={course.id} course={course} />
-          ))}
+        <div>
+          <h2 className="mb-3 text-sm font-bold text-ink">{t("edu.teacherCourses")}</h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {page.courses.map((course) => (
+              <CourseCard key={course.id} course={course} />
+            ))}
+          </div>
         </div>
       ) : (
         <p className="text-sm text-gray-500">{t("edu.studioEmpty")}</p>

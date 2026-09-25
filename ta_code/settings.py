@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "wagtail.admin",
     "wagtail.api.v2",
     "wagtail",
+    "wagtailmedia",
 
 
 
@@ -170,7 +171,16 @@ TEACHER_DEFAULT_PASSWORD = config("TEACHER_DEFAULT_PASSWORD", default="Teacher#2
 
 WAGTAIL_SITE_NAME = "Tauditor"
 WAGTAILADMIN_BASE_URL = config("WAGTAILADMIN_BASE_URL", default="http://localhost:8080")
-WAGTAILDOCS_EXTENSIONS = ["pdf", "txt", "docx"]
+WAGTAILDOCS_EXTENSIONS = ["pdf", "txt", "docx", "md", "xlsx", "csv"]
+WAGTAILMEDIA = {
+    "MEDIA_MODEL": "wagtailmedia.Media",
+    "AUDIO_EXTENSIONS": ["mp3", "wav", "ogg"],
+    "VIDEO_EXTENSIONS": ["mp4", "webm", "ogg", "mov", "m4v"],
+}
+
+# Lesson video uploads go to disk; nginx also caps the request body.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 # Cache — Redis in production; LocMem fallback for local/dev without Redis.
 REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")

@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import CourseLevelBadge from "@/components/education/CourseLevelBadge";
+import CourseOutline from "@/components/education/CourseOutline";
 import EduProgressBar from "@/components/education/ProgressBar";
+import TeacherCard from "@/components/education/TeacherCard";
 import { Alert, Button, PageLoader } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
 import {
+  courseLevel,
   courseMinutes,
   doneLessonIds,
   flattenLessons,
-  moduleMinutes,
   type EduComment,
   type EduCourse,
 } from "@/lib/education";
@@ -80,11 +83,22 @@ export default function CourseSyllabusPage() {
   if (!course) return <Alert>{error || t("edu.notFound")}</Alert>;
 
   return (
-    <div className="space-y-5">
+    <div className="grid items-start gap-4 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <div className="space-y-3 lg:sticky lg:top-24">
+        <CourseOutline course={course} done={done} sticky={false} />
+        <TeacherCard teacher={course.teacher} />
+      </div>
+      <div className="min-w-0 space-y-5">
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <Link href="/education" className="text-xs font-medium text-navy-800 hover:text-link">
           {t("edu.backCatalog")}
         </Link>
+        {course.thumbnail_url ? (
+          <img src={course.thumbnail_url} alt="" className="mt-3 h-48 w-full rounded-xl object-cover sm:h-56" />
+        ) : null}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <CourseLevelBadge level={courseLevel(course.level)} />
+        </div>
         <h1 className="mt-2 text-xl font-bold text-ink">{course.title}</h1>
         <p className="mt-1 text-sm leading-6 text-gray-600">{course.summary}</p>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
@@ -92,11 +106,6 @@ export default function CourseSyllabusPage() {
           <span>{t("edu.lessonsCount", { n: n(lessons.length) })}</span>
           <span>{t("edu.minutes", { n: n(courseMinutes(course)) })}</span>
           <span>{t("edu.likes", { n: n(course.like_count) })}</span>
-          {course.author_id ? (
-            <Link href={`/education/teachers/${course.author_id}`} className="text-navy-800 hover:text-link">
-              {t("edu.teacherPage")}
-            </Link>
-          ) : null}
         </div>
         <div className="mt-4 max-w-md">
           <EduProgressBar done={done.length} total={lessons.length} label={t("edu.yourProgress")} />
@@ -114,51 +123,6 @@ export default function CourseSyllabusPage() {
       </section>
 
       {error ? <Alert>{error}</Alert> : null}
-
-      <section className="space-y-3">
-        <h2 className="text-sm font-bold text-ink">{t("edu.syllabus")}</h2>
-        {course.modules.map((module, index) => (
-          <article key={module.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold text-brand-800">
-                  {t("edu.moduleN", { n: n(index + 1) })}
-                </p>
-                <h3 className="text-sm font-bold text-ink">{module.title}</h3>
-                {module.summary ? <p className="mt-1 text-xs text-gray-500">{module.summary}</p> : null}
-              </div>
-              <p className="shrink-0 text-[11px] text-gray-500">{t("edu.minutes", { n: n(moduleMinutes(module)) })}</p>
-            </div>
-            <ol className="mt-3 space-y-1">
-              {module.lessons.map((lesson) => {
-                const complete = done.includes(lesson.id);
-                return (
-                  <li key={lesson.id}>
-                    <Link
-                      href={`/education/courses/${course.id}/learn/${lesson.id}`}
-                      className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm hover:bg-gray-50"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={
-                            complete
-                              ? "size-2.5 rounded-full bg-brand-500"
-                              : "size-2.5 rounded-full border border-gray-300"
-                          }
-                        />
-                        <span className="text-ink">{lesson.title}</span>
-                      </span>
-                      <span className="text-[11px] text-gray-400">
-                        {lesson.has_quiz ? t("edu.quiz") : lesson.has_exam ? t("edu.exam") : t("edu.lesson")}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ol>
-          </article>
-        ))}
-      </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-bold text-ink">{t("edu.courseQuestions")}</h2>
@@ -182,6 +146,7 @@ export default function CourseSyllabusPage() {
           </Button>
         </div>
       </section>
+      </div>
     </div>
   );
 }

@@ -140,12 +140,22 @@ class CmsAccessService:
 
     def grant_teachers_admin_access(self):
         group = self.teachers_group()
-        perm = Permission.objects.filter(
-            content_type__app_label="wagtailadmin",
-            codename="access_admin",
-        ).first()
-        if perm:
-            group.permissions.add(perm)
+        needed = (
+            ("wagtailadmin", "access_admin"),
+            ("wagtailimages", "add_image"),
+            ("wagtailimages", "change_image"),
+            ("wagtaildocs", "add_document"),
+            ("wagtaildocs", "change_document"),
+            ("wagtailmedia", "add_media"),
+            ("wagtailmedia", "change_media"),
+        )
+        for app_label, codename in needed:
+            perm = Permission.objects.filter(
+                content_type__app_label=app_label,
+                codename=codename,
+            ).first()
+            if perm:
+                group.permissions.add(perm)
 
     def sync_teacher_explorer_permissions(self, home):
         """Teachers browse آموزش, but only admin adds Category / SubCategory."""

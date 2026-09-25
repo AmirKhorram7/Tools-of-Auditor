@@ -74,7 +74,8 @@ class CourseTree:
                 lesson = LessonPage(
                     title=f"Lesson {m}.{n}",
                     slug=f"lesson-{m}-{n}-{slug}",
-                    body=f"Body for module {m} lesson {n}.",
+                    short_description=f"Body for module {m} lesson {n}.",
+                    content=[("paragraph", f"<p>Body for module {m} lesson {n}.</p>")],
                     live=False,
                 )
                 module.add_child(instance=lesson)

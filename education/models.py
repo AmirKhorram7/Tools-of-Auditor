@@ -63,18 +63,47 @@ class TeacherGroupMember(TimeStamped):
         return str(self.member_id)
 
 
+def clean_http_url(value: str, *, max_length: int = 200) -> str:
+    text = plain_text(value, max_length=max_length) if value else ""
+    if not text:
+        return ""
+    if not text.startswith(("http://", "https://")):
+        raise ValidationError("Enter a valid http or https link.")
+    return text
+
+
 class TeacherProfile(TimeStamped):
+    MAX_NAME = 120
+    MAX_HEADLINE = 200
     MAX_BIO = 2000
+    MAX_PROJECTS = 4000
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="teacher_profile",
     )
+    display_name = models.CharField(max_length=MAX_NAME, blank=True)
+    photo = models.ImageField(upload_to="teachers/", blank=True, null=True)
+    headline = models.CharField(max_length=MAX_HEADLINE, blank=True)
     bio = models.TextField(blank=True)
+    website = models.URLField(blank=True)
+    linkedin_url = models.URLField(blank=True)
+    telegram_url = models.URLField(blank=True)
+    instagram_url = models.URLField(blank=True)
+    projects = models.TextField(blank=True)
 
     def clean(self):
+        self.display_name = (
+            plain_text(self.display_name, max_length=self.MAX_NAME) if self.display_name else ""
+        )
+        self.headline = plain_text(self.headline, max_length=self.MAX_HEADLINE) if self.headline else ""
         self.bio = plain_text(self.bio, max_length=self.MAX_BIO) if self.bio else ""
+        self.website = clean_http_url(self.website)
+        self.linkedin_url = clean_http_url(self.linkedin_url)
+        self.telegram_url = clean_http_url(self.telegram_url)
+        self.instagram_url = clean_http_url(self.instagram_url)
+        self.projects = plain_text(self.projects, max_length=self.MAX_PROJECTS) if self.projects else ""
 
 
 class QuizAttempt(TimeStamped):
