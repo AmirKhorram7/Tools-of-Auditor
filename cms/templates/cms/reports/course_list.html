@@ -1,0 +1,36 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n %}
+
+{% block main_content %}
+    <p class="help">{% trans "Your courses. Open a course to see students, comments and likes." %}</p>
+    <table class="listing">
+        <thead>
+            <tr>
+                <th>{% trans "Course" %}</th>
+                <th>{% trans "Folder" %}</th>
+                <th>{% trans "Students" %}</th>
+                <th>{% trans "Comments" %}</th>
+                <th>{% trans "Likes" %}</th>
+                <th>{% trans "Status" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td>
+                        <a href="{% url 'cms_teacher_course_report_detail' row.course.id %}">{{ row.course.title }}</a>
+                    </td>
+                    <td>{{ row.folder }}</td>
+                    <td>{{ row.student_count }}</td>
+                    <td>{{ row.comment_count }}</td>
+                    <td>{{ row.like_count }}</td>
+                    <td>{% if row.live %}{% trans "Live" %}{% else %}{% trans "Draft" %}{% endif %}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6">{% trans "You have no courses yet." %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

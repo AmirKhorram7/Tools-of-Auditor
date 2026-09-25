@@ -1,0 +1,76 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n %}
+
+{% block main_content %}
+    <p>
+        <a href="{% url 'cms_teacher_course_report' %}">{% trans "Back to course report" %}</a>
+        &nbsp;|&nbsp;
+        <a href="{% url 'wagtailadmin_pages:edit' course.id %}">{% trans "Edit course" %}</a>
+    </p>
+    <p>
+        <strong>{% trans "Folder" %}:</strong> {{ folder }}
+        &nbsp;|&nbsp;
+        <strong>{% trans "Status" %}:</strong> {% if live %}{% trans "Live" %}{% else %}{% trans "Draft" %}{% endif %}
+        &nbsp;|&nbsp;
+        <strong>{% trans "Students" %}:</strong> {{ student_count }}
+        &nbsp;|&nbsp;
+        <strong>{% trans "Comments" %}:</strong> {{ comment_count }}
+        &nbsp;|&nbsp;
+        <strong>{% trans "Likes" %}:</strong> {{ like_count }}
+        &nbsp;|&nbsp;
+        <strong>{% trans "Lessons" %}:</strong> {{ lesson_total }}
+    </p>
+    {% if course.summary %}
+        <p>{{ course.summary }}</p>
+    {% endif %}
+
+    <h2>{% trans "Students" %}</h2>
+    <table class="listing">
+        <thead>
+            <tr>
+                <th>{% trans "Student" %}</th>
+                <th>{% trans "Lessons done" %}</th>
+                <th>{% trans "Comments" %}</th>
+                <th>{% trans "Liked" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in students %}
+                <tr>
+                    <td>{{ row.label }}</td>
+                    <td>{{ row.completed_lessons }} / {{ row.lesson_total }}</td>
+                    <td>{{ row.comment_count }}</td>
+                    <td>{% if row.liked %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4">{% trans "No students on this course yet." %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>{% trans "Recent comments" %}</h2>
+    <table class="listing">
+        <thead>
+            <tr>
+                <th>{% trans "Student" %}</th>
+                <th>{% trans "Comment" %}</th>
+                <th>{% trans "When" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for comment in comments %}
+                <tr>
+                    <td>{{ comment.author }}</td>
+                    <td>{{ comment.body }}</td>
+                    <td>{{ comment.created_at }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="3">{% trans "No comments yet." %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
