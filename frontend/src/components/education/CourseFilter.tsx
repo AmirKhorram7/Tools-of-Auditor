@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
+
 import { cx } from "@/components/ui";
-import type { CourseLevel } from "@/lib/education";
+import type { CourseLevel, EduCategoryNode } from "@/lib/education";
 import { useI18n } from "@/lib/i18n";
 
 const LEVELS: CourseLevel[] = ["basic", "advanced", "professional"];
@@ -12,79 +14,184 @@ const LEVEL_KEYS = {
   professional: "edu.levelProfessional",
 } as const;
 
-function FilterButton({
-  active,
+function toggleValue<T>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+}
+
+function Check({ on }: { on: boolean }) {
+  return (
+    <span
+      className={cx(
+        "flex size-4 shrink-0 items-center justify-center rounded border-[1.5px]",
+        on ? "border-navy-800 bg-navy-800 text-white" : "border-gray-300 bg-white",
+      )}
+      aria-hidden
+    >
+      {on ? (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+          <path d="M4 12l6 6L20 6" />
+        </svg>
+      ) : null}
+    </span>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      className={cx("shrink-0 text-gray-500 transition-transform", !open && "-rotate-90")}
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function CheckRow({
+  checked,
   label,
-  onClick,
+  onToggle,
 }: {
-  active: boolean;
+  checked: boolean;
   label: string;
-  onClick: () => void;
+  onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "block w-full rounded-lg px-3 py-2 text-start text-sm",
-        active ? "bg-navy-800 font-medium text-white" : "text-ink hover:bg-gray-50",
-      )}
-    >
-      {label}
+    <button type="button" onClick={onToggle} className="flex w-full items-center gap-2 text-start">
+      <Check on={checked} />
+      <span className={cx("text-[13px] leading-5", checked ? "font-semibold text-ink" : "text-gray-700")}>{label}</span>
     </button>
   );
 }
 
 export default function CourseFilter({
   categories,
-  level,
-  categoryId,
-  onLevel,
-  onCategory,
+  levels,
+  folderIds,
+  onLevels,
+  onFolders,
 }: {
-  categories: { id: number; title: string }[];
-  level: CourseLevel | "";
-  categoryId: number | null;
-  onLevel: (value: CourseLevel | "") => void;
-  onCategory: (value: number | null) => void;
+  categories: EduCategoryNode[];
+  levels: CourseLevel[];
+  folderIds: number[];
+  onLevels: (value: CourseLevel[]) => void;
+  onFolders: (value: number[]) => void;
 }) {
   const { t } = useI18n();
+  const allOn = !levels.length && !folderIds.length;
+  const [levelOpen, setLevelOpen] = useState(true);
+  const [catsOpen, setCatsOpen] = useState(true);
+  const [openCats, setOpenCats] = useState<Record<number, boolean>>({});
+
+  const clear = () => {
+    onLevels([]);
+    onFolders([]);
+  };
 
   return (
-    <aside className="rounded-xl border border-gray-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)] lg:sticky lg:top-24 lg:w-[16.5rem]">
-      <p className="px-3 pb-2 text-xs font-bold text-gray-500">{t("edu.filterTitle")}</p>
-      <FilterButton
-        active={!level && !categoryId}
-        label={t("edu.filterAll")}
-        onClick={() => {
-          onLevel("");
-          onCategory(null);
-        }}
-      />
+    <aside className="w-full rounded-2xl border border-gray-200 bg-white lg:sticky lg:top-24 lg:w-[300px] lg:shrink-0">
+      <div className="flex flex-col gap-5 p-[22px]">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[14px] font-bold text-ink">{t("edu.filterTitle")}</p>
+          <button type="button" onClick={clear} className="text-xs text-gray-500 hover:text-navy-800">
+            {t("edu.filterClear")}
+          </button>
+        </div>
 
-      <p className="mt-4 px-3 pb-1 text-xs font-bold text-gray-500">{t("edu.filterLevel")}</p>
-      {LEVELS.map((item) => (
-        <FilterButton
-          key={item}
-          active={level === item}
-          label={t(LEVEL_KEYS[item])}
-          onClick={() => onLevel(level === item ? "" : item)}
-        />
-      ))}
+        <button
+          type="button"
+          onClick={clear}
+          className={cx(
+            "inline-flex h-8 w-full items-center justify-center rounded-[10px] text-[13px] font-semibold",
+            allOn ? "bg-navy-900 text-white" : "border border-gray-200 bg-white text-ink hover:border-navy-800",
+          )}
+        >
+          {t("edu.filterAll")}
+        </button>
 
-      {categories.length ? (
-        <>
-          <p className="mt-4 px-3 pb-1 text-xs font-bold text-gray-500">{t("edu.filterCategory")}</p>
-          {categories.map((item) => (
-            <FilterButton
-              key={item.id}
-              active={categoryId === item.id}
-              label={item.title}
-              onClick={() => onCategory(categoryId === item.id ? null : item.id)}
-            />
-          ))}
-        </>
-      ) : null}
+        <div className="flex flex-col gap-3 border-t border-gray-100 pt-4">
+          <button
+            type="button"
+            onClick={() => setLevelOpen((value) => !value)}
+            className="flex w-full items-center justify-between"
+            aria-expanded={levelOpen}
+          >
+            <span className="text-[13px] font-bold text-ink">{t("edu.filterLevel")}</span>
+            <Chevron open={levelOpen} />
+          </button>
+          {levelOpen
+            ? LEVELS.map((item) => (
+                <CheckRow
+                  key={item}
+                  checked={levels.includes(item)}
+                  label={t(LEVEL_KEYS[item])}
+                  onToggle={() => onLevels(toggleValue(levels, item))}
+                />
+              ))
+            : null}
+        </div>
+
+        {categories.length ? (
+          <div className="flex flex-col gap-3 border-t border-gray-100 pt-4">
+            <button
+              type="button"
+              onClick={() => setCatsOpen((value) => !value)}
+              className="flex w-full items-center justify-between"
+              aria-expanded={catsOpen}
+            >
+              <span className="text-[13px] font-bold text-ink">{t("edu.filterCategory")}</span>
+              <Chevron open={catsOpen} />
+            </button>
+            {catsOpen
+              ? categories.map((cat) => {
+                  const kidsOpen = openCats[cat.id] !== false && Boolean(cat.children.length);
+                  return (
+                    <div key={cat.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <CheckRow
+                            checked={folderIds.includes(cat.id)}
+                            label={cat.title}
+                            onToggle={() => onFolders(toggleValue(folderIds, cat.id))}
+                          />
+                        </div>
+                        {cat.children.length ? (
+                          <button
+                            type="button"
+                            onClick={() => setOpenCats((row) => ({ ...row, [cat.id]: !kidsOpen }))}
+                            className="p-1 text-gray-500"
+                            aria-expanded={kidsOpen}
+                            aria-label={cat.title}
+                          >
+                            <Chevron open={kidsOpen} />
+                          </button>
+                        ) : null}
+                      </div>
+                      {cat.children.length && kidsOpen ? (
+                        <div className="mt-2.5 flex flex-col gap-2.5 ps-6">
+                          {cat.children.map((child) => (
+                            <CheckRow
+                              key={child.id}
+                              checked={folderIds.includes(child.id)}
+                              label={child.title}
+                              onToggle={() => onFolders(toggleValue(folderIds, child.id))}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              : null}
+          </div>
+        ) : null}
+      </div>
     </aside>
   );
 }

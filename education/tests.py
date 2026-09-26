@@ -111,6 +111,16 @@ class EducationProcessSmokeTests(EducationBase):
         self.assertEqual(comment.status_code, 201, comment.data)
         notes = self.client.get(f"{API}/courses/{self.course.id}/comments/")
         self.assertEqual(len(notes.data), 1)
+        reply = self.teacher_c.post(
+            f"{API}/courses/{self.course.id}/comments/",
+            {"body": "Start with chapter one.", "parent": comment.data["id"]},
+            format="json",
+        )
+        self.assertEqual(reply.status_code, 201, reply.data)
+        vote = self.student_c.post(f"{API}/comments/{comment.data['id']}/vote/", {"value": 1}, format="json")
+        self.assertEqual(vote.status_code, 200, vote.data)
+        self.assertEqual(vote.data["like_count"], 1)
+        self.assertEqual(vote.data["my_vote"], 1)
 
     def test_quiz_then_exam_then_teacher_page(self):
         from cms.models import LessonExam, LessonQuiz

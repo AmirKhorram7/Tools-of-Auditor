@@ -28,7 +28,7 @@ export default function TeacherPage() {
   return (
     <div className="space-y-6">
       <TeacherProfile teacher={page} />
-      <Link href="/education" className="inline-block text-xs font-medium text-navy-800 hover:text-link">
+      <Link href="/education" className="inline-block text-[13px] font-medium text-navy-800 hover:text-link">
         {t("edu.backCatalog")}
       </Link>
     </div>

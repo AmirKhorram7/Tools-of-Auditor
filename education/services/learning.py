@@ -168,16 +168,27 @@ class LearningService:
             raise ValidationError("Pass the lesson quiz or exam before marking it complete.")
         return {"lesson": lesson.id, "completed_at": progress.completed_at}
 
-    def list_comments(self, course_id: int, lesson_id=None):
+    def list_comments(self, course_id: int, lesson_id=None, user=None):
+        from django.db.models import Count, Prefetch, Q
+
+        from education.models import CommentVote
+
         course = self.published_course(course_id)
-        qs = course.comments.select_related("author")
+        qs = course.comments.select_related("author").annotate(
+            like_total=Count("votes", filter=Q(votes__value=1)),
+            dislike_total=Count("votes", filter=Q(votes__value=-1)),
+        )
+        if user and user.is_authenticated:
+            qs = qs.prefetch_related(
+                Prefetch("votes", queryset=CommentVote.objects.filter(user=user), to_attr="my_votes")
+            )
         if lesson_id:
             qs = qs.filter(lesson_id=lesson_id)
         else:
             qs = qs.filter(lesson__isnull=True)
         return qs
 
-    def add_comment(self, user, course_id: int, body: str, lesson_id=None):
+    def add_comment(self, user, course_id: int, body: str, lesson_id=None, parent_id=None):
         course = self.published_course(course_id)
         key = f"edu-comment:{user.id}"
         count = cache.get(key, 0)
@@ -186,10 +197,18 @@ class LearningService:
         lesson = None
         if lesson_id:
             lesson = self.published_lesson(lesson_id)
+        parent = None
+        if parent_id:
+            parent = CourseComment.objects.filter(pk=parent_id, course=course).first()
+            if parent is None:
+                raise ValidationError("Parent comment was not found.")
+            if parent.parent_id:
+                raise ValidationError("Only one reply level is allowed.")
         try:
             comment = CourseComment(
                 course=course,
-                lesson=lesson,
+                lesson=lesson if lesson is not None else (parent.lesson if parent else None),
+                parent=parent,
                 author=user,
                 body=plain_text(body, max_length=CourseComment.MAX_LENGTH),
             )
@@ -198,6 +217,25 @@ class LearningService:
         except DjangoValidationError as exc:
             raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages)
         cache.set(key, count + 1, COMMENT_WINDOW)
+        return comment
+
+    def vote_comment(self, user, comment_id: int, value):
+        from education.models import CommentVote
+
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            raise ValidationError("Vote must be 1, -1, or 0.")
+        if value not in (1, -1, 0):
+            raise ValidationError("Vote must be 1, -1, or 0.")
+        comment = CourseComment.objects.filter(pk=comment_id).first()
+        if comment is None:
+            raise ValidationError("Comment was not found.")
+        self.published_course(comment.course_id)
+        if value == 0:
+            CommentVote.objects.filter(comment=comment, user=user).delete()
+        else:
+            CommentVote.objects.update_or_create(comment=comment, user=user, defaults={"value": value})
         return comment
 
     def like_course(self, user, course_id: int):

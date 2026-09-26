@@ -9,7 +9,7 @@ import CourseOutline from "@/components/education/CourseOutline";
 import EduProgressBar from "@/components/education/ProgressBar";
 import TeacherCard from "@/components/education/TeacherCard";
 import { Alert, Button, PageLoader } from "@/components/ui";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, mediaUrl } from "@/lib/api";
 import {
   courseLevel,
   courseMinutes,
@@ -55,6 +55,7 @@ export default function CourseSyllabusPage() {
   const lessons = useMemo(() => (course ? flattenLessons(course) : []), [course]);
   const done = course ? doneLessonIds(course.id) : [];
   const firstOpen = lessons.find((lesson) => !done.includes(lesson.id)) ?? lessons[0];
+  const photo = mediaUrl(course?.thumbnail_url);
 
   const like = async () => {
     try {
@@ -83,69 +84,83 @@ export default function CourseSyllabusPage() {
   if (!course) return <Alert>{error || t("edu.notFound")}</Alert>;
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[auto_minmax(0,1fr)]">
-      <div className="space-y-3 lg:sticky lg:top-24">
-        <CourseOutline course={course} done={done} sticky={false} />
+    <div className="flex flex-col-reverse gap-8 lg:flex-row lg:items-start">
+      <aside className="flex w-full flex-col gap-4 lg:sticky lg:top-24 lg:w-[22.5rem] lg:shrink-0">
         <TeacherCard teacher={course.teacher} />
-      </div>
-      <div className="min-w-0 space-y-5">
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <Link href="/education" className="text-xs font-medium text-navy-800 hover:text-link">
-          {t("edu.backCatalog")}
+        <CourseOutline course={course} done={done} sticky={false} />
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <Link href="/education" className="text-[13px] text-gray-500 hover:text-navy-800">
+          {t("edu.backCatalog")} ‹
         </Link>
-        {course.thumbnail_url ? (
-          <img src={course.thumbnail_url} alt="" className="mt-3 h-48 w-full rounded-xl object-cover sm:h-56" />
+
+        <div className="relative flex h-[240px] items-center justify-center overflow-hidden rounded-2xl bg-navy-900 sm:h-[320px]">
+          {photo ? (
+            <img src={photo} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-sm font-medium text-brand-400">{t("edu.course")}</span>
+          )}
+        </div>
+
+        <CourseLevelBadge level={courseLevel(course.level)} />
+        <h1 className="text-[1.75rem] font-bold leading-tight text-ink sm:text-[2rem]">{course.title}</h1>
+        {course.summary ? (
+          <p className="max-w-xl text-[15px] leading-8 text-gray-700">{course.summary}</p>
         ) : null}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <CourseLevelBadge level={courseLevel(course.level)} />
-        </div>
-        <h1 className="mt-2 text-xl font-bold text-ink">{course.title}</h1>
-        <p className="mt-1 text-sm leading-6 text-gray-600">{course.summary}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-gray-500">
           <span>{t("edu.modulesCount", { n: n(course.modules.length) })}</span>
+          <span aria-hidden>·</span>
           <span>{t("edu.lessonsCount", { n: n(lessons.length) })}</span>
+          <span aria-hidden>·</span>
           <span>{t("edu.minutes", { n: n(courseMinutes(course)) })}</span>
+          <span aria-hidden>·</span>
           <span>{t("edu.likes", { n: n(course.like_count) })}</span>
-        </div>
-        <div className="mt-4 max-w-md">
-          <EduProgressBar done={done.length} total={lessons.length} label={t("edu.yourProgress")} />
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        </p>
+
+        <EduProgressBar done={done.length} total={lessons.length} label={t("edu.yourProgress")} />
+
+        <div className="flex flex-wrap gap-3">
           {firstOpen ? (
-            <Link href={`/education/courses/${course.id}/learn/${firstOpen.id}`}>
-              <Button>{done.length ? t("edu.continue") : t("edu.start")}</Button>
+            <Link
+              href={`/education/courses/${course.id}/learn/${firstOpen.id}`}
+              className="inline-flex h-11 items-center justify-center rounded-[10px] bg-brand-500 px-6 text-sm font-semibold text-ink hover:bg-brand-700 hover:text-white"
+            >
+              {done.length ? t("edu.continue") : t("edu.start")}
             </Link>
           ) : null}
-          <Button variant="secondary" onClick={like}>
+          <Button variant="secondary" onClick={like} className="h-11 px-6 text-sm font-semibold">
             {t("edu.like")}
           </Button>
         </div>
-      </section>
 
-      {error ? <Alert>{error}</Alert> : null}
+        {error ? <Alert>{error}</Alert> : null}
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-bold text-ink">{t("edu.courseQuestions")}</h2>
-        <div className="mt-3 space-y-2">
-          {comments.map((row) => (
-            <p key={row.id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-ink">
-              {row.body}
-            </p>
-          ))}
-        </div>
-        <textarea
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          rows={3}
-          className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          placeholder={t("edu.askTeacher")}
-        />
-        <div className="mt-2">
-          <Button size="sm" onClick={sendComment} disabled={!body.trim()}>
-            {t("edu.sendQuestion")}
-          </Button>
-        </div>
-      </section>
+        <section className="flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-6">
+          <h2 className="text-base font-bold text-ink">{t("edu.courseQuestions")}</h2>
+          {comments.length ? (
+            <div className="space-y-2">
+              {comments.map((row) => (
+                <p key={row.id} className="rounded-lg bg-gray-50 px-3 py-2 text-[14px] leading-6 text-ink">
+                  {row.body}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          <textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            rows={3}
+            className="min-h-16 w-full resize-none rounded-[10px] border border-gray-200 px-3 py-3 text-[14px] leading-6 text-ink outline-none placeholder:text-gray-400 focus:border-navy-800"
+            placeholder={t("edu.askTeacher")}
+          />
+          <div>
+            <Button onClick={sendComment} disabled={!body.trim()} className="h-11 px-6 text-sm font-semibold">
+              {t("edu.sendQuestion")}
+            </Button>
+          </div>
+        </section>
       </div>
     </div>
   );

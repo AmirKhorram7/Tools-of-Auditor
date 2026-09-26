@@ -98,8 +98,12 @@ class CommentListCreateView(APIView):
         return [IsAuthenticated()]
 
     def get(self, request, course_id):
-        rows = learning_service.list_comments(course_id, request.query_params.get("lesson"))
-        return Response(CommentSerializer(rows, many=True).data)
+        rows = learning_service.list_comments(
+            course_id,
+            request.query_params.get("lesson"),
+            request.user,
+        )
+        return Response(CommentSerializer(rows, many=True, context={"request": request}).data)
 
     def post(self, request, course_id):
         comment = learning_service.add_comment(
@@ -107,8 +111,17 @@ class CommentListCreateView(APIView):
             course_id,
             request.data.get("body") or "",
             request.data.get("lesson"),
+            request.data.get("parent"),
         )
-        return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+        return Response(CommentSerializer(comment, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
+class CommentVoteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = learning_service.vote_comment(request.user, comment_id, request.data.get("value"))
+        return Response(CommentSerializer(comment, context={"request": request}).data)
 
 
 class CourseLikeView(APIView):

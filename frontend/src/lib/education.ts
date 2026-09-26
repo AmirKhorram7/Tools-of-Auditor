@@ -28,24 +28,51 @@ export type EduCourseCard = {
   student_count?: number;
 };
 
+export type EduCategoryNode = {
+  id: number;
+  title: string;
+  children: { id: number; title: string }[];
+};
+
 export function courseCategories(courses: EduCourseCard[]): { id: number; title: string }[] {
-  const seen = new Map<number, string>();
+  return courseCategoryTree(courses).map(({ id, title }) => ({ id, title }));
+}
+
+export function courseCategoryTree(courses: EduCourseCard[]): EduCategoryNode[] {
+  const map = new Map<number, EduCategoryNode>();
   courses.forEach((course) => {
-    if (course.category_id && course.category_title && !seen.has(course.category_id)) {
-      seen.set(course.category_id, course.category_title);
+    if (!course.category_id || !course.category_title) return;
+    if (!map.has(course.category_id)) {
+      map.set(course.category_id, { id: course.category_id, title: course.category_title, children: [] });
+    }
+    const node = map.get(course.category_id);
+    if (
+      node &&
+      course.subcategory_id &&
+      course.subcategory_title &&
+      !node.children.some((child) => child.id === course.subcategory_id)
+    ) {
+      node.children.push({ id: course.subcategory_id, title: course.subcategory_title });
     }
   });
-  return [...seen.entries()].map(([id, title]) => ({ id, title }));
+  return [...map.values()];
 }
 
 export function filterCourses(
   courses: EduCourseCard[],
-  level: CourseLevel | "",
-  categoryId: number | null,
+  levels: CourseLevel[] | CourseLevel | "",
+  folderIds: number[] | number | null,
 ): EduCourseCard[] {
+  const levelList = Array.isArray(levels) ? levels : levels ? [levels] : [];
+  const folders = Array.isArray(folderIds) ? folderIds : folderIds ? [folderIds] : [];
   return courses.filter((course) => {
-    if (level && courseLevel(course.level) !== level) return false;
-    if (categoryId && course.category_id !== categoryId) return false;
+    if (levelList.length && !levelList.includes(courseLevel(course.level))) return false;
+    if (folders.length) {
+      const hit =
+        (course.category_id != null && folders.includes(course.category_id)) ||
+        (course.subcategory_id != null && folders.includes(course.subcategory_id));
+      if (!hit) return false;
+    }
     return true;
   });
 }
@@ -99,8 +126,14 @@ export type EduComment = {
   id: number;
   course: number;
   lesson: number | null;
+  parent?: number | null;
   author_id: number;
+  author_name?: string;
+  is_teacher?: boolean;
   body: string;
+  like_count?: number;
+  dislike_count?: number;
+  my_vote?: number;
   created_at: string;
 };
 
@@ -154,6 +187,13 @@ export function markLessonDone(courseId: number, lessonId: number) {
   const next = new Set(all[key] ?? []);
   next.add(lessonId);
   all[key] = [...next];
+  window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
+}
+
+export function unmarkLessonDone(courseId: number, lessonId: number) {
+  const all = readProgress();
+  const key = String(courseId);
+  all[key] = (all[key] ?? []).filter((id) => id !== lessonId);
   window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
 }
 

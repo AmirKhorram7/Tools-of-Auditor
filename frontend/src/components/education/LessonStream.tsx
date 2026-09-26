@@ -22,18 +22,18 @@ function embedSrc(url: string): string | null {
 function BlockView({ block }: { block: EduLessonBlock }) {
   const { t } = useI18n();
   if (block.type === "heading") {
-    return <h3 className="text-base font-bold text-ink">{String(block.value)}</h3>;
+    return <h3 className="text-lg font-bold text-ink">{String(block.value)}</h3>;
   }
   if (block.type === "paragraph") {
     return (
       <div
-        className="text-sm leading-7 text-ink [&_a]:text-navy-800 [&_li]:ms-5 [&_ol]:list-decimal [&_ul]:list-disc"
+        className="text-[15px] leading-[1.9] text-[#33302B] [&_a]:text-navy-800 [&_li]:ms-5 [&_ol]:list-decimal [&_ul]:list-disc"
         dangerouslySetInnerHTML={{ __html: safeHtml(String(block.value)) }}
       />
     );
   }
   if (block.type === "quote") {
-    return <blockquote className="border-s-2 border-brand-500 ps-3 text-sm leading-7 text-gray-700">{String(block.value)}</blockquote>;
+    return <blockquote className="border-s-2 border-brand-500 ps-3 text-[15px] leading-8 text-gray-700">{String(block.value)}</blockquote>;
   }
   if (block.type === "code") {
     return (
@@ -81,14 +81,14 @@ export default function LessonStream({ lesson }: { lesson: EduLesson }) {
   const heroVideo = embedSrc(lesson.video_url || "");
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="space-y-4">
       {lesson.featured_image_url ? (
         <img src={lesson.featured_image_url} alt="" className="max-h-72 w-full rounded-xl object-cover" />
       ) : null}
       {lesson.short_description ? <p className="text-sm text-gray-600">{lesson.short_description}</p> : null}
       {lesson.video_file_url ? (
         <video
-          className="aspect-video w-full rounded-xl bg-navy-900"
+          className="aspect-video w-full rounded-2xl bg-navy-900"
           src={lesson.video_file_url}
           controls
           preload="metadata"

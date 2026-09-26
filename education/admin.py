@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from education.models import (
+    CommentVote,
     CourseComment,
     CourseLike,
     ExamSubmission,
@@ -42,4 +43,5 @@ admin.site.register(QuizAttempt)
 admin.site.register(ExamSubmission)
 admin.site.register(LessonProgress)
 admin.site.register(CourseComment)
+admin.site.register(CommentVote)
 admin.site.register(CourseLike)

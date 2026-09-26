@@ -199,6 +199,13 @@ class CourseComment(TimeStamped):
         on_delete=models.CASCADE,
         related_name="course_comments",
     )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="replies",
+    )
     body = models.TextField(max_length=MAX_LENGTH)
 
     class Meta:
@@ -208,6 +215,28 @@ class CourseComment(TimeStamped):
         self.body = plain_text(self.body, max_length=self.MAX_LENGTH)
         if self.lesson_id and self.lesson.course().pk != self.course_id:
             raise ValidationError("Lesson does not belong to this course.")
+        if self.parent_id:
+            if self.parent.course_id != self.course_id:
+                raise ValidationError("Reply must stay on the same course.")
+            if self.parent.parent_id:
+                raise ValidationError("Only one reply level is allowed.")
+
+
+class CommentVote(TimeStamped):
+    LIKE = 1
+    DISLIKE = -1
+    comment = models.ForeignKey(CourseComment, on_delete=models.CASCADE, related_name="votes")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comment_votes",
+    )
+    value = models.SmallIntegerField(choices=((LIKE, "like"), (DISLIKE, "dislike")))
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["comment", "user"], name="uniq_comment_vote")
+        ]
 
 
 class CourseLike(TimeStamped):

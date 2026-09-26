@@ -2,6 +2,7 @@ from django.urls import path
 
 from education.api.v1.views import (
     CommentListCreateView,
+    CommentVoteView,
     CourseLikeView,
     ExamGradeView,
     ExamSubmitView,
@@ -20,6 +21,7 @@ urlpatterns = [
     path("courses/", PublishedCourseListView.as_view(), name="education-courses"),
     path("courses/<int:course_id>/", PublishedCourseDetailView.as_view(), name="education-course-detail"),
     path("courses/<int:course_id>/comments/", CommentListCreateView.as_view(), name="education-comments"),
+    path("comments/<int:comment_id>/vote/", CommentVoteView.as_view(), name="education-comment-vote"),
     path("courses/<int:course_id>/like/", CourseLikeView.as_view(), name="education-like"),
     path("lessons/<int:lesson_id>/", PublishedLessonView.as_view(), name="education-lesson"),
     path("lessons/<int:lesson_id>/complete/", LessonCompleteView.as_view(), name="education-lesson-complete"),

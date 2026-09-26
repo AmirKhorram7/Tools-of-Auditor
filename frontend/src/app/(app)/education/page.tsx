@@ -7,7 +7,7 @@ import CourseFilter from "@/components/education/CourseFilter";
 import { Alert, PageLoader } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import {
-  courseCategories,
+  courseCategoryTree,
   filterCourses,
   type CourseLevel,
   type EduCourseCard,
@@ -21,8 +21,8 @@ export default function EducationCatalogPage() {
   const [me, setMe] = useState<EduMe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [level, setLevel] = useState<CourseLevel | "">("");
-  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [levels, setLevels] = useState<CourseLevel[]>([]);
+  const [folderIds, setFolderIds] = useState<number[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -46,45 +46,46 @@ export default function EducationCatalogPage() {
     };
   }, [t]);
 
-  const categories = useMemo(() => courseCategories(courses), [courses]);
-  const visible = useMemo(() => filterCourses(courses, level, categoryId), [courses, level, categoryId]);
+  const categories = useMemo(() => courseCategoryTree(courses), [courses]);
+  const visible = useMemo(() => filterCourses(courses, levels, folderIds), [courses, levels, folderIds]);
 
   if (loading) return <PageLoader />;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">{t("edu.catalogTitle")}</h1>
-          <p className="mt-1 text-sm text-gray-500">{t("edu.catalogHint")}</p>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-[1.875rem] font-bold leading-tight text-ink">{t("edu.catalogTitle")}</h1>
+          <p className="text-[13px] leading-6 text-gray-500">{t("edu.catalogHint")}</p>
         </div>
         {me?.can_build_course ? (
           <a
             href={me.cms_url || "/cms/"}
-            className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-navy-900 hover:bg-brand-400"
+            className="inline-flex h-11 items-center justify-center rounded-[10px] bg-brand-500 px-[22px] text-sm font-semibold text-white hover:bg-brand-700"
           >
             {t("edu.makeCourse")}
           </a>
         ) : null}
       </div>
+
+      <p className="text-[13px] text-gray-500">{t("edu.catalogCount", { n: n(visible.length) })}</p>
       {error ? <Alert>{error}</Alert> : null}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[16.5rem_minmax(0,1fr)]">
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
         <CourseFilter
           categories={categories}
-          level={level}
-          categoryId={categoryId}
-          onLevel={setLevel}
-          onCategory={setCategoryId}
+          levels={levels}
+          folderIds={folderIds}
+          onLevels={setLevels}
+          onFolders={setFolderIds}
         />
-        <div className="min-w-0">
-          <p className="mb-4 text-sm text-gray-500">{t("edu.catalogCount", { n: n(visible.length) })}</p>
+        <div className="min-w-0 flex-1">
           {visible.length === 0 ? (
-            <p className="rounded-xl border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
+            <p className="rounded-2xl border border-gray-200 bg-white px-4 py-10 text-center text-[15px] text-gray-500">
               {courses.length ? t("edu.filterEmpty") : t("edu.empty")}
             </p>
           ) : (
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-6 sm:grid-cols-2">
               {visible.map((course) => (
                 <CourseCard key={course.id} course={course} />
               ))}

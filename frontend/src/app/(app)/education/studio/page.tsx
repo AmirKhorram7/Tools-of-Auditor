@@ -29,8 +29,8 @@ export default function EducationStudioPage() {
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h1 className="text-lg font-bold text-ink">{t("edu.studio")}</h1>
-        <p className="mt-1 text-sm text-gray-600">{t("edu.studioHint")}</p>
+        <h1 className="text-2xl font-bold text-ink">{t("edu.studio")}</h1>
+        <p className="mt-2 text-[15px] leading-7 text-gray-600">{t("edu.studioHint")}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <a
             href={me?.cms_url || "/cms/"}
