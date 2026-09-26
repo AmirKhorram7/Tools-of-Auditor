@@ -1,32 +1,57 @@
 import Link from "next/link";
 
-import type { EduCourseCard } from "@/lib/education";
-import { courseLevel } from "@/lib/education";
-import { useI18n } from "@/lib/i18n";
 import CourseLevelBadge from "@/components/education/CourseLevelBadge";
+import { mediaUrl } from "@/lib/api";
+import type { EduCourseCard } from "@/lib/education";
+import { useI18n } from "@/lib/i18n";
 
 export default function CourseCard({ course }: { course: EduCourseCard }) {
   const { t, n } = useI18n();
+  const photo = mediaUrl(course.thumbnail_url);
+  const teacher = course.teacher?.name || "";
+  const chapters = course.chapter_count ?? 0;
+  const lessons = course.lesson_count ?? 0;
+
   return (
     <Link
       href={`/education/courses/${course.id}`}
-      className="flex min-h-[10rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:border-brand-500 hover:shadow-md"
+      className="group flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06),0_6px_16px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(15,23,42,0.12)]"
     >
-      {course.thumbnail_url ? (
-        <img src={course.thumbnail_url} alt="" className="h-40 w-full object-cover" />
+      {photo ? (
+        <img src={photo} alt="" className="aspect-[16/9] w-full object-cover" />
       ) : (
-        <div className="flex h-40 w-full items-center justify-center bg-navy-800 text-sm font-bold text-brand-400">
+        <div className="flex aspect-[16/9] w-full items-center justify-center bg-navy-800 text-sm font-bold text-brand-400">
           {t("edu.course")}
         </div>
       )}
-      <div className="flex flex-1 flex-col p-4">
-        <div className="flex items-center gap-2">
-          <p className="text-[11px] font-semibold text-brand-800">{t("edu.course")}</p>
-          <CourseLevelBadge level={courseLevel(course.level)} />
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
+        {teacher ? <p className="text-xs font-medium text-gray-500">{teacher}</p> : null}
+        <h3 className="mt-1 line-clamp-2 text-[15px] font-bold leading-6 text-ink group-hover:text-navy-800">
+          {course.title}
+        </h3>
+        {course.summary ? (
+          <p className="mt-1 line-clamp-2 text-sm leading-6 text-gray-500">{course.summary}</p>
+        ) : null}
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+          <span>{t("edu.likes", { n: n(course.like_count) })}</span>
+          {lessons ? (
+            <>
+              <span aria-hidden>·</span>
+              <span>{t("edu.lessonsCount", { n: n(lessons) })}</span>
+            </>
+          ) : null}
         </div>
-        <h3 className="mt-1 text-sm font-bold leading-6 text-ink">{course.title}</h3>
-        <p className="mt-1 line-clamp-3 flex-1 text-xs leading-5 text-gray-500">{course.summary}</p>
-        <p className="mt-3 text-[11px] text-gray-500">{t("edu.likes", { n: n(course.like_count) })}</p>
+        <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+          <CourseLevelBadge level={course.level} />
+          {course.category_title ? (
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-navy-800">
+              {course.category_title}
+            </span>
+          ) : null}
+          {chapters ? (
+            <span className="text-[11px] text-gray-400">{t("edu.modulesCount", { n: n(chapters) })}</span>
+          ) : null}
+        </div>
       </div>
     </Link>
   );

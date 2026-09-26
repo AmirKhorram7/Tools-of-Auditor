@@ -52,7 +52,7 @@ export default function EducationStudioPage() {
       {page?.courses.length ? (
         <div>
           <h2 className="mb-3 text-sm font-bold text-ink">{t("edu.teacherCourses")}</h2>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {page.courses.map((course) => (
               <CourseCard key={course.id} course={course} />
             ))}

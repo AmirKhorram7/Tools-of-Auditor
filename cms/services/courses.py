@@ -1,4 +1,4 @@
-from cms.models import CoursePage, LessonExam, LessonPage, LessonQuiz
+from cms.models import CategoryPage, CoursePage, LessonExam, LessonPage, LessonQuiz, ModulePage, SubCategoryPage
 
 
 class CourseCatalogService:
@@ -57,9 +57,22 @@ class CourseCatalogService:
             row["has_exam"] = self.exam_for(lesson) is not None
         return row
 
+    def course_folders(self, course: CoursePage):
+        parent = course.get_parent()
+        if parent is None:
+            return None, None
+        specific = parent.specific
+        if isinstance(specific, SubCategoryPage):
+            grand = parent.get_parent()
+            return (grand.specific if grand else None), specific
+        if isinstance(specific, CategoryPage):
+            return specific, None
+        return None, None
+
     def course_card_payload(self, course: CoursePage) -> dict:
         from education.services.teachers import teacher_card_payload
 
+        category, subcategory = self.course_folders(course)
         return {
             "id": course.id,
             "title": course.title,
@@ -70,6 +83,12 @@ class CourseCatalogService:
             "thumbnail_url": course.thumbnail_url(),
             "level": course.level or CoursePage.Level.BASIC,
             "teacher": teacher_card_payload(course.author),
+            "category_id": getattr(category, "id", None),
+            "category_title": getattr(category, "title", "") or "",
+            "subcategory_id": getattr(subcategory, "id", None),
+            "subcategory_title": getattr(subcategory, "title", "") or "",
+            "chapter_count": course.get_children().type(ModulePage).live().public().count(),
+            "lesson_count": course.get_descendants().type(LessonPage).live().public().count(),
         }
 
     def courses_by_author(self, user_id: int):

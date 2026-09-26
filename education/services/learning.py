@@ -257,12 +257,26 @@ class LearningService:
 
     def teacher_page(self, user_id: int):
         from django.contrib.auth import get_user_model
+        from cms.services.reports import TeacherReportService
         from education.services.teachers import teacher_profile_payload
 
         user = get_object_or_404(get_user_model(), pk=user_id)
         profile, _created = TeacherProfile.objects.get_or_create(user=user)
         payload = teacher_profile_payload(user, profile)
-        payload["courses"] = [
-            catalog.course_card_payload(course) for course in catalog.courses_by_author(user_id)
-        ]
+        published = list(catalog.courses_by_author(user_id))
+        reports = TeacherReportService()
+        students: set[int] = set()
+        like_total = 0
+        courses = []
+        for course in published:
+            card = catalog.course_card_payload(course)
+            course_students = reports.student_ids_for(course)
+            card["student_count"] = len(course_students)
+            students.update(course_students)
+            like_total += card.get("like_count") or 0
+            courses.append(card)
+        payload["courses"] = courses
+        payload["course_count"] = len(courses)
+        payload["student_count"] = len(students)
+        payload["like_count"] = like_total
         return payload

@@ -19,7 +19,36 @@ export type EduCourseCard = {
   thumbnail_url?: string;
   level?: CourseLevel | string;
   teacher?: EduTeacherCard | null;
+  category_id?: number | null;
+  category_title?: string;
+  subcategory_id?: number | null;
+  subcategory_title?: string;
+  chapter_count?: number;
+  lesson_count?: number;
+  student_count?: number;
 };
+
+export function courseCategories(courses: EduCourseCard[]): { id: number; title: string }[] {
+  const seen = new Map<number, string>();
+  courses.forEach((course) => {
+    if (course.category_id && course.category_title && !seen.has(course.category_id)) {
+      seen.set(course.category_id, course.category_title);
+    }
+  });
+  return [...seen.entries()].map(([id, title]) => ({ id, title }));
+}
+
+export function filterCourses(
+  courses: EduCourseCard[],
+  level: CourseLevel | "",
+  categoryId: number | null,
+): EduCourseCard[] {
+  return courses.filter((course) => {
+    if (level && courseLevel(course.level) !== level) return false;
+    if (categoryId && course.category_id !== categoryId) return false;
+    return true;
+  });
+}
 
 export function courseLevel(level?: string): CourseLevel {
   if (level === "advanced" || level === "professional") return level;
@@ -98,6 +127,9 @@ export type EduTeacher = {
   instagram_url?: string;
   projects?: string[];
   projects_text?: string;
+  course_count?: number;
+  student_count?: number;
+  like_count?: number;
   courses: EduCourseCard[];
 };
 
