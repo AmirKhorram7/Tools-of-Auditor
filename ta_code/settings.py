@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "meeting_minutes_servicesclear.apps.MeetingMinutesServicesclearConfig",
     "cms",
     "education",
+    "daybook_services.apps.DaybookServicesConfig",
 ]
 
 MIDDLEWARE = [

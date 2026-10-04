@@ -14,6 +14,7 @@ const TILE: Record<
   minutes: { from: "#1a9aaa", to: "#007185" },
   docs: { from: "#37475a", to: "#131a22" },
   learn: { from: "#ff9900", to: "#c7511f" },
+  daybook: { from: "#22a06b", to: "#166534" },
   contact: { from: "#2a8f9c", to: "#0f5f6c" },
   profile: { from: "#4a5d73", to: "#232f3e" },
   plan: { from: "#6b7c8f", to: "#37475a" },
@@ -106,6 +107,18 @@ function Glyph({ name, className }: { name: Mark; className?: string }) {
           d="M11.6 22.2v7.6c0 .6.3 1.1.8 1.4 3.4 2 7.2 3 11.6 3s8.2-1 11.6-3c.5-.3.8-.8.8-1.4v-7.6L24 28.2 11.6 22.2Z"
         />
         <path d="M36.6 20.4v8.8" stroke="#fff8ec" strokeWidth="2" strokeLinecap="round" />
+      </Tile>
+    );
+  }
+  if (name === "daybook") {
+    return (
+      <Tile name={name} className={className}>
+        <rect x="11" y="13.2" width="26" height="23.6" rx="4" fill="#fff" />
+        <rect x="11" y="13.2" width="26" height="7" rx="3.5" fill="#ff9900" />
+        <rect x="11" y="17.2" width="26" height="3" fill="#ff9900" />
+        <rect x="16.4" y="10.4" width="2.6" height="6.4" rx="1.3" fill="#fff" />
+        <rect x="29" y="10.4" width="2.6" height="6.4" rx="1.3" fill="#fff" />
+        <path d="m18.2 28.4 3.6 3.6 7.6-7.6" stroke="#166534" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
       </Tile>
     );
   }
