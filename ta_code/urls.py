@@ -21,6 +21,8 @@ urlpatterns = [
     path("api/v1/minutes/", include("meeting_minutes_servicesclear.api.v1.urls")),
     path("api/v1/education/", include("education.api.v1.urls")),
     path("api/v1/daybook/", include("daybook_services.api.v1.urls")),
+    path("api/v1/subscription/", include("subscription_services.api.v1.urls")),
+    path("api/v1/reminders/", include("reminder_services.api.v1.urls")),
 ]
 
 if settings.ENABLE_API_DOCS:

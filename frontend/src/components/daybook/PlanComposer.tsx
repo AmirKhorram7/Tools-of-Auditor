@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import ColorDots from "@/components/daybook/ColorDots";
 import DayDateField from "@/components/daybook/DayDateField";
+import ReminderPicker from "@/components/reminders/ReminderPicker";
 import { Alert, Button, cx, Modal } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
+import { toReminderBody, type ReminderDraft } from "@/lib/reminders";
 import {
   addDays,
   DAY_COLORS,
@@ -47,6 +49,7 @@ export default function PlanComposer({
   const [custom, setCustom] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reminder, setReminder] = useState<ReminderDraft | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const lineRef = useRef<HTMLInputElement>(null);
   const editing = draft?.plan;
@@ -61,6 +64,7 @@ export default function PlanComposer({
     setItems([]);
     setLine("");
     setCustom(false);
+    setReminder(null);
     setError(null);
     window.setTimeout(() => titleRef.current?.focus(), 30);
   }, [draft]);
@@ -103,6 +107,16 @@ export default function PlanComposer({
             method: "POST",
             body: { title, start_date: start, end_date: end, color, item_titles: pending },
           });
+      if (reminder && !editing) {
+        try {
+          await apiFetch("/reminders/items/", {
+            method: "POST",
+            body: { target_type: "daybook.plan", target_id: plan.id, ...toReminderBody(reminder) },
+          });
+        } catch (err) {
+          if (!(err instanceof ApiError && err.status === 402)) throw err;
+        }
+      }
       onSaved(plan);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("day.error"));
@@ -268,6 +282,14 @@ export default function PlanComposer({
           <p className="mb-2 text-xs font-medium text-gray-500">{t("day.color")}</p>
           <ColorDots colors={DAY_COLORS} value={color} onChange={setColor} />
         </section>
+
+        <ReminderPicker
+          targetType="daybook.plan"
+          targetId={editing?.id}
+          system={system}
+          draft={reminder}
+          onDraft={setReminder}
+        />
 
         {editing ? (
           <section className="flex flex-wrap gap-2">

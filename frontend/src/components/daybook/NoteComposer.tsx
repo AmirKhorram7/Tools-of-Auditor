@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import ColorDots from "@/components/daybook/ColorDots";
 import DayDateField from "@/components/daybook/DayDateField";
 import NoteEditor from "@/components/daybook/NoteEditor";
+import ReminderPicker from "@/components/reminders/ReminderPicker";
 import { Alert, Button, cx, Modal } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
+import { toReminderBody, type ReminderDraft } from "@/lib/reminders";
 import {
   DAY_COLORS,
   DEFAULT_DAY_COLOR,
@@ -38,6 +40,7 @@ export default function NoteComposer({
   const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reminder, setReminder] = useState<ReminderDraft | null>(null);
   const editing = draft?.note;
 
   useEffect(() => {
@@ -47,6 +50,7 @@ export default function NoteComposer({
     setBody(draft.note?.body ?? "");
     setColor(draft.note?.color ?? DEFAULT_DAY_COLOR);
     setPinned(draft.note?.is_pinned ?? false);
+    setReminder(null);
     setError(null);
   }, [draft]);
 
@@ -59,6 +63,16 @@ export default function NoteComposer({
       const note = editing
         ? await apiFetch<DayNote>(`/daybook/notes/${editing.id}/`, { method: "PATCH", body: payload })
         : await apiFetch<DayNote>("/daybook/notes/", { method: "POST", body: payload });
+      if (reminder && !editing) {
+        try {
+          await apiFetch("/reminders/items/", {
+            method: "POST",
+            body: { target_type: "daybook.note", target_id: note.id, ...toReminderBody(reminder) },
+          });
+        } catch (err) {
+          if (!(err instanceof ApiError && err.status === 402)) throw err;
+        }
+      }
       onSaved(note);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("day.error"));
@@ -121,6 +135,14 @@ export default function NoteComposer({
             </div>
           </div>
         </div>
+
+        <ReminderPicker
+          targetType="daybook.note"
+          targetId={editing?.id}
+          system={system}
+          draft={reminder}
+          onDraft={setReminder}
+        />
 
         {error ? <Alert>{error}</Alert> : null}
 

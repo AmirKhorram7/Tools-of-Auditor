@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DayPanel from "@/components/daybook/DayPanel";
 import MonthGrid from "@/components/daybook/MonthGrid";
 import NoteComposer, { type NoteDraft } from "@/components/daybook/NoteComposer";
 import PlanComposer, { type PlanDraft } from "@/components/daybook/PlanComposer";
+import ReminderSettings from "@/components/reminders/ReminderSettings";
 import WeekGrid from "@/components/daybook/WeekGrid";
 import { Alert, cx, PageLoader, Spinner } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
@@ -87,6 +88,8 @@ export default function DaybookPage() {
   const [error, setError] = useState<string | null>(null);
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const openedFromQuery = useRef(false);
 
   const today = todayIso();
   const system: CalendarSystem = settings?.calendar_system ?? "jalali";
@@ -121,6 +124,38 @@ export default function DaybookPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (openedFromQuery.current || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const planId = Number(params.get("plan") || 0);
+    const noteId = Number(params.get("note") || 0);
+    if (!planId && !noteId) return;
+    openedFromQuery.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (planId > 0) {
+          const plan = await apiFetch<Plan>(`/daybook/plans/${planId}/`);
+          if (cancelled) return;
+          const iso = plan.end_date || plan.start_date;
+          setCursor(iso);
+          setPlanDraft({ date: iso, plan });
+        } else {
+          const note = await apiFetch<DayNote>(`/daybook/notes/${noteId}/`);
+          if (cancelled) return;
+          setCursor(note.date);
+          setNoteDraft({ date: note.date, note });
+        }
+        window.history.replaceState(null, "", "/daybook");
+      } catch {
+        openedFromQuery.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const buckets = useMemo(() => bucketByDay(agenda, visible), [agenda, visible]);
   const selectedBucket = useMemo(
@@ -222,14 +257,33 @@ export default function DaybookPage() {
           <h1 className="text-[28px] font-bold leading-10 text-navy-900">{t("day.title")}</h1>
           <p className="text-sm text-gray-500">{t("day.subtitle")}</p>
         </div>
-        <Segmented<CalendarSystem>
-          value={system}
-          onChange={(value) => saveSettings({ calendar_system: value })}
-          options={[
-            { value: "jalali", label: t("day.jalali") },
-            { value: "gregorian", label: t("day.gregorian") },
-          ]}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            title={t("rem.settings")}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 px-3 py-1.5 text-sm font-medium text-navy-800 transition hover:border-navy-700 hover:bg-surface"
+          >
+            <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden>
+              <circle cx="10" cy="10" r="2.2" stroke="currentColor" strokeWidth="1.6" />
+              <path
+                d="M8.2 2.8h3.6l.5 1.7 1.6.7 1.6-1 2.5 2.5-1 1.6.7 1.6 1.7.5v3.6l-1.7.5-.7 1.6 1 1.6-2.5 2.5-1.6-1-1.6.7-.5 1.7H8.2l-.5-1.7-1.6-.7-1.6 1L2 14.4l1-1.6-.7-1.6L.6 10.7V7.1l1.7-.5.7-1.6-1-1.6L4.5 1l1.6 1 .6-.7.5-1.5Z"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {t("rem.settingsShort")}
+          </button>
+          <Segmented<CalendarSystem>
+            value={system}
+            onChange={(value) => saveSettings({ calendar_system: value })}
+            options={[
+              { value: "jalali", label: t("day.jalali") },
+              { value: "gregorian", label: t("day.gregorian") },
+            ]}
+          />
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2.5">
@@ -363,6 +417,7 @@ export default function DaybookPage() {
           load();
         }}
       />
+      <ReminderSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} system={system} />
     </div>
   );
 }

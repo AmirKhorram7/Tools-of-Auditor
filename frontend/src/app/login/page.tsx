@@ -22,6 +22,24 @@ const RESEND_SECONDS = 120;
 
 type Mode = "otp" | "password";
 
+function safeNextPath(raw: string | null): string | null {
+  if (!raw) return null;
+  let path = raw;
+  try {
+    path = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("://")) return null;
+  if (path.startsWith("/login")) return null;
+  return path;
+}
+
+function nextAfterLogin(): string | null {
+  if (typeof window === "undefined") return null;
+  return safeNextPath(new URLSearchParams(window.location.search).get("next"));
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { ready, isAuthenticated, signIn } = useAuth();
@@ -38,7 +56,7 @@ export default function LoginPage() {
   const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
-    if (ready && isAuthenticated) router.replace("/dashboard");
+    if (ready && isAuthenticated) router.replace(nextAfterLogin() || "/dashboard");
   }, [ready, isAuthenticated, router]);
 
   useEffect(() => {
@@ -65,7 +83,7 @@ export default function LoginPage() {
       router.replace("/profile");
       return;
     }
-    router.replace("/dashboard");
+    router.replace(nextAfterLogin() || "/dashboard");
   };
 
   const sendOtp = async () => {

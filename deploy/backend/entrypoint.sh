@@ -28,8 +28,15 @@ else:
     raise SystemExit(f"Database did not become ready in time: {last_error}")
 PY
 
-echo "[entrypoint] applying migrations..."
-python manage.py migrate --noinput
+if [ "${SKIP_STARTUP_MIGRATE:-}" != "1" ]; then
+  echo "[entrypoint] applying migrations..."
+  python manage.py migrate --noinput
+fi
+
+if [ "$#" -gt 0 ]; then
+  echo "[entrypoint] running: $*"
+  exec "$@"
+fi
 
 echo "[entrypoint] preparing Wagtail course root..."
 python manage.py ensure_course_root

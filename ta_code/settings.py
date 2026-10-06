@@ -73,6 +73,8 @@ INSTALLED_APPS = [
     "cms",
     "education",
     "daybook_services.apps.DaybookServicesConfig",
+    "subscription_services.apps.SubscriptionServicesConfig",
+    "reminder_services.apps.ReminderServicesConfig",
 ]
 
 MIDDLEWARE = [
@@ -268,7 +270,16 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_HOST = config("EMAIL_HOST", default="")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+    EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+    EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+    EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@tauditor.ir")
 
 LOGGING = {
     "version": 1,
@@ -289,6 +300,7 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "reminder_services": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
 
@@ -296,6 +308,18 @@ LOGGING = {
 SMS_IR_API_URL = config("SMS_IR_API_URL", default="https://api.sms.ir/v1/send/verify")
 SMS_IR_API_KEY = config("SMS_IR_API_KEY", default="")
 SMS_IR_TEMPLATE_ID = config("SMS_IR_TEMPLATE_ID", default=0, cast=int)
+SMS_IR_REMINDER_TEMPLATE_ID = config("SMS_IR_REMINDER_TEMPLATE_ID", default="0") or "0"
+SMS_IR_REMINDER_TEMPLATE_ID = int(SMS_IR_REMINDER_TEMPLATE_ID)
+SMS_IR_LINE_NUMBER = config("SMS_IR_LINE_NUMBER", default="")
+SMS_IR_BULK_URL = config("SMS_IR_BULK_URL", default="https://api.sms.ir/v1/send/bulk")
+
+# Reminder channels. Unset providers log the message instead when dry-run is on.
+TELEGRAM_BOT_TOKEN = config("TELEGRAM_BOT_TOKEN", default="")
+WHATSAPP_TOKEN = config("WHATSAPP_TOKEN", default="")
+WHATSAPP_PHONE_NUMBER_ID = config("WHATSAPP_PHONE_NUMBER_ID", default="")
+REMINDER_DRY_RUN = config("REMINDER_DRY_RUN", default=DEBUG, cast=bool)
+# Public origin for plan/note links in email, Telegram and WhatsApp (no trailing slash).
+SITE_URL = (config("SITE_URL", default="") or config("NEXT_PUBLIC_SITE_URL", default="http://localhost:8080")).rstrip("/")
 
 # Shahkar / match-info (optional; used later for identity checks)
 SHAHKAR_API_URL = config("SHAHKAR_API_URL", default="https://s.api.ir/api/sw1/ShahkarLite")

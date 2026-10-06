@@ -192,22 +192,24 @@ export function Modal({
       />
       <div
         className={cx(
-          "relative z-10 w-full overflow-visible rounded-xl bg-white p-5 shadow-xl max-md:max-h-[85dvh] max-md:overflow-y-auto",
+          "relative z-10 flex w-full max-h-[min(90dvh,760px)] flex-col overflow-hidden rounded-2xl bg-white shadow-xl",
           className ?? "max-w-lg",
         )}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-ink">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <h2 className="text-base font-semibold text-navy-900">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 transition hover:bg-surface hover:text-navy-800"
+            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-surface hover:text-navy-800"
             aria-label={t("common.close")}
           >
             ✕
           </button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-4">
+          {children}
+        </div>
       </div>
     </div>
   );

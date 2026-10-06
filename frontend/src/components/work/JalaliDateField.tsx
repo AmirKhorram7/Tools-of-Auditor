@@ -146,7 +146,7 @@ export default function JalaliDateField({
       </button>
 
       {open && (
-        <div className="absolute bottom-full z-[70] mb-1 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+        <div className="absolute top-full z-[70] mt-1 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
           <div className="mb-2 grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-gray-500">{t("work.year")}</span>

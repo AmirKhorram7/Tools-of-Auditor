@@ -20,8 +20,11 @@ export default function AppLayout({
   const showFooter = pathname === "/dashboard" || pathname === "/contact";
 
   useEffect(() => {
-    if (ready && !isAuthenticated) router.replace("/login");
-  }, [ready, isAuthenticated, router]);
+    if (ready && !isAuthenticated) {
+      const next = `${pathname}${typeof window !== "undefined" ? window.location.search : ""}`;
+      router.replace(`/login?next=${encodeURIComponent(next)}`);
+    }
+  }, [ready, isAuthenticated, router, pathname]);
 
   if (!ready || !isAuthenticated) return <PageLoader />;
 

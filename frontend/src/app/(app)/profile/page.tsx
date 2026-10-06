@@ -21,6 +21,7 @@ import {
 } from "@/lib/characters";
 import { useI18n } from "@/lib/i18n";
 import type { EduMe } from "@/lib/education";
+import type { SubscriptionMe } from "@/lib/subscription";
 import type { Profile } from "@/lib/types";
 import {
   notificationHref,
@@ -51,7 +52,7 @@ const emptyForm: FormState = {
 
 export default function ProfilePage() {
   const { profile, setProfile, refreshProfile } = useAuth();
-  const { t, n } = useI18n();
+  const { t, n, locale } = useI18n();
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -76,6 +77,7 @@ export default function ProfilePage() {
   const [activity, setActivity] = useState<WorkTimelineItem[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [sideError, setSideError] = useState<string | null>(null);
+  const [subMe, setSubMe] = useState<SubscriptionMe | null>(null);
 
   useEffect(() => {
     if (!profile) {
@@ -129,6 +131,9 @@ export default function ProfilePage() {
     apiFetch<EduMe>("/education/me/")
       .then(setEduMe)
       .catch(() => setEduMe(null));
+    apiFetch<SubscriptionMe>("/subscription/me/")
+      .then(setSubMe)
+      .catch(() => setSubMe(null));
   }, []);
 
   const update = (key: keyof FormState, value: string) =>
@@ -405,6 +410,27 @@ export default function ProfilePage() {
 
       {tab === "info" && (
         <>
+
+      <Link href="/subscription" className="block">
+        <Card className={subMe?.is_pro ? "border-green-300" : "border-brand-400"}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold tracking-widest text-gray-400">{t("pro.status")}</p>
+              <p className="mt-0.5 text-sm font-bold text-navy-900">
+                {subMe?.is_pro
+                  ? t("pro.activeUntil", {
+                      date: subMe.pro_until
+                        ? new Date(subMe.pro_until).toLocaleDateString(locale === "fa" ? "fa-IR" : "en-GB")
+                        : "",
+                    })
+                  : t("pro.freeNow")}
+              </p>
+            </div>
+            {subMe?.is_pro ? <Badge tone="green">Pro</Badge> : <Badge tone="amber">Free</Badge>}
+            <span className="text-xs font-medium text-link">{t("pro.manage")}</span>
+          </div>
+        </Card>
+      </Link>
 
       <Card>
         <div className="flex flex-wrap items-center gap-4">

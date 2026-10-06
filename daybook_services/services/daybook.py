@@ -6,7 +6,11 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from daybook_services.models import DEFAULT_COLOR, Daybook, DayNote, Plan, PlanItem
+from daybook_services.reminders import NOTE, PLAN
 from daybook_services.services.html import plain_text, sanitize_html
+from reminder_services.services.reminders import ReminderService
+
+reminder_service = ReminderService()
 
 MAX_RANGE_DAYS = 120
 MAX_PLAN_DAYS = 366
@@ -92,11 +96,13 @@ class DaybookService:
         if "is_pinned" in fields:
             note.is_pinned = fields["is_pinned"]
         note.save()
+        reminder_service.target_changed(NOTE, note.pk)
         return note
 
     def delete_note(self, *, user, note: DayNote) -> None:
         if note.owner_id != user.id:
             raise NotFound("Note not found.")
+        reminder_service.target_deleted(NOTE, note.pk)
         note.delete()
 
     # ---- plans ----
@@ -181,6 +187,10 @@ class DaybookService:
         if "status" in fields:
             self._set_status(plan, fields["status"])
         plan.save()
+        if plan.status == Plan.Status.CANCELLED:
+            reminder_service.target_deleted(PLAN, plan.pk)
+        else:
+            reminder_service.target_changed(PLAN, plan.pk)
         return self.get_plan(user, plan.pk)
 
     def _set_status(self, plan: Plan, status: str) -> None:
@@ -198,7 +208,9 @@ class DaybookService:
     def delete_plan(self, *, user, plan: Plan) -> None:
         if plan.owner_id != user.id:
             raise NotFound("Plan not found.")
+        plan_id = plan.pk
         plan.delete()
+        reminder_service.target_deleted(PLAN, plan_id)
 
     def _sync_status(self, plan: Plan) -> None:
         """Checking the last item closes the plan; unchecking one reopens it."""
