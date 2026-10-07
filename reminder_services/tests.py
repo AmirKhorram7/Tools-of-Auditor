@@ -1,6 +1,7 @@
 """Smoke + security tests for /api/v1/reminders/ with daybook targets."""
 
 from datetime import date, datetime, time, timedelta
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import override_settings
@@ -243,3 +244,85 @@ class ReminderTests(APITestCase):
             status.HTTP_404_NOT_FOUND,
         )
         self.assertEqual(self.free_c.delete(f"{RM}/groups/{group['id']}/").status_code, status.HTTP_404_NOT_FOUND)
+
+
+@override_settings(
+    REMINDER_DRY_RUN=False,
+    SMS_IR_API_KEY="test-sms-key",
+    SMS_IR_REMINDER_TEMPLATE_ID=377268,
+    SMS_IR_API_URL="https://api.sms.ir/v1/send/verify",
+)
+class ReminderSmsOnTimeTests(APITestCase):
+    """SMS goes out only when send_at is due, via the reminder Verify template."""
+
+    def setUp(self):
+        self.pro = User.objects.create_user(
+            phone_number="09125550001", password="Rem#2026", first_name="علی", last_name="رضایی"
+        )
+        staff = User.objects.create_user(phone_number="09125550009", password="Rem#2026", is_staff=True)
+        subs = SubscriptionService()
+        order = subs.checkout(user=self.pro, cycle="monthly")
+        subs.activate(subscription_id=order.pk, actor=staff)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(self.pro).access_token}")
+        self.soon = date.today() + timedelta(days=5)
+
+    def _ok_sms(self):
+        res = MagicMock()
+        res.status_code = 200
+        res.json.return_value = {"status": 1}
+        return res
+
+    def test_sms_waits_until_send_at_then_uses_template_377268(self):
+        plan = self.client.post(
+            f"{DB}/plans/",
+            {
+                "title": "بستن حساب‌ها",
+                "start_date": date.today().isoformat(),
+                "end_date": self.soon.isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(plan.status_code, status.HTTP_201_CREATED, plan.data)
+        send_at = (timezone.now() + timedelta(minutes=12)).replace(microsecond=0)
+        rem = self.client.post(
+            f"{RM}/items/",
+            {
+                "target_type": "daybook.plan",
+                "target_id": plan.data["id"],
+                "channels": ["sms"],
+                "mode": "at",
+                "fixed_at": send_at.isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(rem.status_code, status.HTTP_201_CREATED, rem.data)
+        row = Reminder.objects.get(pk=rem.data["id"])
+        self.assertEqual(row.send_at, send_at)
+        self.assertEqual(row.status, "scheduled")
+
+        with patch("reminder_services.services.channels.requests.post") as post:
+            early = ReminderService().send_due(now=send_at - timedelta(seconds=1))
+            self.assertEqual(early, 0)
+            post.assert_not_called()
+            row.refresh_from_db()
+            self.assertEqual(row.status, "scheduled")
+
+            post.return_value = self._ok_sms()
+            due = ReminderService().send_due(now=send_at + timedelta(seconds=1))
+            self.assertEqual(due, 1)
+            post.assert_called_once()
+            _args, kwargs = post.call_args
+            self.assertEqual(_args[0], "https://api.sms.ir/v1/send/verify")
+            payload = kwargs["json"]
+            self.assertEqual(payload["mobile"], "09125550001")
+            self.assertEqual(payload["templateId"], 377268)
+            params = {item["name"]: item["value"] for item in payload["parameters"]}
+            self.assertEqual(set(params), {"NAME", "TITLE", "PERIOD"})
+            self.assertEqual(params["NAME"], "علی رضایی")
+            self.assertEqual(params["TITLE"], "بستن حساب‌ها")
+            self.assertTrue(params["PERIOD"])
+            self.assertEqual(kwargs["headers"]["x-api-key"], "test-sms-key")
+
+        row.refresh_from_db()
+        self.assertEqual(row.status, "sent")
+        self.assertEqual(row.results, {"sms": "sent"})
