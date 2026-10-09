@@ -9,6 +9,7 @@ const SERVICES = [
   { href: "/work", labelKey: "nav.work" as const },
   { href: "/minutes", labelKey: "nav.minutes" as const },
   { href: "/explanation", labelKey: "nav.explanation" as const },
+  { href: "/about", labelKey: "nav.about" as const },
   { href: "/contact", labelKey: "nav.contact" as const },
 ];
 

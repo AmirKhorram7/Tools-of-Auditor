@@ -156,6 +156,7 @@ export default function TopBar() {
           {navLink("/minutes", t("nav.minutes"), pathname.startsWith("/minutes"))}
           {navLink("/education", t("nav.education"), pathname.startsWith("/education"))}
           {navLink("/daybook", t("nav.daybook"), pathname.startsWith("/daybook"))}
+          {navLink("/about", t("nav.about"), pathname.startsWith("/about"))}
           {navLink("/contact", t("nav.contact"), pathname.startsWith("/contact"))}
           {navLink("/profile", t("nav.profile"), pathname === "/profile")}
         </nav>
