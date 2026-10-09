@@ -19,6 +19,7 @@ class Target:
     """Date that `before` mode counts back from. None → only `at` mode works."""
     owner_name: str = ""
     period: str = ""
+    url: str = ""
 
 
 Resolver = Callable[[object, int], Optional[Target]]

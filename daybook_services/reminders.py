@@ -30,7 +30,7 @@ def _period(start, end) -> str:
 
 
 def _item_url(kind: str, pk: int) -> str:
-    """Absolute daybook URL. Empty when SITE_URL is unset. Not used on SMS."""
+    """Absolute daybook URL. Empty when SITE_URL is unset."""
     base = (getattr(settings, "SITE_URL", "") or "").rstrip("/")
     if not base:
         return ""
@@ -49,16 +49,18 @@ def plan_target(user, plan_id):
         return None
     name = _person_name(user)
     period = _period(plan.start_date, plan.end_date)
+    url = _item_url("plan", plan.pk)
     left = plan.items.filter(is_done=False).count()
     lines = [f"{name} عزیز", f"برنامه: {plan.title}", f"بازه: {period}"]
     if left:
         lines.append(f"{fa_digits(left)} مورد هنوز باز است.")
     return targets.Target(
         title=plan.title,
-        message=_with_link(lines, _item_url("plan", plan.pk)),
+        message=_with_link(lines, url),
         due=plan.end_date,
         owner_name=name,
         period=period,
+        url=url,
     )
 
 
@@ -70,15 +72,17 @@ def note_target(user, note_id):
     period = format_fa(note.date)
     heading = note.title or "یادداشت"
     body = plain_text(note.body)
+    url = _item_url("note", note.pk)
     lines = [f"{name} عزیز", heading, period]
     if body:
         lines.append(body)
     return targets.Target(
         title=heading,
-        message=_with_link(lines, _item_url("note", note.pk)),
+        message=_with_link(lines, url),
         due=note.date,
         owner_name=name,
         period=period,
+        url=url,
     )
 
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { jalaaliMonthLength, toGregorian, toJalaali } from "jalaali-js";
 
 import { cx } from "@/components/ui";
@@ -59,7 +60,10 @@ export default function JalaliDateField({
   const selected = parseIso(value);
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState({ jy: today.jy, jm: today.jm });
+  const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const POP_W = 320;
   const yearMin = kind === "birth" ? today.jy - 100 : today.jy - 20;
   const yearMax = kind === "birth" ? today.jy - 5 : today.jy + 5;
   const years = useMemo(() => {
@@ -77,11 +81,42 @@ export default function JalaliDateField({
   useEffect(() => {
     if (!open) return;
     const onDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const node = event.target as Node;
+      if (rootRef.current?.contains(node) || popRef.current?.contains(node)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+
+  const placePop = () => {
+    const btn = rootRef.current?.querySelector("button");
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const popH = popRef.current?.offsetHeight || 348;
+    const maxLeft = window.innerWidth - POP_W - 8;
+    const left = r.left + POP_W > window.innerWidth - 8 ? Math.max(8, r.right - POP_W) : Math.min(Math.max(8, r.left), maxLeft);
+    const below = r.bottom + 6;
+    const above = r.top - popH - 6;
+    const fitsBelow = below + popH <= window.innerHeight - 8;
+    const top = fitsBelow || above < 8 ? Math.min(below, Math.max(8, window.innerHeight - popH - 8)) : above;
+    setPlace({ top, left });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPlace(null);
+      return;
+    }
+    placePop();
+    const onWin = () => placePop();
+    window.addEventListener("resize", onWin);
+    window.addEventListener("scroll", onWin, true);
+    return () => {
+      window.removeEventListener("resize", onWin);
+      window.removeEventListener("scroll", onWin, true);
+    };
+  }, [open, cursor]);
 
   const days = useMemo(() => {
     const length = jalaaliMonthLength(cursor.jy, cursor.jm);
@@ -134,7 +169,10 @@ export default function JalaliDateField({
         type="button"
         onClick={() => {
           setCursor(openingCursor());
-          setOpen((current) => !current);
+          setOpen((current) => {
+            if (!current) rootRef.current?.scrollIntoView({ block: "center", inline: "nearest" });
+            return !current;
+          });
         }}
         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-start text-sm text-ink outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
       >
@@ -145,8 +183,13 @@ export default function JalaliDateField({
         )}
       </button>
 
-      {open && (
-        <div className="absolute top-full z-[70] mt-1 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+      {open &&
+        createPortal(
+        <div
+          ref={popRef}
+          style={{ top: place?.top ?? -9999, left: place?.left ?? 8, width: POP_W }}
+          className="fixed z-[80] rounded-xl border border-gray-200 bg-white p-3 shadow-xl"
+        >
           <div className="mb-2 grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-gray-500">{t("work.year")}</span>
@@ -262,7 +305,8 @@ export default function JalaliDateField({
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

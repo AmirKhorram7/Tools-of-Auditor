@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from reminder_services import targets
+from reminder_services.jalali import format_fa
 from reminder_services.models import Channel, Mode, Reminder, ReminderContact, ReminderGroup
 from reminder_services.services import channels as delivery
 from subscription_services.services.subscriptions import SubscriptionService
@@ -242,11 +243,13 @@ class ReminderService:
             subject = " · ".join(part for part in (target.owner_name, target.title) if part)
             return delivery.send_email(address, subject or target.title, target.message)
         if channel == Channel.SMS:
+            due = format_fa(target.due) if target.due else target.period
             return delivery.send_sms(
                 address,
                 name=target.owner_name,
                 title=target.title,
-                period=target.period,
+                period=due,
+                link=getattr(target, "url", "") or "",
             )
         if channel == Channel.TELEGRAM:
             return delivery.send_telegram(address, target.message)

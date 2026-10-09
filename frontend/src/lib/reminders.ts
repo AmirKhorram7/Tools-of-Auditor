@@ -67,6 +67,8 @@ export function emptyDraft(): ReminderDraft {
 
 export function timeHm(value: string | null | undefined): string {
   if (!value) return "09:00";
+  const stamp = value.indexOf("T");
+  if (stamp >= 0) return value.slice(stamp + 1, stamp + 6);
   return value.slice(0, 5);
 }
 

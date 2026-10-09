@@ -251,6 +251,7 @@ class ReminderTests(APITestCase):
     SMS_IR_API_KEY="test-sms-key",
     SMS_IR_REMINDER_TEMPLATE_ID=377268,
     SMS_IR_API_URL="https://api.sms.ir/v1/send/verify",
+    SITE_URL="https://tauditor.test",
 )
 class ReminderSmsOnTimeTests(APITestCase):
     """SMS goes out only when send_at is due, via the reminder Verify template."""
@@ -317,10 +318,11 @@ class ReminderSmsOnTimeTests(APITestCase):
             self.assertEqual(payload["mobile"], "09125550001")
             self.assertEqual(payload["templateId"], 377268)
             params = {item["name"]: item["value"] for item in payload["parameters"]}
-            self.assertEqual(set(params), {"NAME", "TITLE", "PERIOD"})
+            self.assertEqual(set(params), {"NAME", "TITLE", "PERIOD", "LINK"})
             self.assertEqual(params["NAME"], "علی رضایی")
             self.assertEqual(params["TITLE"], "بستن حساب‌ها")
             self.assertTrue(params["PERIOD"])
+            self.assertTrue(params["LINK"].startswith("https://tauditor.test/daybook?plan="))
             self.assertEqual(kwargs["headers"]["x-api-key"], "test-sms-key")
 
         row.refresh_from_db()

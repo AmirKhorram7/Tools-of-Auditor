@@ -14,10 +14,11 @@ from reminder_services.models import Channel
 
 log = logging.getLogger("reminder_services")
 TIMEOUT = 10
-# sms.ir Verify slots are short. Email / Telegram / WhatsApp keep the full text.
-SMS_NAME_MAX = 20
-SMS_TITLE_MAX = 25
-SMS_PERIOD_MAX = 30
+# sms.ir Verify slots. Email / Telegram / WhatsApp keep the full text.
+SMS_NAME_MAX = 32
+SMS_TITLE_MAX = 70
+SMS_PERIOD_MAX = 40
+SMS_LINK_MAX = 90
 # Provider hard cap only — not a product limit.
 TELEGRAM_WHATSAPP_MAX = 4096
 
@@ -84,12 +85,21 @@ def clip_message(text: str, limit: int) -> str:
     return _trim(text, limit)
 
 
-def sms_values(*, name: str = "", title: str = "", period: str = "") -> dict[str, str]:
-    """Short fields for the Verify template. Do not use these on other channels."""
+def _sms_link(url: str) -> str:
+    text = (url or "").strip()
+    if len(text) <= SMS_LINK_MAX:
+        return text
+    base = (getattr(settings, "SITE_URL", "") or "").rstrip("/")
+    return f"{base}/daybook" if base else text[:SMS_LINK_MAX]
+
+
+def sms_values(*, name: str = "", title: str = "", period: str = "", link: str = "") -> dict[str, str]:
+    """Fields for the Verify template. Do not use these on other channels."""
     return {
         "NAME": _clip(name, SMS_NAME_MAX),
         "TITLE": _clip(title, SMS_TITLE_MAX),
         "PERIOD": _clip(period, SMS_PERIOD_MAX),
+        "LINK": _sms_link(link),
     }
 
 
@@ -103,10 +113,10 @@ def send_email(to: str, subject: str, text: str) -> tuple[bool, str]:
         return False, str(exc)[:200]
 
 
-def send_sms(to: str, *, name: str = "", title: str = "", period: str = "") -> tuple[bool, str]:
-    """sms.ir Verify. Template variables must be named NAME, TITLE, PERIOD."""
-    fields = sms_values(name=name, title=title, period=period)
-    summary = f"{fields['NAME']} | {fields['TITLE']} | {fields['PERIOD']}"
+def send_sms(to: str, *, name: str = "", title: str = "", period: str = "", link: str = "") -> tuple[bool, str]:
+    """sms.ir Verify. Template variables: NAME, TITLE, PERIOD, LINK."""
+    fields = sms_values(name=name, title=title, period=period, link=link)
+    summary = f"{fields['NAME']} | {fields['TITLE']} | {fields['PERIOD']} | {fields['LINK']}"
     if _dry_run():
         return _logged("sms", to, summary)
     key = settings.SMS_IR_API_KEY
@@ -120,6 +130,7 @@ def send_sms(to: str, *, name: str = "", title: str = "", period: str = "") -> t
             {"name": "NAME", "value": fields["NAME"]},
             {"name": "TITLE", "value": fields["TITLE"]},
             {"name": "PERIOD", "value": fields["PERIOD"]},
+            {"name": "LINK", "value": fields["LINK"]},
         ],
     }
     try:

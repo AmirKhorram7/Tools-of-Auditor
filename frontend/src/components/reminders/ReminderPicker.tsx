@@ -7,7 +7,7 @@ import Paywall from "@/components/reminders/Paywall";
 import SpecFields from "@/components/reminders/SpecFields";
 import { cx } from "@/components/ui";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
-import type { CalendarSystem } from "@/lib/daybook";
+import { formatDay, type CalendarSystem } from "@/lib/daybook";
 import {
   emptyDraft,
   timeHm,
@@ -31,7 +31,15 @@ export default function ReminderPicker({
   draft: ReminderDraft | null;
   onDraft: (next: ReminderDraft | null) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+
+  const rowLabel = (row: Reminder) => {
+    const clock = timeHm(row.send_at || row.at_time);
+    const iso = (row.send_at || "").slice(0, 10);
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? formatDay(iso, system, locale) : "";
+    if (row.mode === "at") return t("rem.rowAt", { date: day, time: clock });
+    return t("rem.rowBefore", { days: row.offset_days, time: clock, date: day });
+  };
   const [open, setOpen] = useState(false);
   const [paywall, setPaywall] = useState(false);
   const [groups, setGroups] = useState<ReminderGroup[]>([]);
@@ -100,16 +108,15 @@ export default function ReminderPicker({
 
       {rows.length ? (
         <ul className="mt-2 space-y-1.5">
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <li key={row.id} className="flex items-center gap-2 rounded-lg bg-surface px-2 py-1.5">
-              <span className="flex gap-0.5">
+              <span className="w-4 shrink-0 text-center text-[11px] font-bold text-gray-500">{index + 1}</span>
+              <span className="flex shrink-0 gap-0.5">
                 {row.channels.map((channel) => (
-                  <ChannelIcon key={channel} channel={channel} className="size-4" />
+                  <ChannelIcon key={channel} channel={channel} className="size-5" />
                 ))}
               </span>
-              <span className="min-w-0 flex-1 truncate text-xs text-navy-800">
-                {row.group_name || t(`rem.mode.${row.mode}`)}
-              </span>
+              <span className="min-w-0 flex-1 truncate text-xs text-navy-800">{rowLabel(row)}</span>
               <button type="button" onClick={() => remove(row.id)} className="text-gray-400 hover:text-red-600">
                 ✕
               </button>
