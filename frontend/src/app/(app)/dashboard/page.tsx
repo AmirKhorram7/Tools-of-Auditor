@@ -241,6 +241,18 @@ export default function DashboardPage() {
             blurb={t("dash.explanationBlurb")}
           />
           <ProductTile
+            href="/knowledge"
+            tone="navy"
+            icon={
+              <ServiceGlyph
+                service={APP_SERVICES.find((row) => row.key === "knowledge")!}
+                size="sm"
+              />
+            }
+            title={t("dash.enterKnowledge")}
+            blurb={t("dash.knowledgeBlurb")}
+          />
+          <ProductTile
             href="/education"
             tone="brand"
             icon={

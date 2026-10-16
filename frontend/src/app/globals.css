@@ -415,3 +415,123 @@ html.dark .rich-content a.step-mention:hover {
     touch-action: manipulation;
   }
 }
+
+/* Knowledge themes live on this shell only. Platform dark mode does not restyle it. */
+.km-app {
+  background: var(--km-bg);
+  color: var(--km-text);
+  color-scheme: var(--km-scheme);
+}
+.km-app .km-field {
+  background: var(--km-elevated);
+  color: var(--km-text);
+  border-color: var(--km-border);
+}
+.km-app .km-field::placeholder {
+  color: var(--km-faint);
+}
+.km-app .km-field:focus {
+  border-color: var(--km-accent);
+  outline: none;
+}
+.km-app ::selection {
+  background: var(--km-selection);
+  color: var(--km-text);
+}
+.km-app .km-tool {
+  color: var(--km-muted);
+}
+.km-app .km-tool:hover,
+.km-app .km-tool:focus-visible {
+  color: var(--km-accent);
+}
+.km-app .km-new {
+  color: var(--km-text);
+  transition: transform 140ms ease, color 140ms ease;
+}
+.km-app .km-new:hover,
+.km-app .km-new:focus-visible,
+.km-app .km-new:active {
+  transform: scale(1.045);
+  color: var(--km-accent);
+}
+.km-app .km-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--km-border);
+}
+.km-app .km-resize:hover::after,
+.km-app .km-resize:active::after {
+  width: 2px;
+  background: var(--km-accent);
+}
+.km-sidebar {
+  width: var(--km-side);
+}
+.km-app {
+  --k-red-bg: color-mix(in srgb, var(--k-red) 25%, transparent);
+  --k-orange-bg: color-mix(in srgb, var(--k-orange) 25%, transparent);
+  --k-gold-bg: color-mix(in srgb, var(--k-gold) 25%, transparent);
+  --k-green-bg: color-mix(in srgb, var(--k-green) 25%, transparent);
+  --k-blue-bg: color-mix(in srgb, var(--k-blue) 25%, transparent);
+  --k-purple-bg: color-mix(in srgb, var(--k-purple) 25%, transparent);
+  --k-gray-bg: color-mix(in srgb, var(--k-gray) 20%, transparent);
+}
+.km-app [data-color="red"] { color: var(--k-red); }
+.km-app [data-color="orange"] { color: var(--k-orange); }
+.km-app [data-color="gold"] { color: var(--k-gold); }
+.km-app [data-color="green"] { color: var(--k-green); }
+.km-app [data-color="blue"] { color: var(--k-blue); }
+.km-app [data-color="purple"] { color: var(--k-purple); }
+.km-app [data-color="gray"] { color: var(--k-gray); }
+.km-app [data-highlight="red"] { background: var(--k-red-bg); }
+.km-app [data-highlight="orange"] { background: var(--k-orange-bg); }
+.km-app [data-highlight="gold"] { background: var(--k-gold-bg); }
+.km-app [data-highlight="green"] { background: var(--k-green-bg); }
+.km-app [data-highlight="blue"] { background: var(--k-blue-bg); }
+.km-app [data-highlight="purple"] { background: var(--k-purple-bg); }
+.km-app [data-highlight="gray"] { background: var(--k-gray-bg); }
+.km-editor {
+  min-height: 18rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--km-editor-font, inherit);
+  font-size: var(--km-editor-size, 16px);
+  line-height: var(--km-editor-leading, 1.8);
+  outline: none;
+}
+.km-app [data-callout] {
+  margin: 0.35rem 0;
+  border-radius: 0.75rem;
+  border-inline-start: 3px solid var(--km-border);
+  padding: 0.45rem 0.75rem;
+}
+.km-app [data-callout="red"] { border-inline-start-color: var(--k-red); background: var(--k-red-bg); }
+.km-app [data-callout="orange"] { border-inline-start-color: var(--k-orange); background: var(--k-orange-bg); }
+.km-app [data-callout="gold"] { border-inline-start-color: var(--k-gold); background: var(--k-gold-bg); }
+.km-app [data-callout="green"] { border-inline-start-color: var(--k-green); background: var(--k-green-bg); }
+.km-app [data-callout="blue"] { border-inline-start-color: var(--k-blue); background: var(--k-blue-bg); }
+.km-app [data-callout="purple"] { border-inline-start-color: var(--k-purple); background: var(--k-purple-bg); }
+.km-app [data-callout="gray"] { border-inline-start-color: var(--k-gray); background: var(--k-gray-bg); }
+.km-app [data-label] {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.km-app [data-callout="red"] [data-label] { color: var(--k-red); }
+.km-app [data-callout="orange"] [data-label] { color: var(--k-orange); }
+.km-app [data-callout="gold"] [data-label] { color: var(--k-gold); }
+.km-app [data-callout="green"] [data-label] { color: var(--k-green); }
+.km-app [data-callout="blue"] [data-label] { color: var(--k-blue); }
+.km-app [data-callout="purple"] [data-label] { color: var(--k-purple); }
+.km-app [data-callout="gray"] [data-label] { color: var(--k-gray); }
+@media (max-width: 767px) {
+  .km-sidebar {
+    width: 18rem;
+  }
+}

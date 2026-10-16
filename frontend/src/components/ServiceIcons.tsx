@@ -15,6 +15,7 @@ const TILE: Record<
   docs: { from: "#37475a", to: "#131a22" },
   learn: { from: "#ff9900", to: "#c7511f" },
   daybook: { from: "#22a06b", to: "#166534" },
+  knowledge: { from: "#ffb433", to: "#232f3e" },
   contact: { from: "#2a8f9c", to: "#0f5f6c" },
   profile: { from: "#4a5d73", to: "#232f3e" },
   plan: { from: "#6b7c8f", to: "#37475a" },
@@ -119,6 +120,17 @@ function Glyph({ name, className }: { name: Mark; className?: string }) {
         <rect x="16.4" y="10.4" width="2.6" height="6.4" rx="1.3" fill="#fff" />
         <rect x="29" y="10.4" width="2.6" height="6.4" rx="1.3" fill="#fff" />
         <path d="m18.2 28.4 3.6 3.6 7.6-7.6" stroke="#166534" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+      </Tile>
+    );
+  }
+  if (name === "knowledge") {
+    return (
+      <Tile name={name} className={className}>
+        <path fill="#fff" d="M14 12.5h16.2c1.4 0 2.6 1.2 2.6 2.6V35.2H16.6c-1.4 0-2.6-1.1-2.6-2.5V12.5Z" />
+        <path fill="#fff" fillOpacity=".72" d="M18.2 12.5h15.4c1.2 0 2.2 1 2.2 2.2v18.2c-1.6-.8-3.4-1.2-5.2-1.2H18.2V12.5Z" />
+        <path fill="#ff9900" d="M24.2 12.2h3.2v10.4l-1.6-1.2-1.6 1.2V12.2Z" />
+        <rect x="17.2" y="26.2" width="9.2" height="1.8" rx=".9" fill="#232f3e" />
+        <rect x="17.2" y="30" width="6.4" height="1.8" rx=".9" fill="#232f3e" />
       </Tile>
     );
   }

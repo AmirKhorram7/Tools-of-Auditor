@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "cms",
     "education",
     "daybook_services.apps.DaybookServicesConfig",
+    "knowledge_management.apps.KnowledgeManagementConfig",
     "subscription_services.apps.SubscriptionServicesConfig",
     "reminder_services.apps.ReminderServicesConfig",
 ]
