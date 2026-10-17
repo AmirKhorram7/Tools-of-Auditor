@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 
 /** Seven named colours from the colour brief. Stored as token names, never hex. */
 export const KM_TOKENS = [
-  { id: "red", light: "#C62828", dark: "#FF8A80", mix: 25 },
-  { id: "orange", light: "#BF360C", dark: "#FFB74D", mix: 25 },
+  { id: "red", light: "#C62828", dark: "#FF6B6B", mix: 25 },
+  { id: "orange", light: "#E65100", dark: "#FF9E2C", mix: 25 },
   { id: "gold", light: "#8D6E00", dark: "#FFD54F", mix: 25 },
-  { id: "green", light: "#2E7D32", dark: "#81C784", mix: 25 },
-  { id: "blue", light: "#1565C0", dark: "#64B5F6", mix: 25 },
-  { id: "purple", light: "#6A1B9A", dark: "#CE93D8", mix: 25 },
-  { id: "gray", light: "#616161", dark: "#BDBDBD", mix: 20 },
+  { id: "green", light: "#2E7D32", dark: "#69DB7C", mix: 25 },
+  { id: "blue", light: "#1565C0", dark: "#4DABF7", mix: 25 },
+  { id: "purple", light: "#6A1B9A", dark: "#DA77F2", mix: 25 },
+  { id: "gray", light: "#616161", dark: "#CED4DA", mix: 20 },
 ] as const;
 
 export type KmTokenId = (typeof KM_TOKENS)[number]["id"];

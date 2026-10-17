@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import ContentPalette from "@/components/knowledge/ContentPalette";
 import KnowledgeEditor, { type KnowledgeEditorHandle } from "@/components/knowledge/KnowledgeEditor";
 import { mediaUrl } from "@/lib/api";
-import type { EditorType } from "@/lib/knowledge-colors";
+import type { EditorType, KmTokenId } from "@/lib/knowledge-colors";
 import { editorTypeStyle } from "@/lib/knowledge-colors";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -69,6 +69,7 @@ export default function PageView({
   const [title, setTitle] = useState(page.title);
   const [text, setText] = useState(docToText(page.content));
   const [revision, setRevision] = useState(0);
+  const [lineColor, setLineColor] = useState<KmTokenId | null>(null);
   const [pageKey, setPageKey] = useState(page.id);
   const [links, setLinks] = useState<KmLink[]>(page.links);
   const [files, setFiles] = useState<KmFile[]>(page.files);
@@ -84,6 +85,10 @@ export default function PageView({
   const version = useRef(page.version);
   const editorRef = useRef<KnowledgeEditorHandle>(null);
   const quiet = useRef(true);
+  const saving = useRef(false);
+  const queued = useRef(false);
+  const titleRef = useRef(title);
+  titleRef.current = title;
   const study = pageStudy(page, nodes, plans, reviews);
   const commands = SLASH.filter((item) => !slash || item.token.startsWith(slash.toLowerCase()) || t(item.labelKey).includes(slash));
 
@@ -129,33 +134,50 @@ export default function PageView({
   }, [query]);
 
   async function persist(nextTitle: string) {
-    const clean = nextTitle.trim();
+    const clean = (titleRef.current || nextTitle).trim();
     if (!clean) return;
+    if (saving.current) {
+      queued.current = true;
+      return;
+    }
+    saving.current = true;
     try {
-      const saved = await knowledgeApi.save(page.id, version.current, {
-        title: clean,
-        content: editorRef.current?.getDoc() ?? textToDoc(text),
-      });
-      version.current = saved.version;
-      setLinks(saved.links);
-      onSaved(saved);
-      setError(null);
-      setSaveState("saved");
-    } catch (err) {
-      setSaveState("idle");
-      if (err && typeof err === "object" && "status" in err && (err as { status: number }).status === 409) {
-        const fresh = await knowledgeApi.page(page.id);
-        quiet.current = true;
-        setTitle(fresh.title);
-        setText(docToText(fresh.content));
-        editorRef.current?.load(fresh.content);
-        setLinks(fresh.links);
-        version.current = fresh.version;
-        onSaved(fresh);
-        setError(t("km.conflict"));
-        return;
-      }
-      setError(err instanceof Error ? err.message : t("km.saveFailed"));
+      let retries = 0;
+      do {
+        queued.current = false;
+        try {
+          const saved = await knowledgeApi.save(page.id, version.current, {
+            title: titleRef.current.trim() || clean,
+            content: editorRef.current?.getDoc() ?? textToDoc(text),
+          });
+          version.current = saved.version;
+          setLinks(saved.links);
+          onSaved(saved);
+          setError(null);
+          setSaveState("saved");
+        } catch (err) {
+          const status = err && typeof err === "object" && "status" in err ? Number((err as { status: number }).status) : 0;
+          const nextVersion =
+            err && typeof err === "object" && "data" in err
+              ? Number((err as { data?: { version?: number } }).data?.version)
+              : NaN;
+          if (status === 409 && Number.isFinite(nextVersion) && retries < 2) {
+            version.current = nextVersion;
+            retries += 1;
+            queued.current = true;
+            continue;
+          }
+          setSaveState("idle");
+          if (status === 409) {
+            setError(t("km.conflict"));
+            return;
+          }
+          setError(err instanceof Error ? err.message : t("km.saveFailed"));
+          return;
+        }
+      } while (queued.current);
+    } finally {
+      saving.current = false;
     }
   }
 
@@ -248,9 +270,16 @@ export default function PageView({
             <ToolButton label={t("km.block.code")} onClick={() => prefixLine("```\n")}><CodeIcon /></ToolButton>
             <ToolButton label={t("km.bold")} onClick={() => wrap("**")}><BoldIcon /></ToolButton>
             <ContentPalette
-              onText={(token) => editorRef.current?.applyMark("color", token)}
+              active={lineColor}
+              onText={(token) => {
+                editorRef.current?.applyMark("color", token);
+                setLineColor(token);
+              }}
               onHighlight={(token) => editorRef.current?.applyMark("highlight", token)}
-              onClear={() => editorRef.current?.clearFormatting()}
+              onClear={() => {
+                editorRef.current?.clearFormatting();
+                setLineColor(null);
+              }}
             />
             <span className="mx-1 w-px shrink-0 self-stretch" style={{ background: "var(--km-border)" }} />
             <ToolButton label={t("km.draw")} pressed={drawingOn} onClick={() => setDrawingOn((value) => !value)}>
@@ -305,6 +334,7 @@ export default function PageView({
               placeholder={t("km.writeHint")}
               onEdit={(plain, cursor, dirty) => {
                 setText(plain);
+                setLineColor(editorRef.current?.lineColor() ?? null);
                 readCursor(plain, cursor);
                 if (dirty) setRevision((value) => value + 1);
               }}

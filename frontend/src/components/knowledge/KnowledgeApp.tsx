@@ -349,7 +349,7 @@ export default function KnowledgeApp() {
         {error ? (
           <p className="px-4 py-2 text-sm" style={{ color: "var(--km-danger)" }}>{error}</p>
         ) : null}
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {loading ? (
             <p className="p-6 text-sm" style={{ color: "var(--km-muted)" }}>{t("common.loading")}</p>
           ) : mode === "settings" ? (

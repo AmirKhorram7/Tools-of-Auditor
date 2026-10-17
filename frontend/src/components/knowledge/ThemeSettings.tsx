@@ -23,7 +23,7 @@ export default function ThemeSettings({
   const light = KNOWLEDGE_THEMES.filter((item) => item.mode === "light");
 
   return (
-    <div className="w-full max-w-3xl px-3 py-6">
+    <div className="w-full max-w-3xl px-3 py-6 pb-16">
       <h1 className="text-2xl font-bold">{t("km.settings")}</h1>
       <p className="mt-2 max-w-xl text-sm leading-6" style={{ color: "var(--km-muted)" }}>
         {t("km.themeLead")}

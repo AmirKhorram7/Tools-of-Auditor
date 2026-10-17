@@ -3,7 +3,7 @@
 import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 import { isToken, type KmTokenId } from "@/lib/knowledge-colors";
-import { docToHtml, editorPlain, editorToDoc } from "@/lib/knowledge-marks";
+import { caretPiece, docToHtml, editorPlain, editorToDoc, visualLines, wrapLoose } from "@/lib/knowledge-marks";
 import type { KmDoc } from "@/lib/knowledge";
 
 export type KnowledgeEditorHandle = {
@@ -17,6 +17,7 @@ export type KnowledgeEditorHandle = {
   insertCallout: (token: KmTokenId, label: string) => void;
   insertLink: (name: string) => void;
   load: (content: unknown) => void;
+  lineColor: () => KmTokenId | null;
 };
 
 type Props = {
@@ -32,6 +33,7 @@ const KnowledgeEditor = forwardRef<KnowledgeEditorHandle, Props>(function Knowle
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
+  const lineRef = useRef<HTMLElement | null>(null);
   const labelsRef = useRef(labels);
   const contentRef = useRef(content);
   labelsRef.current = labels;
@@ -42,6 +44,10 @@ const KnowledgeEditor = forwardRef<KnowledgeEditorHandle, Props>(function Knowle
     if (!root) return;
     const selection = window.getSelection();
     const plain = editorPlain(root, selection?.anchorNode ?? null, selection?.anchorOffset ?? 0);
+    if (selection?.anchorNode && root.contains(selection.anchorNode)) {
+      const line = lineOf(selection.anchorNode, root);
+      if (line) lineRef.current = line;
+    }
     onEdit(plain.plain, plain.cursor, dirty);
   }
 
@@ -107,34 +113,18 @@ const KnowledgeEditor = forwardRef<KnowledgeEditorHandle, Props>(function Knowle
       insertText(`${mark}${selected}${mark}`);
     },
     applyMark: (kind, token) => {
-      const root = host.current;
-      const selection = window.getSelection();
-      if (!root || !selection || selection.isCollapsed || selection.rangeCount === 0) return;
-      const range = selection.getRangeAt(0);
-      if (!root.contains(range.commonAncestorContainer)) return;
-      const fragment = range.extractContents();
-      stripMarks(fragment, kind);
-      if (token) {
-        const span = document.createElement("span");
-        if (kind === "color") span.dataset.color = token;
-        else span.dataset.highlight = token;
-        span.appendChild(fragment);
-        range.insertNode(span);
-      } else {
-        range.insertNode(fragment);
-      }
+      const line = lineUnderCaret(host.current, lineRef.current);
+      if (!line) return;
+      paintLine(line, kind, token);
+      lineRef.current = line;
       emit(true);
     },
     clearFormatting: () => {
-      const root = host.current;
-      const selection = window.getSelection();
-      if (!root || !selection || selection.isCollapsed || selection.rangeCount === 0) return;
-      const range = selection.getRangeAt(0);
-      if (!root.contains(range.commonAncestorContainer)) return;
-      const fragment = range.extractContents();
-      stripMarks(fragment, "color");
-      stripMarks(fragment, "highlight");
-      range.insertNode(fragment);
+      const line = lineUnderCaret(host.current, lineRef.current);
+      if (!line) return;
+      paintLine(line, "color", null);
+      paintLine(line, "highlight", null);
+      lineRef.current = line;
       emit(true);
     },
     insertLink: (name: string) => {
@@ -180,6 +170,16 @@ const KnowledgeEditor = forwardRef<KnowledgeEditorHandle, Props>(function Knowle
       emit(true);
     },
     load,
+    lineColor: () => {
+      const root = host.current;
+      if (!root) return null;
+      const selection = window.getSelection();
+      const fromCaret =
+        selection?.anchorNode && root.contains(selection.anchorNode) ? lineOf(selection.anchorNode, root) : null;
+      const line = fromCaret ?? (lineRef.current && root.contains(lineRef.current) ? lineRef.current : null);
+      const token = line?.dataset.color;
+      return isToken(token) ? token : null;
+    },
   }));
 
   return (
@@ -192,6 +192,19 @@ const KnowledgeEditor = forwardRef<KnowledgeEditorHandle, Props>(function Knowle
       contentEditable
       suppressContentEditableWarning
       className="km-editor mt-2"
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" || event.shiftKey) return;
+        const root = host.current;
+        if (!root) return;
+        wrapLoose(root);
+        const selection = window.getSelection();
+        if (!selection?.anchorNode || !root.contains(selection.anchorNode)) return;
+        const line = lineOf(selection.anchorNode, root);
+        if (!line || line.dataset.callout) return;
+        event.preventDefault();
+        splitLine(line);
+        emit(true);
+      }}
       onInput={() => emit(true)}
       onKeyUp={() => emit(false)}
       onMouseUp={() => emit(false)}
@@ -206,6 +219,57 @@ const KnowledgeEditor = forwardRef<KnowledgeEditorHandle, Props>(function Knowle
 });
 
 export default KnowledgeEditor;
+
+function lineUnderCaret(root: HTMLElement | null, remembered: HTMLElement | null): HTMLElement | null {
+  if (!root) return null;
+  wrapLoose(root);
+  const selection = window.getSelection();
+  const anchor = selection?.anchorNode && root.contains(selection.anchorNode) ? selection.anchorNode : null;
+  const line = anchor ? lineOf(anchor, root) : remembered && root.contains(remembered) ? remembered : null;
+  if (!line) return null;
+  const piece = caretPiece(line, anchor, selection?.anchorOffset ?? 0);
+  const parts = visualLines(line);
+  return parts[Math.min(piece, parts.length - 1)] ?? parts[0] ?? null;
+}
+
+function lineOf(node: Node, root: HTMLElement): HTMLElement | null {
+  let current: Node | null = node;
+  while (current && current !== root) {
+    if (current instanceof HTMLElement && current.parentElement === root) return current;
+    current = current.parentNode;
+  }
+  return null;
+}
+
+function paintLine(line: HTMLElement, kind: "color" | "highlight", token: KmTokenId | null) {
+  const target = line.dataset.callout ? (line.querySelector("div") ?? line) : line;
+  stripMarks(target, kind);
+  const key = kind === "color" ? "color" : "highlight";
+  if (token) target.dataset[key] = token;
+  else delete target.dataset[key];
+}
+
+function splitLine(line: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  const after = range.cloneRange();
+  after.selectNodeContents(line);
+  after.setStart(range.endContainer, range.endOffset);
+  const fragment = after.extractContents();
+  const next = document.createElement("div");
+  if (isToken(line.dataset.color)) next.dataset.color = line.dataset.color;
+  if (isToken(line.dataset.highlight)) next.dataset.highlight = line.dataset.highlight;
+  if (!fragment.textContent) next.appendChild(document.createElement("br"));
+  else next.appendChild(fragment);
+  if (!line.textContent) line.replaceChildren(document.createElement("br"));
+  line.after(next);
+  const caret = document.createRange();
+  caret.selectNodeContents(next);
+  caret.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(caret);
+}
 
 function locate(root: HTMLElement, index: number): { node: Text; offset: number } | null {
   let left = index;
