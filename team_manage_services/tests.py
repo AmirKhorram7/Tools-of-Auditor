@@ -49,6 +49,74 @@ class WorkAPISmokeTests(APITestCase):
         response = self.client.get(f"{WORK}/dashboard/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_desk_create_team_and_chat(self):
+        desk = self.manager_client.post(
+            f"{WORK}/projects/",
+            {"name": "میز کار فروش"},
+            format="json",
+        )
+        self.assertEqual(desk.status_code, status.HTTP_201_CREATED, desk.data)
+        desk_id = desk.data["id"]
+        self.assertEqual(desk.data["name"], "میز کار فروش")
+        self.assertTrue(desk.data.get("owner_name"))
+        self.assertTrue(desk.data.get("created_at"))
+        self.assertIsNotNone(desk.data.get("company"))
+
+        team = self.manager_client.post(
+            f"{WORK}/projects/{desk_id}/teams/",
+            {"name": "تیم فروش"},
+            format="json",
+        )
+        self.assertEqual(team.status_code, status.HTTP_201_CREATED, team.data)
+        linked = self.manager_client.get(f"{WORK}/projects/{desk_id}/teams/")
+        self.assertEqual(linked.status_code, status.HTTP_200_OK, linked.data)
+        self.assertTrue(any(row["id"] == team.data["id"] for row in linked.data))
+
+        empty = self.manager_client.get(f"{WORK}/projects/{desk_id}/chat/")
+        self.assertEqual(empty.status_code, status.HTTP_200_OK, empty.data)
+        self.assertEqual(empty.data, [])
+
+        sent = self.manager_client.post(
+            f"{WORK}/projects/{desk_id}/chat/",
+            {"body": "سلام، خروجی آماده است"},
+            format="json",
+        )
+        self.assertEqual(sent.status_code, status.HTTP_201_CREATED, sent.data)
+        self.assertEqual(sent.data["body"], "سلام، خروجی آماده است")
+        self.assertEqual(sent.data["author"], self.manager.id)
+
+        listed = self.manager_client.get(f"{WORK}/projects/{desk_id}/chat/")
+        self.assertEqual(listed.status_code, status.HTTP_200_OK, listed.data)
+        self.assertEqual(len(listed.data), 1)
+
+        outsider = User.objects.create_user(
+            phone_number="09120000099",
+            password="pass-out",
+            is_phone_verified=True,
+        )
+        outsider_client = self._client_for(outsider)
+        blocked = outsider_client.get(f"{WORK}/projects/{desk_id}/chat/")
+        self.assertEqual(blocked.status_code, status.HTTP_404_NOT_FOUND)
+
+        blank = self.manager_client.post(
+            f"{WORK}/projects/{desk_id}/chat/",
+            {"body": "   "},
+            format="json",
+        )
+        self.assertEqual(blank.status_code, status.HTTP_400_BAD_REQUEST)
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        photo = SimpleUploadedFile("note.png", b"\x89PNG\r\n\x1a\n" + b"0" * 40, content_type="image/png")
+        media = self.manager_client.post(
+            f"{WORK}/projects/{desk_id}/chat/",
+            {"body": "عکس", "file": photo},
+            format="multipart",
+        )
+        self.assertEqual(media.status_code, status.HTTP_201_CREATED, media.data)
+        self.assertEqual(media.data["kind"], "image")
+        self.assertTrue(media.data.get("file_url"))
+
     def test_work_api_happy_path(self):
         today = date.today()
         yesterday = today - timedelta(days=1)

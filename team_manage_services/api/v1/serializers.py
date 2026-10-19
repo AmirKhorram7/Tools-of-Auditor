@@ -7,6 +7,7 @@ from team_manage_services.models import (
     BoardTemplateColumn,
     Company,
     CompanyMember,
+    DeskChatMessage,
     Invitation,
     Notification,
     Project,
@@ -21,6 +22,7 @@ from team_manage_services.models import (
 from team_manage_services.services.access import (
     can_add_task,
     can_move_task,
+    display_name,
     is_company_manager,
     is_project_manager,
     project_requires_approval,
@@ -79,6 +81,11 @@ class CompanyMemberSerializer(serializers.ModelSerializer):
 
 class TeamSerializer(serializers.ModelSerializer):
     can_manage = serializers.SerializerMethodField()
+    company = serializers.PrimaryKeyRelatedField(
+        queryset=Company.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     company_name = serializers.CharField(source="company.name", read_only=True)
     member_count = serializers.SerializerMethodField()
     project_count = serializers.SerializerMethodField()
@@ -325,7 +332,13 @@ class ProjectSerializer(serializers.ModelSerializer):
     can_add_task = serializers.SerializerMethodField()
     can_manage_company = serializers.SerializerMethodField()
     require_approval = serializers.SerializerMethodField()
+    company = serializers.PrimaryKeyRelatedField(
+        queryset=Company.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     company_name = serializers.CharField(source="company.name", read_only=True)
+    owner_name = serializers.SerializerMethodField()
     team_names = serializers.SerializerMethodField()
 
     class Meta:
@@ -338,6 +351,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "owner",
+            "owner_name",
             "status",
             "priority",
             "start_date",
@@ -351,7 +365,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["owner", "created_at", "updated_at"]
+        read_only_fields = ["owner", "owner_name", "created_at", "updated_at"]
 
     def get_progress_percent(self, obj):
         return project_progress_percent(obj)
@@ -377,6 +391,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_require_approval(self, obj):
         return project_requires_approval(obj)
 
+    def get_owner_name(self, obj):
+        return display_name(obj.owner)
+
     def get_team_names(self, obj):
         links = obj.project_teams.all()
         names = []
@@ -385,6 +402,47 @@ class ProjectSerializer(serializers.ModelSerializer):
             if team and team.name:
                 names.append(team.name)
         return names
+
+
+class DeskChatMessageSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    kind = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DeskChatMessage
+        fields = [
+            "id",
+            "author",
+            "author_name",
+            "body",
+            "kind",
+            "file",
+            "file_url",
+            "original_name",
+            "file_size",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_author_name(self, obj):
+        return display_name(obj.author)
+
+    def get_kind(self, obj):
+        return obj.kind()
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return None
+        request = self.context.get("request")
+        url = obj.file.url
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+
+class DeskChatWriteSerializer(serializers.Serializer):
+    body = serializers.CharField(max_length=2000, required=False, allow_blank=True)
 
 
 class TaskStepSerializer(serializers.ModelSerializer):

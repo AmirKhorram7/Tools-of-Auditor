@@ -158,6 +158,14 @@ html.dark .border-red-200 {
 html.dark .bg-\[\#e7f3f5\] {
   background-color: #2a4450;
 }
+html.dark .bg-\[\#F7F8FA\],
+html.dark .bg-\[\#F3F5F8\] {
+  background-color: #2f3c4a;
+}
+html.dark textarea,
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]) {
+  color: var(--ta-ink);
+}
 html.dark .bg-gray-300 {
   background-color: #4d5d70;
 }

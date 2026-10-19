@@ -285,7 +285,7 @@ export default function DashboardPage() {
               {todayItems.map((row) => (
                 <WorkRow
                   key={row.id}
-                  href={`/work/projects/${row.project_id}`}
+                  href={`/work/desks/${row.project_id}`}
                   title={row.title}
                   meta={row.project_name}
                   late={row.late}
@@ -304,7 +304,7 @@ export default function DashboardPage() {
               {recentItems.map((row) => (
                 <WorkRow
                   key={row.id}
-                  href={row.project_id ? `/work/projects/${row.project_id}` : "/work"}
+                  href={row.project_id ? `/work/desks/${row.project_id}` : "/work"}
                   title={row.message || row.title}
                 />
               ))}

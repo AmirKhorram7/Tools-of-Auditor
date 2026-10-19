@@ -11,6 +11,7 @@ from team_manage_services.models import (
     BoardTemplateColumn,
     Company,
     CompanyMember,
+    DeskChatMessage,
     Invitation,
     Notification,
     Project,
@@ -709,6 +710,18 @@ class BoardTemplateAdmin(admin.ModelAdmin):
     @admin.display(description=_("Created by"), ordering="created_by__first_name")
     def created_by_name(self, obj):
         return person_name(obj.created_by)
+
+
+@admin.register(DeskChatMessage)
+class DeskChatMessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "project", "author_name", "created_at")
+    search_fields = ("body", "project__name", "author__first_name", "author__phone_number")
+    autocomplete_fields = ("project", "author")
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description=_("Author"), ordering="author__first_name")
+    def author_name(self, obj):
+        return person_name(obj.author)
 
 
 @admin.register(ProjectMeeting)

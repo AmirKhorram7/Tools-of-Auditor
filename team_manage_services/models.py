@@ -505,6 +505,47 @@ class ProjectMember(BaseModel):
         return f"{self.project} - {self.user}"
 
 
+class DeskChatMessage(BaseModel):
+    """One room per desk (project). Every desk member can read and write."""
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="chat_messages",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="desk_chat_messages",
+    )
+    body = models.TextField(max_length=2000, blank=True, default="")
+    file = models.FileField(upload_to="desk-chat/%Y/%m/", blank=True, null=True)
+    original_name = models.CharField(max_length=255, blank=True, default="")
+    file_size = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["project", "created_at"], name="tm_desk_chat_proj_created"),
+        ]
+
+    def kind(self) -> str:
+        name = (self.original_name or getattr(self.file, "name", "") or "").lower()
+        ext = name.rsplit(".", 1)[-1] if "." in name else ""
+        if ext in {"jpg", "jpeg", "png", "gif", "webp"}:
+            return "image"
+        if ext in {"mp4", "webm", "mov", "m4v"}:
+            return "video"
+        if ext in {"mp3", "ogg", "wav", "m4a", "aac", "weba"}:
+            return "audio"
+        if self.file:
+            return "file"
+        return "text"
+
+    def __str__(self):
+        return f"chat {self.project_id} by {self.author_id}"
+
+
 class BoardColumn(BaseModel):
     """One list on a project board (To Do, Testing, Need Merge, …)."""
 

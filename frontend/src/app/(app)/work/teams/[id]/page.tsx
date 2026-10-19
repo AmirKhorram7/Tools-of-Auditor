@@ -166,13 +166,10 @@ export default function WorkTeamPage() {
   return (
     <div className="space-y-4">
       <WorkBreadcrumb
-        fallbackHref={`/work/companies/${team.company}`}
+        fallbackHref="/work"
         items={[
           { href: "/work", label: t("work.crumb") },
-          {
-            href: `/work/companies/${team.company}`,
-            label: team.company_name || t("work.company"),
-          },
+          { href: "/work", label: t("work.teams") },
           { label: team.name },
         ]}
       />
@@ -193,7 +190,7 @@ export default function WorkTeamPage() {
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold text-ink">{team.name}</h1>
               <p className="mt-0.5 text-[11px] text-gray-500">
-                {team.company_name || t("work.company")} · {t("work.membersCount", { count: members.length })}
+                {t("work.membersCount", { count: members.length })}
               </p>
             </div>
             <Badge tone={team.status === "active" ? "green" : "gray"}>

@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from team_manage_services.models import (
     ActivityLog,
+    DeskChatMessage,
     Notification,
     Project,
     ProjectMember,
@@ -20,11 +21,13 @@ from team_manage_services.services.access import (
     can_add_task,
     can_move_task,
     can_move_task_to_column,
+    can_view_project,
     can_work_on_task,
     is_company_manager,
     is_project_manager,
     project_requires_approval,
 )
+from team_manage_services.services.org import create_team, workspace_for
 from team_manage_services.services.board import (
     apply_column_to_task,
     column_for_status,
@@ -493,3 +496,113 @@ def add_comment(*, user, task: Task, body: str, reply_to=None) -> TaskComment:
                 reference_id=task.id,
             )
     return comment
+
+
+@transaction.atomic
+def create_desk(*, user, name: str, board_template=None, **fields) -> Project:
+    company = workspace_for(user)
+    return create_project(
+        user=user,
+        company=company,
+        board_template=board_template,
+        name=name,
+        **fields,
+    )
+
+
+@transaction.atomic
+def create_desk_team(*, user, project: Project, name: str) -> Team:
+    if not is_project_manager(user, project):
+        raise PermissionDenied("Only a desk manager can create a team.")
+    team = create_team(user=user, company=project.company, name=name)
+    add_team_to_project(user=user, project=project, team=team)
+    return team
+
+
+def list_desk_chat(*, user, project: Project, after_id: int | None = None, limit: int = 100):
+    if not can_view_project(user, project):
+        raise PermissionDenied("You cannot view this desk.")
+    qs = DeskChatMessage.objects.filter(project=project).select_related("author")
+    cap = max(1, min(int(limit or 100), 200))
+    if after_id:
+        return list(qs.filter(id__gt=after_id).order_by("id")[:cap])
+    recent_ids = list(qs.order_by("-id").values_list("id", flat=True)[:cap])
+    if not recent_ids:
+        return []
+    return list(qs.filter(id__in=recent_ids).order_by("id"))
+
+
+CHAT_KIND_LIMITS = {
+    "image": 8 * 1024 * 1024,
+    "video": 40 * 1024 * 1024,
+    "audio": 12 * 1024 * 1024,
+    "file": 20 * 1024 * 1024,
+}
+CHAT_KIND_EXTS = {
+    "image": {"jpg", "jpeg", "png", "gif", "webp"},
+    "video": {"mp4", "webm", "mov", "m4v"},
+    "audio": {"mp3", "ogg", "wav", "m4a", "aac", "weba", "webm"},
+}
+
+
+def _chat_file_kind(name: str, content_type: str = "") -> str:
+    ext = (name or "").rsplit(".", 1)[-1].lower() if "." in (name or "") else ""
+    ctype = (content_type or "").lower()
+    if ext in CHAT_KIND_EXTS["image"] or ctype.startswith("image/"):
+        return "image"
+    if ext in {"mp4", "mov", "m4v"} or ctype.startswith("video/"):
+        return "video"
+    if ext in CHAT_KIND_EXTS["audio"] or ctype.startswith("audio/"):
+        return "audio"
+    if ext == "webm":
+        return "video" if ctype.startswith("video/") else "audio"
+    return "file"
+
+
+def _validate_chat_file(upload) -> None:
+    name = getattr(upload, "name", "") or "file"
+    size = int(getattr(upload, "size", 0) or 0)
+    kind = _chat_file_kind(name, getattr(upload, "content_type", "") or "")
+    limit = CHAT_KIND_LIMITS[kind]
+    if size <= 0:
+        raise ValidationError({"file": "Empty file."})
+    if size > limit:
+        raise ValidationError({"file": "File is too large."})
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    allowed = CHAT_KIND_EXTS["image"] | CHAT_KIND_EXTS["video"] | CHAT_KIND_EXTS["audio"] | {
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "ppt",
+        "pptx",
+        "txt",
+        "zip",
+        "rar",
+        "csv",
+    }
+    if ext and ext not in allowed and kind == "file":
+        raise ValidationError({"file": "This file type is not allowed."})
+
+
+@transaction.atomic
+def post_desk_chat(*, user, project: Project, body: str = "", upload=None) -> DeskChatMessage:
+    if not can_view_project(user, project):
+        raise PermissionDenied("You cannot chat in this desk.")
+    text = (body or "").strip()
+    if upload:
+        _validate_chat_file(upload)
+    elif not text:
+        raise ValidationError({"body": "Message is required."})
+    message = DeskChatMessage(
+        project=project,
+        author=user,
+        body=text[:2000],
+        file=upload if upload else None,
+        original_name=(getattr(upload, "name", "") or "")[:255] if upload else "",
+        file_size=getattr(upload, "size", None) if upload else None,
+    )
+    message.full_clean()
+    message.save()
+    return message

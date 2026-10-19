@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -18,14 +19,14 @@ import TaskCard from "@/components/work/TaskCard";
 import WeekStrip from "@/components/work/WeekStrip";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import WorkGuide from "@/components/work/WorkGuide";
-import WorkPhotoCard from "@/components/work/WorkPhotoCard";
 import WorkSection from "@/components/work/WorkSection";
 import WorkTable, { WorkTd } from "@/components/work/WorkTable";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
-  workCompanyPhoto,
-  type WorkCompany,
+  deskHref,
+  formatWorkDateTime,
+  workDeskPhoto,
   type WorkDashboard,
   type WorkInvitation,
   type WorkProject,
@@ -34,17 +35,17 @@ import {
 } from "@/lib/work";
 
 export default function WorkHomePage() {
-  const { t, n } = useI18n();
+  const { t, n, locale } = useI18n();
+  const router = useRouter();
   const [data, setData] = useState<WorkDashboard | null>(null);
-  const [companies, setCompanies] = useState<WorkCompany[]>([]);
   const [teams, setTeams] = useState<WorkTeam[]>([]);
   const [projects, setProjects] = useState<WorkProject[]>([]);
   const [invites, setInvites] = useState<WorkInvitation[]>([]);
   const [allTasks, setAllTasks] = useState<WorkTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [companyOpen, setCompanyOpen] = useState(false);
-  const [companyName, setCompanyName] = useState("");
+  const [deskOpen, setDeskOpen] = useState(false);
+  const [deskName, setDeskName] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -52,16 +53,14 @@ export default function WorkHomePage() {
     setLoading(true);
     setError(null);
     try {
-      const [dash, companyRows, teamRows, projectRows, inbox, taskRows] = await Promise.all([
+      const [dash, teamRows, projectRows, inbox, taskRows] = await Promise.all([
         apiFetch<WorkDashboard>("/work/dashboard/"),
-        apiList<WorkCompany>("/work/companies/"),
         apiList<WorkTeam>("/work/teams/"),
         apiList<WorkProject>("/work/projects/"),
         apiList<WorkInvitation>("/work/invitations/"),
         apiList<WorkTask>("/work/tasks/"),
       ]);
       setData(dash);
-      setCompanies(companyRows);
       setTeams(teamRows);
       setProjects(projectRows);
       setInvites(inbox.filter((row) => row.status === "pending"));
@@ -77,23 +76,23 @@ export default function WorkHomePage() {
     load();
   }, [load]);
 
-  const createCompany = async () => {
-    if (!companyName.trim()) {
-      setFormError(t("work.companyRequired"));
+  const createDesk = async () => {
+    if (!deskName.trim()) {
+      setFormError(t("work.deskRequired"));
       return;
     }
     setSaving(true);
     setFormError(null);
     try {
-      await apiFetch("/work/companies/", {
+      const desk = await apiFetch<WorkProject>("/work/projects/", {
         method: "POST",
-        body: { name: companyName.trim() },
+        body: { name: deskName.trim() },
       });
-      setCompanyOpen(false);
-      setCompanyName("");
-      await load();
+      setDeskOpen(false);
+      setDeskName("");
+      router.push(deskHref(desk.id));
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t("work.companyFail"));
+      setFormError(err instanceof ApiError ? err.message : t("work.deskFail"));
     } finally {
       setSaving(false);
     }
@@ -125,8 +124,8 @@ export default function WorkHomePage() {
               {invites.length > 0 ? ` (${n(invites.length)})` : ""}
             </Button>
           </Link>
-          <Button size="sm" onClick={() => setCompanyOpen(true)}>
-            + {t("work.newCompany")}
+          <Button size="sm" onClick={() => setDeskOpen(true)}>
+            + {t("work.newDesk")}
           </Button>
         </div>
       </div>
@@ -144,48 +143,73 @@ export default function WorkHomePage() {
       )}
 
       <section>
-        <h2 className="mb-2 text-sm font-bold text-ink">{t("work.companies")}</h2>
-        {companies.length === 0 ? (
+        <h2 className="mb-2 text-sm font-bold text-ink">{t("work.desks")}</h2>
+        {projects.length === 0 ? (
           <EmptyState
-            title={t("work.noCompanyTitle")}
-            description={t("work.noCompanyDesc")}
+            title={t("work.noDeskTitle")}
+            description={t("work.noDeskDesc")}
             action={
-              <Button size="sm" onClick={() => setCompanyOpen(true)}>
-                {t("work.firstCompany")}
+              <Button size="sm" onClick={() => setDeskOpen(true)}>
+                {t("work.firstDesk")}
               </Button>
             }
           />
         ) : (
-          <div className="flex flex-wrap gap-3">
-            {companies.map((company) => {
-              const companyTeams = teams.filter((row) => row.company === company.id);
-              const projectCount = projects.filter((row) => row.company === company.id).length;
-              const teamNames = companyTeams.map((row) => row.name).join(" · ");
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {projects.map((desk) => {
+              const names = (desk.team_names || []).join(" · ");
               return (
-                <WorkPhotoCard
-                  key={company.id}
-                  href={`/work/companies/${company.id}`}
-                  imageSrc={workCompanyPhoto(company.id)}
-                  className="w-full max-w-[22.5rem]"
+                <Link
+                  key={desk.id}
+                  href={deskHref(desk.id)}
+                  className="group relative block min-h-[12.5rem] overflow-hidden rounded-2xl border border-navy-900/15 shadow-[0_2px_10px_rgba(20,35,58,0.12)] transition hover:border-brand-500"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-ink">{company.name}</p>
-                    <p className="mt-0.5 truncate text-[11px] text-gray-500 group-hover:text-navy-800">
-                      {teamNames || t("work.noTeamEmpty")}
-                    </p>
-                    <p className="mt-1 text-[11px] font-medium text-navy-800">
-                      {t("work.companyCardMeta", {
-                        teams: n(companyTeams.length),
-                        projects: n(projectCount),
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={workDeskPhoto(desk.id)}
+                    alt=""
+                    className="absolute inset-0 size-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0F1C30] via-[#14233A]/70 to-[#14233A]/25" />
+                  <div className="relative z-10 flex h-full min-h-[12.5rem] flex-col justify-end p-4">
+                    <div className="mb-auto flex justify-end">
+                      <span className="rounded-full bg-white/90 p-1">
+                        <ProgressGauge value={desk.progress_percent} size={42} />
+                      </span>
+                    </div>
+                    <p className="truncate text-lg font-bold text-white">{desk.name}</p>
+                    <p className="mt-1 text-[12px] text-white/80">
+                      {t("work.deskMeta", {
+                        owner: desk.owner_name || t("work.none"),
+                        date: formatWorkDateTime(desk.created_at, locale, "—"),
                       })}
                     </p>
+                    <p className="mt-1 truncate text-[12px] font-medium text-brand-300">
+                      {names || t("work.noTeamEmpty")}
+                    </p>
                   </div>
-                </WorkPhotoCard>
+                </Link>
               );
             })}
           </div>
         )}
       </section>
+
+      {teams.length > 0 && (
+        <WorkSection id="teams" title={t("work.teams")} count={teams.length} defaultOpen={false}>
+          <div className="flex flex-wrap gap-2">
+            {teams.map((team) => (
+              <Link
+                key={team.id}
+                href={`/work/teams/${team.id}`}
+                className="rounded-lg border border-navy-900/10 bg-white px-3 py-1.5 text-sm font-medium text-navy-900 hover:border-brand-500"
+              >
+                {team.name}
+              </Link>
+            ))}
+          </div>
+        </WorkSection>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="min-w-0">
@@ -211,7 +235,7 @@ export default function WorkHomePage() {
                 {myTasks.map((task) => (
                   <TaskCard
                     key={task.id}
-                    href={`/work/projects/${task.project_id}`}
+                    href={deskHref(task.project_id)}
                     columnName={task.project_name}
                     task={{
                       id: task.id,
@@ -229,11 +253,11 @@ export default function WorkHomePage() {
       </div>
 
       {manager && manager.at_risk.length > 0 && (
-        <WorkSection id="risk" title={t("work.riskProjects")} count={manager.at_risk.length}>
+        <WorkSection id="risk" title={t("work.riskDesks")} count={manager.at_risk.length}>
           <WorkTable
             compact
             columns={[
-              t("work.colProject"),
+              t("work.colDesk"),
               t("work.colLate"),
               t("work.colBlocked"),
               t("work.colSoon"),
@@ -245,7 +269,7 @@ export default function WorkHomePage() {
               <tr key={project.id} className="hover:bg-surface">
                 <WorkTd>
                   <Link
-                    href={`/work/projects/${project.id}`}
+                    href={deskHref(project.id)}
                     className="font-semibold text-navy-900 hover:text-link"
                   >
                     {project.name}
@@ -267,17 +291,12 @@ export default function WorkHomePage() {
       )}
 
       {manager &&
-        (manager.projects.length === 0 ? (
-          <EmptyState
-            title={t("work.noWorkProjectTitle")}
-            description={t("work.noWorkProjectDesc")}
-          />
-        ) : (
-          <WorkSection id="projects" title={t("work.projects")} count={manager.projects.length}>
+        (manager.projects.length === 0 ? null : (
+          <WorkSection id="desks-table" title={t("work.desks")} count={manager.projects.length} defaultOpen={false}>
             <WorkTable
               compact
               columns={[
-                t("work.colProject"),
+                t("work.colDesk"),
                 t("work.colLate"),
                 t("work.colBlocked"),
                 t("work.unassigned"),
@@ -288,7 +307,7 @@ export default function WorkHomePage() {
                 <tr key={project.id} className="hover:bg-surface">
                   <WorkTd>
                     <Link
-                      href={`/work/projects/${project.id}`}
+                      href={deskHref(project.id)}
                       className="font-semibold text-navy-900 hover:text-link"
                     >
                       {project.name}
@@ -340,25 +359,21 @@ export default function WorkHomePage() {
         </WorkSection>
       )}
 
-      <Modal
-        open={companyOpen}
-        title={t("work.newCompany")}
-        onClose={() => setCompanyOpen(false)}
-      >
+      <Modal open={deskOpen} title={t("work.newDesk")} onClose={() => setDeskOpen(false)}>
         <div className="space-y-3">
           {formError && <Alert>{formError}</Alert>}
-          <Field label={t("work.companyName")}>
+          <Field label={t("work.deskName")}>
             <Input
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder={t("work.companyPlaceholder")}
+              value={deskName}
+              onChange={(e) => setDeskName(e.target.value)}
+              placeholder={t("work.deskPlaceholder")}
             />
           </Field>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setCompanyOpen(false)}>
+            <Button variant="secondary" onClick={() => setDeskOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button loading={saving} onClick={createCompany}>
+            <Button loading={saving} onClick={createDesk}>
               {t("common.create")}
             </Button>
           </div>

@@ -82,6 +82,7 @@ export type WorkProject = {
   name: string;
   description: string;
   owner: number;
+  owner_name?: string;
   status: string;
   priority: number;
   start_date: string | null;
@@ -92,7 +93,31 @@ export type WorkProject = {
   can_manage_company?: boolean;
   require_approval_before_close?: boolean | null;
   require_approval?: boolean;
+  created_at?: string;
 };
+
+export type WorkDeskChatKind = "text" | "image" | "video" | "audio" | "file";
+
+export type WorkDeskChatMessage = {
+  id: number;
+  author: number;
+  author_name: string;
+  body: string;
+  kind?: WorkDeskChatKind;
+  file?: string | null;
+  file_url?: string | null;
+  original_name?: string;
+  file_size?: number | null;
+  created_at: string;
+};
+
+export function deskHref(id: number | string): string {
+  return `/work/desks/${id}`;
+}
+
+export function deskSettingsHref(id: number | string): string {
+  return `/work/desks/${id}/settings`;
+}
 
 export type WorkProjectMember = {
   id: number;
@@ -101,6 +126,7 @@ export type WorkProjectMember = {
   full_name: string;
   role: string;
   status: string;
+  added_from_team?: number | null;
 };
 
 export type WorkTaskStatus =
@@ -372,6 +398,42 @@ export function workInviteStatusLabel(t: TranslateFn, status: string): string {
   return t(`invite.${status}`);
 }
 
+export function formatWorkDateTime(
+  value: string | null | undefined,
+  locale: "fa" | "en" = "fa",
+  empty = "",
+): string {
+  if (!value) return empty;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return empty;
+  try {
+    return date.toLocaleDateString(locale === "fa" ? "fa-IR" : "en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return value.slice(0, 10);
+  }
+}
+
+export function formatChatTime(
+  value: string | null | undefined,
+  locale: "fa" | "en" = "fa",
+): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return date.toLocaleTimeString(locale === "fa" ? "fa-IR" : "en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export function formatWorkDate(
   value: string | null | undefined,
   locale: "fa" | "en" = "fa",
@@ -421,6 +483,10 @@ const COMPANY_PHOTOS = [
 export function workCompanyPhoto(companyId: number): string {
   const index = Math.abs(companyId) % COMPANY_PHOTOS.length;
   return COMPANY_PHOTOS[index];
+}
+
+export function workDeskPhoto(deskId: number): string {
+  return workCompanyPhoto(deskId);
 }
 
 export function teamInitials(name: string): string {
@@ -483,9 +549,9 @@ export function notificationHref(item: {
   const type = item.reference_type || item.entity_type || "";
   const id = item.reference_id ?? item.entity_id;
   if (type === "task" && id) return `/work/tasks/${id}`;
-  if (type === "project" && id) return `/work/projects/${id}`;
+  if (type === "project" && id) return deskHref(id);
   if (type === "invitation" && id) return "/work/inbox";
-  if (item.project_id) return `/work/projects/${item.project_id}`;
+  if (item.project_id) return deskHref(item.project_id);
   return "/work";
 }
 

@@ -154,7 +154,7 @@ export default function WorkTaskPage() {
     setError(null);
     try {
       await apiFetch(`/work/tasks/${taskId}/`, { method: "DELETE" });
-      router.push(`/work/projects/${task.project}`);
+      router.push(`/work/desks/${task.project}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("work.deleteTaskFail"));
       setSaving(false);
@@ -220,14 +220,10 @@ export default function WorkTaskPage() {
   return (
     <div className="space-y-4">
       <WorkBreadcrumb
-        fallbackHref={`/work/projects/${task.project}`}
+        fallbackHref={`/work/desks/${task.project}`}
         items={[
           { href: "/work", label: t("work.crumb") },
-          {
-            href: `/work/companies/${project?.company || ""}`,
-            label: project?.company_name || t("work.company"),
-          },
-          { href: `/work/projects/${task.project}`, label: task.project_name },
+          { href: `/work/desks/${task.project}`, label: task.project_name },
           { label: task.title },
         ]}
       />
@@ -356,7 +352,7 @@ export default function WorkTaskPage() {
               {project && (
                 <>
                   {" "}
-                  <Link href={`/work/projects/${project.id}`} className="text-link">
+                  <Link href={`/work/desks/${project.id}`} className="text-link">
                     {t("work.backToBoard")}
                   </Link>
                 </>

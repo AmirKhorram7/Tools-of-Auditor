@@ -423,7 +423,7 @@ export default function CompanyDashboard({
                 <tr key={project.id} className="hover:bg-surface">
                   <WorkTd>
                     <Link
-                      href={`/work/projects/${project.id}`}
+                      href={`/work/desks/${project.id}`}
                       className="flex items-center gap-2"
                     >
                       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-navy-900 text-white [&>svg]:size-3.5">
@@ -467,7 +467,7 @@ export default function CompanyDashboard({
                   <WorkTd>
                     <div className="flex items-center gap-1">
                       <Link
-                        href={`/work/projects/${project.id}`}
+                        href={`/work/desks/${project.id}`}
                         className="rounded-md p-1.5 text-gray-500 hover:bg-surface hover:text-navy-800"
                         title={t("work.viewProject")}
                         aria-label={t("work.viewProject")}

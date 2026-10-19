@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, cx } from "@/components/ui";
 import { apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import type { WorkCompany, WorkInvitation, WorkProject, WorkTeam } from "@/lib/work";
+import { deskHref, type WorkInvitation, type WorkProject, type WorkTeam } from "@/lib/work";
 
 const STORAGE_KEY = "ta_work_panel_open";
 
@@ -22,7 +22,6 @@ export default function WorkSidePanel() {
   const pathname = usePathname();
   const { t, dir } = useI18n();
   const [open, setOpen] = useState(true);
-  const [companies, setCompanies] = useState<WorkCompany[]>([]);
   const [projects, setProjects] = useState<WorkProject[]>([]);
   const [teams, setTeams] = useState<WorkTeam[]>([]);
   const [invites, setInvites] = useState<WorkInvitation[]>([]);
@@ -45,20 +44,17 @@ export default function WorkSidePanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [companyRows, projectRows, teamRows, inviteRows, count] = await Promise.all([
-        apiList<WorkCompany>("/work/companies/"),
+      const [projectRows, teamRows, inviteRows, count] = await Promise.all([
         apiList<WorkProject>("/work/projects/"),
         apiList<WorkTeam>("/work/teams/"),
         apiList<WorkInvitation>("/work/invitations/"),
         apiFetch<{ unread: number }>("/work/notifications/unread_count/"),
       ]);
-      setCompanies(companyRows);
       setProjects(projectRows);
       setTeams(teamRows);
       setInvites(inviteRows.filter((row) => row.status === "pending"));
       setUnread(count.unread || 0);
     } catch {
-      setCompanies([]);
       setProjects([]);
       setTeams([]);
       setInvites([]);
@@ -126,9 +122,13 @@ export default function WorkSidePanel() {
         <button
           type="button"
           onClick={toggle}
-          className="rounded-md px-2 py-1 text-xs text-gray-300 transition hover:bg-navy-700 hover:text-white"
+          className="flex size-8 items-center justify-center rounded-lg text-gray-300 transition hover:bg-navy-700 hover:text-white"
+          title={t("nav.hideTools")}
+          aria-label={t("nav.hideTools")}
         >
-          {t("nav.hideTools")} ›
+          <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden>
+            <path d="M7 4.5 12.5 10 7 15.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
 
@@ -245,33 +245,6 @@ export default function WorkSidePanel() {
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            {t("work.companies")}
-          </p>
-          {companies.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noCompanyEmpty")}</p>
-          ) : (
-            <ul className="space-y-1">
-              {companies.map((company) => (
-                <li key={company.id}>
-                  <Link
-                    href={`/work/companies/${company.id}`}
-                    className={cx(
-                      "block truncate rounded-md px-2 py-1.5 text-xs font-medium transition",
-                      pathname === `/work/companies/${company.id}`
-                        ? "bg-brand-500 font-bold text-ink"
-                        : "text-gray-200 hover:bg-navy-700 hover:text-white",
-                    )}
-                  >
-                    {company.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section>
-          <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
             {t("work.teams")}
           </p>
           {teams.length === 0 && !loading ? (
@@ -299,7 +272,7 @@ export default function WorkSidePanel() {
 
         <section>
           <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            {t("work.projects")}
+            {t("work.desks")}
           </p>
           <Link
             href="/work"
@@ -313,16 +286,16 @@ export default function WorkSidePanel() {
             {t("nav.workHomeShort")}
           </Link>
           {projects.length === 0 && !loading ? (
-            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noProjectEmpty")}</p>
+            <p className="px-2 py-2 text-xs text-gray-500">{t("work.noDeskEmpty")}</p>
           ) : (
             <ul className="space-y-0.5">
               {projects.slice(0, 12).map((project) => (
                 <li key={project.id}>
                   <Link
-                    href={`/work/projects/${project.id}`}
+                    href={deskHref(project.id)}
                     className={cx(
                       "block truncate rounded-md px-2 py-1.5 text-xs transition",
-                      pathname === `/work/projects/${project.id}`
+                      pathname.startsWith(`/work/desks/${project.id}`)
                         ? "bg-brand-500 font-medium text-ink"
                         : "text-gray-200 hover:bg-navy-700 hover:text-white",
                     )}

@@ -22,6 +22,8 @@ from team_manage_services.api.v1.serializers import (
     CommentWriteSerializer,
     CompanyMemberSerializer,
     CompanySerializer,
+    DeskChatMessageSerializer,
+    DeskChatWriteSerializer,
     InvitationSerializer,
     InviteSerializer,
     NotificationSerializer,
@@ -82,18 +84,22 @@ from team_manage_services.services.org import (
     create_team,
     invite_to_team,
     respond_to_invitation,
+    workspace_for,
 )
 from team_manage_services.services.work import (
     add_comment,
     add_project_member,
     add_task_step,
     add_team_to_project,
-    sync_team_role_to_projects,
+    create_desk_team,
     create_project,
     create_task,
     delete_project,
     delete_task,
+    list_desk_chat,
+    post_desk_chat,
     set_step_done,
+    sync_team_role_to_projects,
     update_task,
 )
 
@@ -262,7 +268,11 @@ class BoardTemplateViewSet(viewsets.ModelViewSet):
         return BoardTemplateSerializer
 
     def create(self, request, *args, **kwargs):
-        company = companies_for_user(request.user).filter(pk=request.data.get("company")).first()
+        company_id = request.data.get("company")
+        if company_id in (None, ""):
+            company = workspace_for(request.user)
+        else:
+            company = companies_for_user(request.user).filter(pk=company_id).first()
         if company is None:
             raise ValidationError({"company": "Company not found."})
         serializer = BoardTemplateWriteSerializer(data=request.data)
@@ -364,10 +374,11 @@ class TeamViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        company = serializer.validated_data.get("company") or workspace_for(request.user)
         team = call_service(
             create_team,
             user=request.user,
-            company=serializer.validated_data["company"],
+            company=company,
             name=serializer.validated_data["name"],
         )
         return Response(self.get_serializer(team).data, status=status.HTTP_201_CREATED)
@@ -517,8 +528,8 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
     ),
     retrieve=extend_schema(summary="Get work project"),
     create=extend_schema(
-        summary="Create work project",
-        description="Company manager only. You become project owner. This is **not** the documentation `projects` API.",
+        summary="Create a desk",
+        description="Creates a desk (project). Company is optional; a personal workspace is used when omitted. You become owner.",
     ),
     partial_update=extend_schema(
         summary="Update work project",
@@ -554,7 +565,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
-        company = data.pop("company")
+        company = data.pop("company", None) or workspace_for(request.user)
         template = None
         template_id = request.data.get("board_template_id")
         if template_id not in (None, ""):
@@ -660,18 +671,84 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Response(ProjectMemberSerializer(qs, many=True).data)
 
     @extend_schema(
-        summary="List teams linked to this project",
+        methods=["GET"],
+        operation_id="work_projects_teams_list",
+        summary="List teams linked to this desk",
         responses={200: TeamSerializer(many=True)},
     )
-    @action(detail=True, methods=["get"], url_path="teams")
+    @extend_schema(
+        methods=["POST"],
+        operation_id="work_projects_teams_create",
+        summary="Create a team and link it to this desk",
+        description="Desk manager only. Body: `{name}`.",
+        request=TeamSerializer,
+        responses={201: TeamSerializer},
+    )
+    @action(detail=True, methods=["get", "post"], url_path="teams")
     def linked_teams(self, request, pk=None):
         project = self.get_object()
-        qs = (
-            Team.objects.filter(project_links__project=project)
-            .select_related("company", "owner")
-            .distinct()
+        if request.method == "GET":
+            qs = (
+                Team.objects.filter(project_links__project=project)
+                .select_related("company", "owner")
+                .distinct()
+            )
+            return Response(TeamSerializer(qs, many=True, context={"request": request}).data)
+        name = (request.data.get("name") or "").strip()
+        if not name:
+            raise ValidationError({"name": "Team name is required."})
+        team = call_service(create_desk_team, user=request.user, project=project, name=name)
+        return Response(
+            TeamSerializer(team, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
         )
-        return Response(TeamSerializer(qs, many=True, context={"request": request}).data)
+
+    @extend_schema(
+        methods=["GET"],
+        operation_id="work_projects_chat_list",
+        summary="Desk chat messages",
+        parameters=[_q("after", "Return messages with id greater than this.", OpenApiTypes.INT)],
+        responses={200: DeskChatMessageSerializer(many=True)},
+    )
+    @extend_schema(
+        methods=["POST"],
+        operation_id="work_projects_chat_create",
+        summary="Send a desk chat message",
+        request=DeskChatWriteSerializer,
+        responses={201: DeskChatMessageSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["get", "post"],
+        url_path="chat",
+        parser_classes=[JSONParser, FormParser, MultiPartParser],
+    )
+    def chat(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "GET":
+            after_id = _int_param(request, "after")
+            messages = list_desk_chat(user=request.user, project=project, after_id=after_id)
+            return Response(
+                DeskChatMessageSerializer(messages, many=True, context={"request": request}).data
+            )
+        upload = request.FILES.get("file")
+        body = request.data.get("body") or ""
+        if not isinstance(body, str):
+            body = str(body)
+        if not body.strip() and upload is None:
+            serializer = DeskChatWriteSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+        message = call_service(
+            post_desk_chat,
+            user=request.user,
+            project=project,
+            body=body,
+            upload=upload,
+        )
+        return Response(
+            DeskChatMessageSerializer(message, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @extend_schema(
         summary="Project board (columns + cards)",

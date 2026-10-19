@@ -16,7 +16,11 @@ from team_manage_services.models import (
     Team,
     TeamMember,
 )
-from team_manage_services.services.access import can_view_company, is_company_manager
+from team_manage_services.services.access import (
+    COMPANY_MANAGE_ROLES,
+    can_view_company,
+    is_company_manager,
+)
 from team_manage_services.services.notify import log_activity, notify_user
 
 User = get_user_model()
@@ -35,6 +39,31 @@ def ensure_company_owner_member(company: Company, user) -> CompanyMember:
         },
     )
     return member
+
+
+def workspace_for(user) -> Company:
+    """Hidden org root. Desks (projects) still need a company row."""
+    owned = (
+        Company.objects.filter(owner=user, parent__isnull=True)
+        .order_by("id")
+        .first()
+    )
+    if owned:
+        return owned
+    member = (
+        CompanyMember.objects.filter(
+            user=user,
+            status=CompanyMember.Status.ACTIVE,
+            role__in=COMPANY_MANAGE_ROLES,
+        )
+        .select_related("company")
+        .order_by("id")
+        .first()
+    )
+    if member:
+        return member.company
+    label = (user.get_full_name() or user.phone_number or "میز کار").strip()[:255]
+    return create_company(user=user, name=label)
 
 
 @transaction.atomic
