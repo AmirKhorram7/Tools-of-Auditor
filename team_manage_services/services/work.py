@@ -550,7 +550,10 @@ def mark_desk_chat_seen(*, user, project: Project) -> None:
 def list_desk_chat(*, user, project: Project, after_id: int | None = None, limit: int = 100):
     if not can_view_project(user, project):
         raise PermissionDenied("You cannot view this desk.")
-    qs = DeskChatMessage.objects.filter(project=project).select_related("author")
+    qs = DeskChatMessage.objects.filter(project=project).select_related(
+        "author",
+        "author__profile",
+    )
     cap = max(1, min(int(limit or 100), 200))
     if after_id:
         return list(qs.filter(id__gt=after_id).order_by("id")[:cap])

@@ -638,7 +638,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def members(self, request, pk=None):
         project = self.get_object()
         if request.method == "GET":
-            qs = project.members.select_related("user").order_by("role", "id")
+            qs = project.members.select_related("user", "user__profile").order_by("role", "id")
             return Response(ProjectMemberSerializer(qs, many=True).data)
         serializer = AddProjectMemberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -669,7 +669,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if team is None:
             raise ValidationError({"team_id": "Team not found."})
         call_service(add_team_to_project, user=request.user, project=project, team=team)
-        qs = project.members.select_related("user")
+        qs = project.members.select_related("user", "user__profile")
         return Response(ProjectMemberSerializer(qs, many=True).data)
 
     @extend_schema(

@@ -174,6 +174,11 @@ function HeadButton({
   );
 }
 
+function memberPhoto(members: WorkProjectMember[], userId?: number | null) {
+  if (!userId) return null;
+  return members.find((member) => member.user === userId)?.profile_image || null;
+}
+
 function FacePile({ members }: { members: WorkProjectMember[] }) {
   const shown = members.slice(0, 3);
   if (shown.length === 0) {
@@ -188,6 +193,7 @@ function FacePile({ members }: { members: WorkProjectMember[] }) {
       {shown.map((member) => (
         <Avatar
           key={member.id}
+          src={member.profile_image}
           name={member.full_name || member.phone_number}
           size={28}
           className="ring-2 ring-white"
@@ -304,7 +310,11 @@ function ChatInfo({
                 const fromTeam = teams.find((team) => team.id === member.added_from_team);
                 return (
                   <li key={member.id} className="flex items-center gap-2.5 rounded-xl px-1 py-1.5">
-                    <Avatar name={member.full_name || member.phone_number} size={34} />
+                    <Avatar
+                      src={member.profile_image}
+                      name={member.full_name || member.phone_number}
+                      size={34}
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-navy-900">
                         {member.full_name || member.phone_number}
@@ -593,7 +603,11 @@ export default function DeskChat({
                     dir="ltr"
                     className={cx("flex w-full gap-2", mine ? "flex-row-reverse" : "flex-row")}
                   >
-                    <Avatar name={message.author_name} size={28} />
+                    <Avatar
+                      src={message.author_image || memberPhoto(members, message.author)}
+                      name={message.author_name}
+                      size={28}
+                    />
                     <div className={cx("max-w-[85%] min-w-0", mine && "text-end")}>
                       <div
                         className={cx(

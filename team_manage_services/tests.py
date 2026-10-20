@@ -77,6 +77,9 @@ class WorkAPISmokeTests(APITestCase):
         self.assertEqual(empty.data["results"], [])
         self.assertEqual(empty.data["others_read_id"], 0)
 
+        self.manager.profile.character_id = "neda"
+        self.manager.profile.save(update_fields=["character_id"])
+
         sent = self.manager_client.post(
             f"{WORK}/projects/{desk_id}/chat/",
             {"body": "سلام، خروجی آماده است"},
@@ -85,6 +88,7 @@ class WorkAPISmokeTests(APITestCase):
         self.assertEqual(sent.status_code, status.HTTP_201_CREATED, sent.data)
         self.assertEqual(sent.data["body"], "سلام، خروجی آماده است")
         self.assertEqual(sent.data["author"], self.manager.id)
+        self.assertEqual(sent.data["author_image"], self.manager.profile.avatar_url())
 
         listed = self.manager_client.get(f"{WORK}/projects/{desk_id}/chat/")
         self.assertEqual(listed.status_code, status.HTTP_200_OK, listed.data)

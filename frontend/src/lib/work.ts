@@ -105,6 +105,7 @@ export type WorkDeskChatMessage = {
   id: number;
   author: number;
   author_name: string;
+  author_image?: string | null;
   body: string;
   kind?: WorkDeskChatKind;
   file?: string | null;
@@ -127,6 +128,7 @@ export type WorkProjectMember = {
   user: number;
   phone_number: string;
   full_name: string;
+  profile_image?: string | null;
   role: string;
   status: string;
   added_from_team?: number | null;

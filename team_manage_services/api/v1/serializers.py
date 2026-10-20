@@ -33,6 +33,14 @@ from team_manage_services.services.progress import (
 )
 
 
+def user_avatar_url(user):
+    """Same photo the profile page shows: uploaded image, then character."""
+    profile = getattr(user, "profile", None)
+    if not profile:
+        return None
+    return profile.avatar_url()
+
+
 class CompanySerializer(serializers.ModelSerializer):
     can_manage = serializers.SerializerMethodField()
 
@@ -169,14 +177,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         return obj.user.get_full_name().strip() or obj.user.phone_number
 
     def get_profile_image(self, obj):
-        profile = getattr(obj.user, "profile", None)
-        image = getattr(profile, "profile_image", None) if profile else None
-        if not image:
-            return None
-        try:
-            return image.url
-        except (AttributeError, ValueError):
-            return None
+        return user_avatar_url(obj.user)
 
 
 class TeamMemberUpdateSerializer(serializers.Serializer):
@@ -229,6 +230,7 @@ class InvitationSerializer(serializers.ModelSerializer):
 class ProjectMemberSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     full_name = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectMember
@@ -237,6 +239,7 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
             "user",
             "phone_number",
             "full_name",
+            "profile_image",
             "role",
             "status",
             "added_from_team",
@@ -244,6 +247,9 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
 
     def get_full_name(self, obj):
         return obj.user.get_full_name().strip() or obj.user.phone_number
+
+    def get_profile_image(self, obj):
+        return user_avatar_url(obj.user)
 
 
 class AddProjectMemberSerializer(serializers.Serializer):
@@ -424,6 +430,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class DeskChatMessageSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
+    author_image = serializers.SerializerMethodField()
     kind = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
 
@@ -433,6 +440,7 @@ class DeskChatMessageSerializer(serializers.ModelSerializer):
             "id",
             "author",
             "author_name",
+            "author_image",
             "body",
             "kind",
             "file",
@@ -445,6 +453,9 @@ class DeskChatMessageSerializer(serializers.ModelSerializer):
 
     def get_author_name(self, obj):
         return display_name(obj.author)
+
+    def get_author_image(self, obj):
+        return user_avatar_url(obj.author)
 
     def get_kind(self, obj):
         return obj.kind()
@@ -588,14 +599,7 @@ class TaskSerializer(serializers.ModelSerializer):
     def get_assignee_avatar(self, obj):
         if not obj.assigned_to_id:
             return None
-        profile = getattr(obj.assigned_to.user, "profile", None)
-        image = getattr(profile, "profile_image", None) if profile else None
-        if not image:
-            return None
-        try:
-            return image.url
-        except (AttributeError, ValueError):
-            return None
+        return user_avatar_url(obj.assigned_to.user)
 
     def get_prerequisites(self, obj):
         return [
