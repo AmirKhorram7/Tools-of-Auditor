@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { Avatar, cx, Spinner } from "@/components/ui";
 import { ApiError, apiFetch, mediaUrl } from "@/lib/api";
+import { chatTheme, wallpaperStyle } from "@/lib/chatAppearance";
 import { useI18n } from "@/lib/i18n";
 import {
   formatChatTime,
@@ -113,6 +114,44 @@ function IconChatMark() {
   );
 }
 
+function Ticks({ count }: { count: 1 | 2 }) {
+  return (
+    <svg viewBox="0 0 16 12" className="inline-block h-3 w-4" aria-hidden>
+      <path
+        d="M1.2 6.4 3.7 9 8.8 2.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {count === 2 && (
+        <path
+          d="M6.4 6.4 8.9 9 14.2 2.4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+function parseChatList(data: unknown): { results: WorkDeskChatMessage[]; othersReadId: number } {
+  if (Array.isArray(data)) {
+    return { results: data as WorkDeskChatMessage[], othersReadId: 0 };
+  }
+  if (data && typeof data === "object") {
+    const row = data as { results?: WorkDeskChatMessage[]; others_read_id?: number };
+    if (Array.isArray(row.results)) {
+      return { results: row.results, othersReadId: Number(row.others_read_id || 0) };
+    }
+  }
+  return { results: [], othersReadId: 0 };
+}
+
 function HeadButton({
   label,
   onClick,
@@ -207,7 +246,7 @@ function ChatInfo({
 }) {
   const { t, n, dir } = useI18n();
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-1 border-b border-navy-900/10 px-2 py-2">
         <HeadButton label={t("work.chatBack")} onClick={onBack}>
           <IconBack rtl={dir === "rtl"} />
@@ -291,6 +330,9 @@ export default function DeskChat({
   members,
   teams,
   currentUserId,
+  title,
+  theme,
+  wallpaper,
   expanded = false,
   onToggleExpand,
   onCollapse,
@@ -299,12 +341,17 @@ export default function DeskChat({
   members: WorkProjectMember[];
   teams: WorkTeam[];
   currentUserId?: number | null;
+  title?: string;
+  theme?: string;
+  wallpaper?: string;
   expanded?: boolean;
   onToggleExpand?: () => void;
   onCollapse?: () => void;
 }) {
   const { t, n, locale, dir } = useI18n();
+  const look = chatTheme(theme);
   const [messages, setMessages] = useState<WorkDeskChatMessage[]>([]);
+  const [othersReadId, setOthersReadId] = useState(0);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -344,11 +391,11 @@ export default function DeskChat({
   const load = useCallback(
     async (after?: number) => {
       const query = after ? `?after=${after}` : "";
-      const rows = await apiFetch<WorkDeskChatMessage[]>(
-        `/work/projects/${projectId}/chat/${query}`,
+      const payload = parseChatList(
+        await apiFetch(`/work/projects/${projectId}/chat/${query}`),
       );
-      if (!Array.isArray(rows)) return;
-      mergeRows(rows, after);
+      setOthersReadId(payload.othersReadId);
+      mergeRows(payload.results, after);
     },
     [mergeRows, projectId],
   );
@@ -500,7 +547,9 @@ export default function DeskChat({
             >
               <FacePile members={members} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-bold text-navy-900">{t("work.chat")}</span>
+                <span className="block truncate text-sm font-bold text-navy-900">
+                  {title?.trim() || t("work.chat")}
+                </span>
                 <span className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-500">
                   <IconPeople />
                   <span className="truncate">{subtitle}</span>
@@ -522,6 +571,7 @@ export default function DeskChat({
             )}
           </div>
 
+          <div className="relative min-h-0 flex-1 overflow-hidden" style={wallpaperStyle(wallpaper)}>
           <div
             ref={scroller}
             onScroll={(event) => {
@@ -529,44 +579,73 @@ export default function DeskChat({
               stickToBottom.current =
                 node.scrollHeight - node.scrollTop - node.clientHeight < 48;
             }}
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-gray-50 px-3 py-3"
+            className="absolute inset-0 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3"
           >
             {messages.length === 0 ? (
               <p className="py-8 text-center text-xs leading-6 text-gray-500">{t("work.chatEmpty")}</p>
             ) : (
               messages.map((message) => {
                 const mine = message.author === currentUserId;
+                const ticks: 1 | 2 = message.id <= othersReadId ? 2 : 1;
                 return (
                   <div
                     key={message.id}
-                    className={cx("flex gap-2", mine ? "flex-row-reverse" : "flex-row")}
+                    dir="ltr"
+                    className={cx("flex w-full gap-2", mine ? "flex-row-reverse" : "flex-row")}
                   >
                     <Avatar name={message.author_name} size={28} />
-                    <div className="max-w-[85%] min-w-0">
-                      <div className="mb-0.5 flex items-center gap-1.5 text-[10px] text-gray-400">
+                    <div className={cx("max-w-[85%] min-w-0", mine && "text-end")}>
+                      <div
+                        className={cx(
+                          "mb-0.5 flex items-center gap-1.5 text-[10px] text-gray-500",
+                          mine ? "flex-row-reverse" : "flex-row",
+                        )}
+                      >
                         <span className="font-medium text-gray-600">
                           {mine ? t("work.chatYou") : message.author_name || teamInitials("?")}
                         </span>
-                        <span>{formatChatTime(message.created_at, locale)}</span>
                       </div>
                       <div
                         className={cx(
-                          "rounded-2xl px-3 py-2 text-[13px] leading-6",
+                          "rounded-2xl px-3 py-2 text-start text-[13px] leading-6",
                           mine
-                            ? "rounded-ss-md bg-navy-900 text-white"
-                            : "rounded-se-md bg-white text-navy-900 shadow-[0_1px_2px_rgba(20,35,58,0.06)]",
+                            ? "rounded-br-md"
+                            : "rounded-bl-md bg-white text-navy-900 shadow-[0_1px_2px_rgba(20,35,58,0.06)]",
                         )}
+                        style={
+                          mine
+                            ? { backgroundColor: look.bubble, color: look.text }
+                            : undefined
+                        }
                       >
                         {message.body ? (
                           <p className="whitespace-pre-wrap break-words">{message.body}</p>
                         ) : null}
                         <ChatMedia message={message} />
+                        <div
+                          className={cx(
+                            "mt-1 flex items-center justify-end gap-1 text-[10px] leading-none",
+                            mine ? "opacity-80" : "text-gray-400",
+                          )}
+                          style={mine ? { color: look.tick } : undefined}
+                        >
+                          <span>{formatChatTime(message.created_at, locale)}</span>
+                          {mine && (
+                            <span
+                              title={ticks === 2 ? t("work.chatTicksRead") : t("work.chatTicksSent")}
+                              aria-label={ticks === 2 ? t("work.chatTicksRead") : t("work.chatTicksSent")}
+                            >
+                              <Ticks count={ticks} />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 );
               })
             )}
+          </div>
           </div>
 
           <div className="shrink-0 border-t border-navy-900/10 bg-white p-2">

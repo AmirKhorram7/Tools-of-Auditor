@@ -1,11 +1,13 @@
 """Project, members, tasks, and steps."""
 
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from team_manage_services.models import (
     ActivityLog,
+    DeskChatCursor,
     DeskChatMessage,
     Notification,
     Project,
@@ -517,6 +519,32 @@ def create_desk_team(*, user, project: Project, name: str) -> Team:
     team = create_team(user=user, company=project.company, name=name)
     add_team_to_project(user=user, project=project, team=team)
     return team
+
+
+def others_chat_read_id(*, user, project: Project) -> int:
+    value = (
+        DeskChatCursor.objects.filter(project=project)
+        .exclude(user=user)
+        .aggregate(m=Max("last_read_id"))
+        .get("m")
+    )
+    return int(value or 0)
+
+
+def mark_desk_chat_seen(*, user, project: Project) -> None:
+    latest = (
+        DeskChatMessage.objects.filter(project=project)
+        .order_by("-id")
+        .values_list("id", flat=True)
+        .first()
+    )
+    if not latest:
+        return
+    DeskChatCursor.objects.update_or_create(
+        project=project,
+        user=user,
+        defaults={"last_read_id": latest},
+    )
 
 
 def list_desk_chat(*, user, project: Project, after_id: int | None = None, limit: int = 100):

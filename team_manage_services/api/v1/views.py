@@ -97,6 +97,8 @@ from team_manage_services.services.work import (
     delete_project,
     delete_task,
     list_desk_chat,
+    mark_desk_chat_seen,
+    others_chat_read_id,
     post_desk_chat,
     set_step_done,
     sync_team_role_to_projects,
@@ -727,9 +729,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project = self.get_object()
         if request.method == "GET":
             after_id = _int_param(request, "after")
+            others_read = others_chat_read_id(user=request.user, project=project)
             messages = list_desk_chat(user=request.user, project=project, after_id=after_id)
+            mark_desk_chat_seen(user=request.user, project=project)
             return Response(
-                DeskChatMessageSerializer(messages, many=True, context={"request": request}).data
+                {
+                    "results": DeskChatMessageSerializer(
+                        messages, many=True, context={"request": request}
+                    ).data,
+                    "others_read_id": others_read,
+                }
             )
         upload = request.FILES.get("file")
         body = request.data.get("body") or ""

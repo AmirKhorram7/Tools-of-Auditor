@@ -74,7 +74,8 @@ class WorkAPISmokeTests(APITestCase):
 
         empty = self.manager_client.get(f"{WORK}/projects/{desk_id}/chat/")
         self.assertEqual(empty.status_code, status.HTTP_200_OK, empty.data)
-        self.assertEqual(empty.data, [])
+        self.assertEqual(empty.data["results"], [])
+        self.assertEqual(empty.data["others_read_id"], 0)
 
         sent = self.manager_client.post(
             f"{WORK}/projects/{desk_id}/chat/",
@@ -87,7 +88,33 @@ class WorkAPISmokeTests(APITestCase):
 
         listed = self.manager_client.get(f"{WORK}/projects/{desk_id}/chat/")
         self.assertEqual(listed.status_code, status.HTTP_200_OK, listed.data)
-        self.assertEqual(len(listed.data), 1)
+        self.assertEqual(len(listed.data["results"]), 1)
+        self.assertEqual(listed.data["others_read_id"], 0)
+
+        look = self.manager_client.patch(
+            f"{WORK}/projects/{desk_id}/",
+            {
+                "chat_name": "اتاق فروش",
+                "chat_theme": "teal",
+                "chat_wallpaper": "dots",
+            },
+            format="json",
+        )
+        self.assertEqual(look.status_code, status.HTTP_200_OK, look.data)
+        self.assertEqual(look.data["chat_name"], "اتاق فروش")
+        self.assertEqual(look.data["chat_theme"], "teal")
+        self.assertEqual(look.data["chat_wallpaper"], "dots")
+
+        add_member = self.manager_client.post(
+            f"{WORK}/projects/{desk_id}/members/",
+            {"user_id": self.employee.id, "role": "member"},
+            format="json",
+        )
+        self.assertEqual(add_member.status_code, status.HTTP_201_CREATED, add_member.data)
+        seen = self.employee_client.get(f"{WORK}/projects/{desk_id}/chat/")
+        self.assertEqual(seen.status_code, status.HTTP_200_OK, seen.data)
+        reread = self.manager_client.get(f"{WORK}/projects/{desk_id}/chat/")
+        self.assertGreaterEqual(reread.data["others_read_id"], sent.data["id"])
 
         outsider = User.objects.create_user(
             phone_number="09120000099",

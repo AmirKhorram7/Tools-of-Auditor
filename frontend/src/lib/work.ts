@@ -93,6 +93,9 @@ export type WorkProject = {
   can_manage_company?: boolean;
   require_approval_before_close?: boolean | null;
   require_approval?: boolean;
+  chat_name?: string;
+  chat_theme?: string;
+  chat_wallpaper?: string;
   created_at?: string;
 };
 

@@ -297,14 +297,6 @@ export default function DeskPage() {
     }
   };
 
-  const addColumn = async (name: string, color: string) => {
-    await apiFetch(`/work/projects/${projectId}/columns/`, {
-      method: "POST",
-      body: { name, color, status_key: "in_progress" },
-    });
-    await load(true);
-  };
-
   if (loading) return <PageLoader />;
   if (!project) return <Alert>{error || t("work.deskMissing")}</Alert>;
 
@@ -317,7 +309,7 @@ export default function DeskPage() {
       teams={projectTeams}
       canCreate={canAddTask}
     >
-      <div className="flex h-[calc(100vh-6.75rem)] min-h-[36rem] flex-col gap-2 pt-2">
+      <div className="flex h-0 min-h-0 flex-1 flex-col gap-2 overflow-hidden">
         <header className="flex shrink-0 flex-wrap items-center gap-2 rounded-2xl border border-navy-900/10 bg-white px-3 py-2">
           <WorkBreadcrumb
             fallbackHref="/work"
@@ -393,21 +385,27 @@ export default function DeskPage() {
         <WorkMeetLiveBar />
         {error && <Alert>{error}</Alert>}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2 md:flex-row" dir="ltr">
+        <div
+          dir="ltr"
+          className={cx(
+            "grid h-0 min-h-0 flex-1 gap-2 overflow-hidden",
+            chatLayout === "full" && "grid-rows-[minmax(0,1fr)]",
+            chatLayout === "closed" &&
+              "max-md:grid-rows-[2.5rem_minmax(0,1fr)] md:grid-cols-[2.5rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]",
+            chatLayout === "side" &&
+              "max-md:grid-rows-[19rem_minmax(0,1fr)] md:grid-cols-[22rem_minmax(0,1fr)] lg:grid-cols-[24rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]",
+          )}
+        >
           {chatLayout !== "closed" ? (
-            <div
-              className={cx(
-                "flex w-full shrink-0 flex-col",
-                chatLayout === "full"
-                  ? "h-[min(72vh,42rem)] md:h-full"
-                  : "h-[19rem] md:h-full md:w-[22rem] lg:w-[24rem]",
-              )}
-            >
+            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
               <DeskChat
                 projectId={project.id}
                 members={members}
                 teams={projectTeams}
                 currentUserId={myUserId}
+                title={project.chat_name}
+                theme={project.chat_theme}
+                wallpaper={project.chat_wallpaper}
                 expanded={chatLayout === "full"}
                 onToggleExpand={() =>
                   setChatVisible(chatLayout === "full" ? "side" : "full")
@@ -419,7 +417,7 @@ export default function DeskPage() {
             <button
               type="button"
               onClick={() => setChatVisible("side")}
-              className="flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-navy-900/10 bg-white text-navy-800 shadow-[0_1px_4px_rgba(20,35,58,0.06)] hover:border-brand-500 md:h-full md:w-10 md:flex-col md:py-3"
+              className="flex h-full w-full items-center justify-center gap-2 rounded-2xl border border-navy-900/10 bg-white text-navy-800 shadow-[0_1px_4px_rgba(20,35,58,0.06)] hover:border-brand-500 md:flex-col md:py-3"
               title={t("work.chatOpen")}
               aria-label={t("work.chatOpen")}
             >
@@ -431,7 +429,13 @@ export default function DeskPage() {
           )}
 
           {chatLayout !== "full" && (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto" dir={dir}>
+          <div
+            className={cx(
+              "flex h-full min-h-0 min-w-0 flex-col",
+              view === "board" ? "overflow-hidden" : "overflow-auto",
+            )}
+            dir={dir}
+          >
 
             {view === "board" && board ? (
               <TaskBoard
@@ -444,7 +448,6 @@ export default function DeskPage() {
                 currentUserId={myUserId}
                 onMove={moveTask}
                 onAddTask={canAddTask ? openTaskModal : undefined}
-                onAddColumn={project.can_manage ? addColumn : undefined}
               />
             ) : view === "flow" ? (
               <WorkFlowView

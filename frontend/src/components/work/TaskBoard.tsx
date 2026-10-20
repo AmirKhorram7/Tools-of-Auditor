@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 
-import CalendarColorPicker from "@/components/CalendarColorPicker";
-import { Button, Field, Input } from "@/components/ui";
 import TaskCard from "@/components/work/TaskCard";
 import { useI18n } from "@/lib/i18n";
 import {
-  BOARD_COLUMN_COLORS,
   type WorkBoard,
   type WorkBoardColumn,
   type WorkTask,
@@ -22,7 +19,6 @@ export default function TaskBoard({
   currentUserId,
   onMove,
   onAddTask,
-  onAddColumn,
   onBlockedClose,
 }: {
   board: WorkBoard;
@@ -33,15 +29,11 @@ export default function TaskBoard({
   currentUserId?: number | null;
   onMove: (task: WorkTask, column: WorkBoardColumn) => Promise<void> | void;
   onAddTask?: (column: WorkBoardColumn) => void;
-  onAddColumn?: (name: string, color: string) => Promise<void> | void;
   onBlockedClose?: () => void;
 }) {
   const { t } = useI18n();
   const showAddTask = Boolean(canAddTask ?? canManage) && Boolean(onAddTask);
   const [dropId, setDropId] = useState<number | null>(null);
-  const [columnName, setColumnName] = useState("");
-  const [columnColor, setColumnColor] = useState<string>(BOARD_COLUMN_COLORS.inProgress);
-  const [adding, setAdding] = useState(false);
 
   const visibleColumns = board.columns.map((column) => ({
     ...column,
@@ -51,19 +43,8 @@ export default function TaskBoard({
     }),
   }));
 
-  const addColumn = async () => {
-    if (!onAddColumn || !columnName.trim()) return;
-    setAdding(true);
-    try {
-      await onAddColumn(columnName.trim(), columnColor);
-      setColumnName("");
-    } finally {
-      setAdding(false);
-    }
-  };
-
   return (
-    <div className="-mx-1 flex items-start gap-3 overflow-x-auto pb-3">
+    <div className="flex h-full min-h-0 w-full min-w-0 items-stretch gap-3 overflow-x-auto overflow-y-hidden overscroll-contain">
       {visibleColumns.map((column) => (
         <section
           key={column.id}
@@ -89,7 +70,7 @@ export default function TaskBoard({
             }
             void onMove(task, column);
           }}
-          className={`flex h-[calc(100vh-16.5rem)] min-h-[280px] w-[270px] shrink-0 flex-col overflow-hidden rounded-xl border bg-white ${
+          className={`flex h-full min-h-0 w-[270px] shrink-0 flex-col overflow-hidden rounded-xl border bg-white ${
             dropId === column.id ? "border-navy-400 shadow-md" : "border-gray-200"
           }`}
         >
@@ -114,9 +95,9 @@ export default function TaskBoard({
               </button>
             )}
           </header>
-          <div className="min-h-0 flex-1 px-2 pb-1">
+          <div className="relative min-h-0 flex-1">
             <div
-              className={`flex h-full flex-col gap-1.5 overflow-y-auto rounded-lg border p-1.5 ${
+              className={`absolute inset-x-2 top-0 bottom-2 flex flex-col gap-1.5 overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg border p-1.5 ${
                 dropId === column.id
                   ? "border-navy-400 bg-white"
                   : "border-dashed border-gray-300 bg-[#F7F8FA]"
@@ -154,26 +135,6 @@ export default function TaskBoard({
           )}
         </section>
       ))}
-      {canManage && onAddColumn && (
-        <section className="w-[240px] shrink-0 rounded-xl border border-dashed border-gray-300 bg-white p-3">
-          <p className="mb-2 text-sm font-semibold text-ink">{t("work.newColumn")}</p>
-          <Field label={t("work.columnName")}>
-            <Input
-              value={columnName}
-              onChange={(event) => setColumnName(event.target.value)}
-              placeholder={t("work.columnExample")}
-            />
-          </Field>
-          <CalendarColorPicker
-            value={columnColor}
-            onChange={setColumnColor}
-            title={t("common.color")}
-          />
-          <Button className="mt-3 w-full" size="sm" loading={adding} onClick={() => void addColumn()}>
-            {t("common.add")}
-          </Button>
-        </section>
-      )}
     </div>
   );
 }

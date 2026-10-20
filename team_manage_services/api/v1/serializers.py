@@ -362,10 +362,28 @@ class ProjectSerializer(serializers.ModelSerializer):
             "can_manage_company",
             "require_approval_before_close",
             "require_approval",
+            "chat_name",
+            "chat_theme",
+            "chat_wallpaper",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["owner", "owner_name", "created_at", "updated_at"]
+
+    def validate_chat_theme(self, value):
+        theme = (value or "navy").strip() or "navy"
+        if theme not in Project.CHAT_THEMES:
+            raise serializers.ValidationError("Unknown chat theme.")
+        return theme
+
+    def validate_chat_wallpaper(self, value):
+        wall = (value or "plain").strip() or "plain"
+        if wall not in Project.CHAT_WALLPAPERS:
+            raise serializers.ValidationError("Unknown chat wallpaper.")
+        return wall
+
+    def validate_chat_name(self, value):
+        return (value or "").strip()[:80]
 
     def get_progress_percent(self, obj):
         return project_progress_percent(obj)

@@ -403,6 +403,20 @@ class Project(BaseModel):
         blank=True,
         help_text=_("Null inherits the company policy."),
     )
+    CHAT_THEMES = ("navy", "brand", "teal", "grape", "sand")
+    CHAT_WALLPAPERS = (
+        "plain",
+        "dots",
+        "waves",
+        "grid",
+        "dusk",
+        "leaves",
+        "paper",
+        "night",
+    )
+    chat_name = models.CharField(max_length=80, blank=True, default="")
+    chat_theme = models.CharField(max_length=16, blank=True, default="navy")
+    chat_wallpaper = models.CharField(max_length=16, blank=True, default="plain")
 
     class Meta:
         ordering = ["-created_at"]
@@ -544,6 +558,36 @@ class DeskChatMessage(BaseModel):
 
     def __str__(self):
         return f"chat {self.project_id} by {self.author_id}"
+
+
+class DeskChatCursor(BaseModel):
+    """How far this person has read in a desk chat — used for double ticks."""
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="chat_cursors",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="desk_chat_cursors",
+    )
+    last_read_id = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "user"],
+                name="tm_unique_desk_chat_cursor",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["project", "last_read_id"], name="tm_desk_chat_cursor_read"),
+        ]
+
+    def __str__(self):
+        return f"chat cursor {self.project_id} / {self.user_id}"
 
 
 class BoardColumn(BaseModel):

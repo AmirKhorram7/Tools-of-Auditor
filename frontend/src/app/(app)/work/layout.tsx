@@ -10,14 +10,27 @@ import { useI18n } from "@/lib/i18n";
 export default function WorkLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t, dir } = useI18n();
+  const deskBoard = /^\/work\/desks\/[^/]+\/?$/.test(pathname);
   const mobileTabs = [
     { href: "/work", label: t("nav.workHomeShort"), exact: true },
     { href: "/work/inbox", label: t("nav.inbox"), exact: false },
   ];
 
   return (
-    <div className="flex items-start gap-2.5 max-md:gap-0" dir="ltr">
-      <div className="min-w-0 flex-1 pb-16 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0" dir={dir}>
+    <div
+      className={cx(
+        "flex gap-2.5 max-md:gap-0",
+        deskBoard ? "h-0 min-h-0 flex-1 items-stretch overflow-hidden" : "items-start",
+      )}
+      dir="ltr"
+    >
+      <div
+        className={cx(
+          "min-w-0 flex-1 pb-16 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+          deskBoard && "flex min-h-0 flex-col self-stretch overflow-hidden",
+        )}
+        dir={dir}
+      >
         {children}
       </div>
       <WorkSidePanel />

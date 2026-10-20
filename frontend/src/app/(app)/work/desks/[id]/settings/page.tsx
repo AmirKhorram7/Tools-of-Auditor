@@ -17,6 +17,7 @@ import PhoneSuggest from "@/components/work/PhoneSuggest";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { WorkMeetButton, WorkMeetModal, WorkMeetScope } from "@/components/work/meet/WorkMeetPanel";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
+import { CHAT_THEMES, CHAT_WALLPAPERS, wallpaperStyle } from "@/lib/chatAppearance";
 import { useI18n } from "@/lib/i18n";
 import {
   ASSIGNABLE_TEAM_ROLES,
@@ -68,6 +69,9 @@ export default function DeskSettingsPage() {
   const [templateName, setTemplateName] = useState("");
   const [templateDefault, setTemplateDefault] = useState(true);
   const [templateCols, setTemplateCols] = useState<Array<{ name: string; color: string }>>([]);
+  const [chatName, setChatName] = useState("");
+  const [chatThemeId, setChatThemeId] = useState("navy");
+  const [chatWallpaperId, setChatWallpaperId] = useState("plain");
 
   useEffect(() => {
     setTemplateCols([
@@ -120,7 +124,34 @@ export default function DeskSettingsPage() {
     setColumnNames(Object.fromEntries(board.columns.map((column) => [column.id, column.name])));
   }, [board]);
 
+  useEffect(() => {
+    if (!project) return;
+    setChatName(project.chat_name || "");
+    setChatThemeId(project.chat_theme || "navy");
+    setChatWallpaperId(project.chat_wallpaper || "plain");
+  }, [project]);
+
   const columns = board?.columns || [];
+
+  const saveChatLook = async () => {
+    setSaving(true);
+    setFormError(null);
+    try {
+      const row = await apiFetch<WorkProject>(`/work/projects/${projectId}/`, {
+        method: "PATCH",
+        body: {
+          chat_name: chatName.trim(),
+          chat_theme: chatThemeId,
+          chat_wallpaper: chatWallpaperId,
+        },
+      });
+      setProject(row);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t("work.chatLookFail"));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const createTeam = async () => {
     if (!newTeamName.trim()) {
@@ -476,6 +507,73 @@ export default function DeskSettingsPage() {
           <p className="mt-3 text-[11px] text-gray-500">
             {project.require_approval ? t("work.policyNowOn") : t("work.policyNowOff")}
           </p>
+        </section>
+
+        <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
+          <h2 className="text-sm font-bold text-ink">{t("work.chatSettings")}</h2>
+          <p className="mt-1 text-xs leading-6 text-gray-500">{t("work.chatSettingsHint")}</p>
+          <div className="mt-3 space-y-3">
+            <Field label={t("work.chatName")}>
+              <Input
+                value={chatName}
+                maxLength={80}
+                disabled={!canManage}
+                placeholder={t("work.chat")}
+                onChange={(event) => setChatName(event.target.value)}
+              />
+            </Field>
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-ink">{t("work.chatTheme")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CHAT_THEMES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={!canManage}
+                    onClick={() => setChatThemeId(item.id)}
+                    className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                      chatThemeId === item.id
+                        ? "border-navy-900 font-semibold text-navy-900"
+                        : "border-gray-200 text-gray-600"
+                    }`}
+                  >
+                    <span
+                      className="size-3.5 rounded-full"
+                      style={{ backgroundColor: item.bubble }}
+                    />
+                    {t(`work.chatTheme.${item.id}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-ink">{t("work.chatWallpaper")}</p>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                {CHAT_WALLPAPERS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={!canManage}
+                    title={t(`work.chatWall.${item.id}`)}
+                    aria-label={t(`work.chatWall.${item.id}`)}
+                    onClick={() => setChatWallpaperId(item.id)}
+                    className={`h-14 overflow-hidden rounded-xl border-2 ${
+                      chatWallpaperId === item.id ? "border-brand-500" : "border-transparent"
+                    }`}
+                    style={wallpaperStyle(item.id)}
+                  />
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-gray-500">
+                {t(`work.chatWall.${chatWallpaperId}`)}
+              </p>
+            </div>
+            {canManage && (
+              <Button size="sm" loading={saving} onClick={() => void saveChatLook()}>
+                {t("work.chatSaveLook")}
+              </Button>
+            )}
+          </div>
         </section>
 
         <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
