@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import PhoneSuggest from "@/components/work/PhoneSuggest";
 import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
+import WorkSection from "@/components/work/WorkSection";
 import { WorkMeetButton, WorkMeetModal, WorkMeetScope } from "@/components/work/meet/WorkMeetPanel";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { CHAT_THEMES, CHAT_WALLPAPERS, wallpaperStyle } from "@/lib/chatAppearance";
@@ -468,6 +469,7 @@ export default function DeskSettingsPage() {
                 date: formatWorkDateTime(project.created_at, locale, "—"),
               })}
             </p>
+            <p className="mt-1.5 text-xs leading-5 text-gray-400">{t("work.settingsModulesHint")}</p>
           </div>
           <Link href={deskHref(project.id)}>
             <Button size="sm" variant="secondary">
@@ -479,9 +481,14 @@ export default function DeskSettingsPage() {
         {error && <Alert>{error}</Alert>}
         {formError && <Alert>{formError}</Alert>}
 
-        <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
-          <h2 className="text-sm font-bold text-ink">{t("work.policyTitle")}</h2>
-          <p className="mt-1 text-xs leading-6 text-gray-500">{t("work.policyHint")}</p>
+        <WorkSection
+          id="desk-settings-policy"
+          title={t("work.policyTitle")}
+          hint={project.require_approval ? t("work.policyNowOn") : t("work.policyNowOff")}
+          icon={<SettingsIcon path="M10 2.5 16 6v8l-6 3.5L4 14V6l6-3.5Z M10 10.2a1.7 1.7 0 1 0 0-3.4 1.7 1.7 0 0 0 0 3.4Z" />}
+          defaultOpen={false}
+        >
+          <p className="text-xs leading-6 text-gray-500">{t("work.policyHint")}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {(
               [
@@ -507,11 +514,18 @@ export default function DeskSettingsPage() {
           <p className="mt-3 text-[11px] text-gray-500">
             {project.require_approval ? t("work.policyNowOn") : t("work.policyNowOff")}
           </p>
-        </section>
+        </WorkSection>
 
-        <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
-          <h2 className="text-sm font-bold text-ink">{t("work.chatSettings")}</h2>
-          <p className="mt-1 text-xs leading-6 text-gray-500">{t("work.chatSettingsHint")}</p>
+        <WorkSection
+          id="desk-settings-chat"
+          title={t("work.chatSettings")}
+          hint={chatName.trim() || t("work.chatSettingsHint")}
+          icon={
+            <SettingsIcon path="M4 5.5A2.5 2.5 0 0 1 6.5 3h7A2.5 2.5 0 0 1 16 5.5v5A2.5 2.5 0 0 1 13.5 13H9l-3.5 3v-3H6.5A2.5 2.5 0 0 1 4 10.5v-5Z" />
+          }
+          defaultOpen={false}
+        >
+          <p className="text-xs leading-6 text-gray-500">{t("work.chatSettingsHint")}</p>
           <div className="mt-3 space-y-3">
             <Field label={t("work.chatName")}>
               <Input
@@ -574,13 +588,19 @@ export default function DeskSettingsPage() {
               </Button>
             )}
           </div>
-        </section>
+        </WorkSection>
 
-        <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-ink">{t("work.teamsTitle")}</h2>
-            <WorkMeetButton />
-          </div>
+        <WorkSection
+          id="desk-settings-teams"
+          title={t("work.teamsTitle")}
+          hint={projectTeams.length ? t("work.teamClickHint") : t("work.noLinkedTeam")}
+          count={projectTeams.length}
+          icon={
+            <SettingsIcon path="M7 9.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4ZM13.2 9.6a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8ZM3.5 15.4c.4-2.2 2-3.4 3.5-3.4s3.1 1.2 3.5 3.4M11 12.2c1.4 0 2.8 1 3.2 3.2" />
+          }
+          actions={<WorkMeetButton />}
+          defaultOpen={false}
+        >
           <div className="mb-4 grid gap-2 sm:grid-cols-2">
             {projectTeams.length === 0 && (
               <p className="text-xs text-gray-500 sm:col-span-2">{t("work.noLinkedTeam")}</p>
@@ -658,10 +678,16 @@ export default function DeskSettingsPage() {
               </div>
             </div>
           )}
-        </section>
+        </WorkSection>
 
-        <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
-          <h2 className="mb-2 text-sm font-bold text-ink">{t("work.labelsTitle")}</h2>
+        <WorkSection
+          id="desk-settings-labels"
+          title={t("work.labelsTitle")}
+          hint={t("work.labelsHint")}
+          count={labels.length}
+          icon={<SettingsIcon path="M3.5 10.2 10.2 3.5h6.3v6.3L9.8 16.5a1.4 1.4 0 0 1-2 0L3.5 12.2a1.4 1.4 0 0 1 0-2ZM13.2 6.8a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" />}
+          defaultOpen={false}
+        >
           <p className="mb-2 text-xs text-gray-500">{t("work.labelsHint")}</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {labels.length === 0 && <p className="text-xs text-gray-500">{t("work.labelExample")}</p>}
@@ -728,10 +754,18 @@ export default function DeskSettingsPage() {
               {t("work.createLabel")}
             </Button>
           </div>
-        </section>
+        </WorkSection>
 
-        <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
-          <h2 className="mb-2 text-sm font-bold text-ink">{t("work.columnsTitle")}</h2>
+        <WorkSection
+          id="desk-settings-columns"
+          title={t("work.columnsTitle")}
+          hint={t("work.columnsHint")}
+          count={columns.length}
+          icon={
+            <SettingsIcon path="M3.5 4.5h3.2v11H3.5zM8.4 4.5h3.2v11H8.4zM13.3 4.5h3.2v11h-3.2z" />
+          }
+          defaultOpen={false}
+        >
           <p className="mb-3 text-xs text-gray-500">{t("work.columnsHint")}</p>
           <ul className="space-y-3">
             {columns.map((column) => (
@@ -785,10 +819,18 @@ export default function DeskSettingsPage() {
               {t("work.addColumn")}
             </Button>
           </div>
-        </section>
+        </WorkSection>
 
-        <section className="rounded-2xl border border-navy-900/10 bg-white p-4">
-          <h2 className="mb-2 text-sm font-bold text-ink">{t("work.defaultBoards")}</h2>
+        <WorkSection
+          id="desk-settings-boards"
+          title={t("work.defaultBoards")}
+          hint={t("work.defaultBoardsHint")}
+          count={templates.length}
+          icon={
+            <SettingsIcon path="M3.5 4.2h13v3.2h-13zM3.5 8.8h6.2v7H3.5zM11.3 8.8h5.2v7h-5.2z" />
+          }
+          defaultOpen={false}
+        >
           <p className="mb-3 text-xs text-gray-500">{t("work.defaultBoardsHint")}</p>
           <ul className="mb-3 space-y-2">
             {templates.length === 0 && (
@@ -934,7 +976,7 @@ export default function DeskSettingsPage() {
           ) : (
             <p className="text-xs text-gray-500">{t("work.onlyCompanyTemplate")}</p>
           )}
-        </section>
+        </WorkSection>
 
         {canManage && (
           <div className="flex justify-between pb-8">
@@ -946,5 +988,19 @@ export default function DeskSettingsPage() {
       </div>
       <WorkMeetModal />
     </WorkMeetScope>
+  );
+}
+
+function SettingsIcon({ path }: { path: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className="size-4 shrink-0 text-navy-700" fill="none" aria-hidden>
+      <path
+        d={path}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

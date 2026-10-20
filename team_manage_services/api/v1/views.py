@@ -779,6 +779,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 "created_by",
             )
             .prefetch_related("labels", "steps", "prerequisites")
+            .annotate(comment_count=Count("comments", distinct=True))
             .order_by("due_date", "-created_at")
         )
         serialized = TaskSerializer(tasks, many=True, context={"request": request}).data
@@ -937,6 +938,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                 "created_by",
             )
             .prefetch_related("steps", "labels", "prerequisites")
+            .annotate(comment_count=Count("comments", distinct=True))
         )
         if self.action == "retrieve":
             qs = qs.prefetch_related("comments__author", "comments__attachments")

@@ -22,6 +22,7 @@ export type TaskCardModel = {
   assignee_name?: string | null;
   assignee_avatar?: string | null;
   progress_percent?: number;
+  comment_count?: number;
   can_move?: boolean;
 };
 
@@ -111,6 +112,22 @@ export default function TaskCard({
       <div className="mt-1.5 flex items-end justify-between gap-2 text-[10px] text-gray-500">
         <span className="flex items-center gap-1.5">
           <span dir="ltr">#{task.id}</span>
+          {(task.comment_count || 0) > 0 && (
+            <span
+              title={t("work.cardHasComments")}
+              aria-label={t("work.cardHasComments")}
+              className="inline-flex text-navy-700"
+            >
+              <svg viewBox="0 0 16 16" className="size-3" fill="none" aria-hidden>
+                <path
+                  d="M3.2 3.2h9.6A1.2 1.2 0 0 1 14 4.4v5.2a1.2 1.2 0 0 1-1.2 1.2H8.2L5 13.6v-2.8H3.2A1.2 1.2 0 0 1 2 9.6V4.4a1.2 1.2 0 0 1 1.2-1.2Z"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          )}
           {task.due_date && (
             <span className={overdue ? "font-medium text-red-600" : ""}>
               {shortWorkDate(task.due_date, locale)}

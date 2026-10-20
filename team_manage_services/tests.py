@@ -260,6 +260,15 @@ class WorkAPISmokeTests(APITestCase):
             format="json",
         )
         self.assertEqual(comment_res.status_code, status.HTTP_201_CREATED, comment_res.data)
+        board_with_comment = self.manager_client.get(f"{WORK}/projects/{project_id}/board/")
+        self.assertEqual(board_with_comment.status_code, status.HTTP_200_OK, board_with_comment.data)
+        commented = next(
+            card
+            for column in board_with_comment.data["columns"]
+            for card in column["tasks"]
+            if card["id"] == task_id
+        )
+        self.assertGreaterEqual(commented["comment_count"], 1)
 
         done_step = self.employee_client.patch(
             f"{WORK}/tasks/{task_id}/steps/{step_id}/",
@@ -552,6 +561,21 @@ class WorkAPISmokeTests(APITestCase):
         )
         closed = next(col for col in board.data["columns"] if col["is_closed"])
         waiting = next(col for col in board.data["columns"] if col["status_key"] == "in_review")
+        self.assertEqual(names[-1], "بسته")
+
+        open_ids = [col["id"] for col in board.data["columns"] if not col["is_closed"]]
+        broken_ids = open_ids[:2] + [closed["id"]] + open_ids[2:]
+        shuffled = self.manager_client.post(
+            f"{WORK}/projects/{project_id}/reorder-columns/",
+            {"column_ids": broken_ids},
+            format="json",
+        )
+        self.assertEqual(shuffled.status_code, status.HTTP_200_OK, shuffled.data)
+        repaired = self.manager_client.get(f"{WORK}/projects/{project_id}/board/")
+        self.assertEqual(
+            [col["name"] for col in repaired.data["columns"]],
+            ["برای انجام", "در حال انجام", "تست", "در انتظار تأیید", "بسته"],
+        )
 
         team_res = self.manager_client.post(
             f"{WORK}/teams/",

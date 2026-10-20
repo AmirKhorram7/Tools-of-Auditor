@@ -205,6 +205,7 @@ export type WorkTask = {
   start_date: string | null;
   due_date: string | null;
   progress_percent: number;
+  comment_count?: number;
   can_move?: boolean;
   created_at?: string;
 };

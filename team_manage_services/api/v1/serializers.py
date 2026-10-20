@@ -553,6 +553,7 @@ class TaskSerializer(serializers.ModelSerializer):
         source="prerequisites",
     )
     can_move = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
@@ -581,6 +582,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "due_date",
             "completed_at",
             "progress_percent",
+            "comment_count",
             "can_move",
             "created_at",
             "updated_at",
@@ -612,6 +614,12 @@ class TaskSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return can_move_task(request.user, obj)
+
+    def get_comment_count(self, obj):
+        count = getattr(obj, "comment_count", None)
+        if count is not None:
+            return int(count)
+        return obj.comments.count()
 
 
 class TaskDetailSerializer(TaskSerializer):

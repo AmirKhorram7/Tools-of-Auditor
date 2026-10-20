@@ -1,5 +1,7 @@
 """Project board columns and company labels (GitLab-style lists + tags)."""
 
+from django.db.models import F
+
 from team_manage_services.models import (
     BoardColumn,
     BoardTemplate,
@@ -46,6 +48,73 @@ PLATFORM_BOARD_COLUMNS = (
     },
     {"name": "بسته", "color": DONE_COLOR, "status_key": Task.Status.DONE, "is_closed": True},
 )
+
+
+def _name_key(name: str) -> str:
+    return (name or "").strip().replace("ي", "ی").replace("ك", "ک")
+
+
+def _write_positions(columns: list[BoardColumn]) -> list[BoardColumn]:
+    for index, column in enumerate(columns):
+        if column.position != index:
+            BoardColumn.objects.filter(pk=column.pk).update(position=index)
+            column.position = index
+    return columns
+
+
+def place_closed_columns_last(project: Project) -> list[BoardColumn]:
+    """Closed / «بسته» always sits at the end of the desk board."""
+    columns = list(project.board_columns.order_by("position", "id"))
+    open_cols = [column for column in columns if not column.is_closed]
+    closed_cols = [column for column in columns if column.is_closed]
+    return _write_positions(open_cols + closed_cols)
+
+
+def align_columns_to_template(project: Project, template: BoardTemplate) -> list[BoardColumn]:
+    """Create any missing template lists and store them in the template order."""
+    existing = {_name_key(column.name): column for column in project.board_columns.all()}
+    ordered: list[BoardColumn] = []
+    for spec in template.columns.all().order_by("position", "id"):
+        name = spec.name.strip()
+        column = existing.pop(_name_key(name), None)
+        if column is None:
+            status_key, is_closed = infer_column_status(name, spec.is_closed)
+            column = BoardColumn.objects.create(
+                project=project,
+                name=name,
+                color=spec.color or DEFAULT_COLUMN_COLOR,
+                status_key=spec.status_key or status_key,
+                is_closed=spec.is_closed or is_closed,
+                position=len(ordered),
+            )
+        ordered.append(column)
+    leftovers = sorted(existing.values(), key=lambda column: (column.is_closed, column.position, column.id))
+    _write_positions(ordered + leftovers)
+    return place_closed_columns_last(project)
+
+
+def maybe_align_known_template(project: Project, columns: list[BoardColumn]) -> list[BoardColumn] | None:
+    names = {_name_key(column.name) for column in columns}
+    if not names:
+        return None
+    candidates = []
+    platform = platform_board_template()
+    if platform is not None:
+        candidates.append(platform)
+    default = default_template_columns(project.company)
+    if default:
+        template = (
+            BoardTemplate.objects.filter(company=project.company, is_default=True)
+            .prefetch_related("columns")
+            .first()
+        )
+        if template is not None:
+            candidates.append(template)
+    for template in candidates:
+        spec_names = [_name_key(column.name) for column in template.columns.all().order_by("position", "id")]
+        if spec_names and set(spec_names) == names:
+            return align_columns_to_template(project, template)
+    return None
 
 
 def infer_column_status(name: str, is_closed=False) -> tuple[str, bool]:
@@ -95,6 +164,10 @@ def seed_project_columns(project: Project, template: BoardTemplate | None = None
         specs = list(template.columns.all())
     if not specs:
         specs = default_template_columns(project.company)
+    if not specs:
+        platform = platform_board_template()
+        if platform is not None:
+            specs = list(platform.columns.all())
     created = []
     if specs:
         for index, spec in enumerate(specs):
@@ -132,7 +205,11 @@ def ensure_project_columns(project: Project) -> list[BoardColumn]:
         column = by_status.get(task.status) or columns[0]
         task.column = column
         task.save(update_fields=["column", "updated_at"])
-    return list(project.board_columns.order_by("position", "id"))
+    columns = list(project.board_columns.order_by("position", "id"))
+    aligned = maybe_align_known_template(project, columns)
+    if aligned is not None:
+        return aligned
+    return place_closed_columns_last(project)
 
 
 def column_for_status(project: Project, status_key: str) -> BoardColumn | None:
@@ -163,14 +240,27 @@ def create_column(*, user, project: Project, name="", color="", status_key="", i
     name = (name or "").strip()
     if not name:
         raise ValidationError({"name": "Column name is required."})
-    last = project.board_columns.order_by("-position").first()
+    closed = bool(is_closed or status_key == Task.Status.DONE)
+    first_closed = (
+        None
+        if closed
+        else project.board_columns.filter(is_closed=True).order_by("position", "id").first()
+    )
+    if first_closed is not None:
+        position = first_closed.position
+        BoardColumn.objects.filter(project=project, position__gte=position).update(
+            position=F("position") + 1
+        )
+    else:
+        last = project.board_columns.order_by("-position").first()
+        position = (last.position + 1) if last else 0
     column = BoardColumn(
         project=project,
         name=name,
         color=(color or DEFAULT_COLUMN_COLOR).strip(),
         status_key=status_key or Task.Status.IN_PROGRESS,
-        is_closed=bool(is_closed or status_key == Task.Status.DONE),
-        position=(last.position + 1) if last else 0,
+        is_closed=closed,
+        position=position,
     )
     column.full_clean()
     column.save()
@@ -262,8 +352,6 @@ def delete_label(*, user, label: WorkLabel):
 
 
 def ensure_approval_column(project: Project) -> BoardColumn:
-    from django.db.models import F
-
     columns = list(project.board_columns.order_by("position", "id"))
     for column in columns:
         if column.status_key == Task.Status.IN_REVIEW or any(
@@ -291,27 +379,16 @@ def apply_template_to_project(*, user, project: Project, template: BoardTemplate
 
     if not is_project_manager(user, project):
         raise PermissionDenied("Only a project manager can change the board.")
-    existing_names = {col.name.strip() for col in project.board_columns.all()}
-    last = project.board_columns.order_by("-position").first()
-    position = (last.position + 1) if last else 0
-    for spec in template.columns.all():
-        if spec.name.strip() in existing_names:
-            continue
-        status_key, is_closed = infer_column_status(spec.name, spec.is_closed)
-        BoardColumn.objects.create(
-            project=project,
-            name=spec.name,
-            color=spec.color or DEFAULT_COLUMN_COLOR,
-            status_key=spec.status_key or status_key,
-            is_closed=spec.is_closed or is_closed,
-            position=position,
-        )
-        position += 1
+    align_columns_to_template(project, template)
     if template.requires_approval or template.is_platform:
         project.require_approval_before_close = True
         project.save(update_fields=["require_approval_before_close", "updated_at"])
         ensure_approval_column(project)
-    return list(project.board_columns.order_by("position", "id"))
+    columns = list(project.board_columns.order_by("position", "id"))
+    aligned = maybe_align_known_template(project, columns)
+    if aligned is not None:
+        return aligned
+    return place_closed_columns_last(project)
 
 
 def save_board_template(*, user, company, name: str, columns: list, is_default=False, template=None):
