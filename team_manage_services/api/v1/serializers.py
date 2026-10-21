@@ -98,6 +98,7 @@ class TeamSerializer(serializers.ModelSerializer):
     member_count = serializers.SerializerMethodField()
     project_count = serializers.SerializerMethodField()
     preview_members = serializers.SerializerMethodField()
+    linked_desks = serializers.SerializerMethodField()
 
     class Meta:
         model = Team
@@ -112,6 +113,7 @@ class TeamSerializer(serializers.ModelSerializer):
             "member_count",
             "project_count",
             "preview_members",
+            "linked_desks",
             "created_at",
             "updated_at",
         ]
@@ -121,6 +123,7 @@ class TeamSerializer(serializers.ModelSerializer):
             "member_count",
             "project_count",
             "preview_members",
+            "linked_desks",
             "created_at",
             "updated_at",
         ]
@@ -142,6 +145,10 @@ class TeamSerializer(serializers.ModelSerializer):
         if isinstance(annotated, int):
             return annotated
         return obj.project_links.count()
+
+    def get_linked_desks(self, obj):
+        links = obj.project_links.all()
+        return [{"id": link.project_id, "name": link.project.name} for link in links]
 
     def get_preview_members(self, obj):
         members = getattr(obj, "active_members", None)

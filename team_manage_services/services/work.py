@@ -58,6 +58,49 @@ def sync_team_role_to_projects(team_member: TeamMember) -> None:
     ).exclude(role=ProjectMember.Role.OWNER).update(role=mapped)
 
 
+def _upsert_project_member_from_team(*, project: Project, team: Team, team_member: TeamMember) -> ProjectMember:
+    mapped = project_role_from_team(team_member.role)
+    member, created = ProjectMember.objects.get_or_create(
+        project=project,
+        user=team_member.user,
+        defaults={
+            "role": mapped,
+            "status": ProjectMember.Status.ACTIVE,
+            "added_from_team": team,
+        },
+    )
+    if created:
+        return member
+    updates = []
+    if member.status != ProjectMember.Status.ACTIVE:
+        member.status = ProjectMember.Status.ACTIVE
+        updates.append("status")
+    if member.role != ProjectMember.Role.OWNER:
+        if member.role != mapped:
+            member.role = mapped
+            updates.append("role")
+        if member.added_from_team_id is None:
+            member.added_from_team = team
+            updates.append("added_from_team")
+    if updates:
+        updates.append("updated_at")
+        member.save(update_fields=updates)
+    return member
+
+
+def sync_team_members_onto_project(project: Project, team: Team) -> None:
+    members = team.members.filter(status=TeamMember.Status.ACTIVE).select_related("user")
+    for team_member in members:
+        _upsert_project_member_from_team(project=project, team=team, team_member=team_member)
+
+
+def add_user_to_linked_desks(*, team: Team, team_member: TeamMember) -> None:
+    """When someone joins a team, they become assignable on every desk that team is on."""
+    links = team.project_links.select_related("project")
+    for link in links:
+        _upsert_project_member_from_team(project=link.project, team=team, team_member=team_member)
+
+
 def _ensure_project_owner_member(project: Project) -> ProjectMember:
     member, _ = ProjectMember.objects.get_or_create(
         project=project,
@@ -123,22 +166,8 @@ def add_team_to_project(*, user, project: Project, team: Team) -> ProjectTeam:
     if team.company_id != project.company_id:
         raise ValidationError({"team": "Team must belong to the same company."})
     link, created = ProjectTeam.objects.get_or_create(project=project, team=team)
+    sync_team_members_onto_project(project, team)
     if created:
-        for tm in team.members.filter(status=TeamMember.Status.ACTIVE):
-            mapped = project_role_from_team(tm.role)
-            member, created = ProjectMember.objects.get_or_create(
-                project=project,
-                user=tm.user,
-                defaults={
-                    "role": mapped,
-                    "status": ProjectMember.Status.ACTIVE,
-                    "added_from_team": team,
-                },
-            )
-            if not created and member.role != ProjectMember.Role.OWNER:
-                member.role = mapped
-                member.status = ProjectMember.Status.ACTIVE
-                member.save(update_fields=["role", "status", "updated_at"])
         log_activity(
             actor=user,
             action=ActivityLog.Action.MEMBER_ADDED,
@@ -149,6 +178,56 @@ def add_team_to_project(*, user, project: Project, team: Team) -> ProjectTeam:
             project=project,
         )
     return link
+
+
+@transaction.atomic
+def remove_team_from_project(*, user, project: Project, team: Team) -> None:
+    if not is_project_manager(user, project):
+        raise PermissionDenied("Only a project manager can remove a team.")
+    link = ProjectTeam.objects.filter(project=project, team=team).first()
+    if link is None:
+        raise ValidationError({"team": "This team is not linked to the desk."})
+    team_name = team.name
+    link.delete()
+    leftover = list(ProjectMember.objects.filter(project=project, added_from_team=team))
+    other_team_by_user: dict[int, Team] = {}
+    leftover_ids = [member.user_id for member in leftover]
+    if leftover_ids:
+        for team_member in TeamMember.objects.filter(
+            status=TeamMember.Status.ACTIVE,
+            user_id__in=leftover_ids,
+            team__project_links__project=project,
+        ).select_related("team"):
+            other_team_by_user.setdefault(team_member.user_id, team_member.team)
+    for member in leftover:
+        if member.user_id == project.owner_id or member.role == ProjectMember.Role.OWNER:
+            member.added_from_team = None
+            member.save(update_fields=["added_from_team", "updated_at"])
+            continue
+        other = other_team_by_user.get(member.user_id)
+        if other is not None:
+            member.added_from_team = other
+            member.save(update_fields=["added_from_team", "updated_at"])
+            continue
+        member.status = ProjectMember.Status.INACTIVE
+        member.added_from_team = None
+        member.save(update_fields=["status", "added_from_team", "updated_at"])
+    log_activity(
+        actor=user,
+        action=ActivityLog.Action.MEMBER_REMOVED,
+        entity_type="project",
+        entity_id=project.id,
+        description=f"تیم «{team_name}» از میز کار برداشته شد.",
+        company=project.company,
+        project=project,
+    )
+
+
+def _require_assignable_member(project: Project, assigned) -> None:
+    if assigned is None:
+        return
+    if assigned.project_id != project.id or assigned.status != ProjectMember.Status.ACTIVE:
+        raise ValidationError({"assigned_to": "Assignee must be an active member of this desk."})
 
 
 @transaction.atomic
@@ -192,8 +271,7 @@ def create_task(*, user, project: Project, labels=None, prerequisites=None, **fi
     if not can_add_task(user, project):
         raise PermissionDenied("Guests can view the board but cannot add work.")
     assigned = fields.get("assigned_to")
-    if assigned and assigned.project_id != project.id:
-        raise ValidationError({"assigned_to": "Assignee must be a member of this project."})
+    _require_assignable_member(project, assigned)
     column = fields.pop("column", None)
     fields.pop("prerequisites", None)
     ensure_project_columns(project)
@@ -338,6 +416,8 @@ def update_task(*, user, task: Task, **fields) -> Task:
         fields.pop("priority", None)
         if labels is not None:
             raise PermissionDenied("Only a manager can change labels.")
+    if "assigned_to" in fields:
+        _require_assignable_member(task.project, fields.get("assigned_to"))
 
     old_assignee_id = task.assigned_to_id
     old_status = task.status

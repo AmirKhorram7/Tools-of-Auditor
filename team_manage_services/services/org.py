@@ -215,7 +215,7 @@ def respond_to_invitation(*, user, invitation: Invitation, accept: bool) -> Invi
 
     invitation.status = Invitation.Status.ACCEPTED
     invitation.save(update_fields=["invited_user", "status", "updated_at"])
-    TeamMember.objects.update_or_create(
+    team_member, _ = TeamMember.objects.update_or_create(
         team=invitation.team,
         user=user,
         defaults={
@@ -225,6 +225,9 @@ def respond_to_invitation(*, user, invitation: Invitation, accept: bool) -> Invi
             "joined_at": timezone.now(),
         },
     )
+    from team_manage_services.services.work import add_user_to_linked_desks
+
+    add_user_to_linked_desks(team=invitation.team, team_member=team_member)
     member, created = CompanyMember.objects.get_or_create(
         company=invitation.team.company,
         user=user,

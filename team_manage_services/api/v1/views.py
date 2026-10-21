@@ -44,6 +44,7 @@ from team_manage_services.models import (
     BoardTemplate,
     Invitation,
     Notification,
+    ProjectMember,
     Task,
     TaskComment,
     TaskStep,
@@ -91,7 +92,9 @@ from team_manage_services.services.work import (
     add_project_member,
     add_task_step,
     add_team_to_project,
+    add_user_to_linked_desks,
     create_desk_team,
+    remove_team_from_project,
     create_project,
     create_task,
     delete_project,
@@ -365,7 +368,8 @@ class TeamViewSet(viewsets.ModelViewSet):
                     .select_related("user", "user__profile")
                     .order_by("id"),
                     to_attr="active_members",
-                )
+                ),
+                "project_links__project",
             )
         )
         company_id = _int_param(self.request, "company")
@@ -460,6 +464,8 @@ class TeamViewSet(viewsets.ModelViewSet):
         if member.user_id == team.owner_id:
             member.role = TeamMember.Role.OWNER
         member.save()
+        if member.status == TeamMember.Status.ACTIVE:
+            add_user_to_linked_desks(team=team, team_member=member)
         if "role" in serializer.validated_data:
             sync_team_role_to_projects(member)
         return Response(TeamMemberSerializer(member).data)
@@ -638,7 +644,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def members(self, request, pk=None):
         project = self.get_object()
         if request.method == "GET":
-            qs = project.members.select_related("user", "user__profile").order_by("role", "id")
+            qs = (
+                project.members.filter(status=ProjectMember.Status.ACTIVE)
+                .select_related("user", "user__profile")
+                .order_by("role", "id")
+            )
             return Response(ProjectMemberSerializer(qs, many=True).data)
         serializer = AddProjectMemberSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -669,7 +679,29 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if team is None:
             raise ValidationError({"team_id": "Team not found."})
         call_service(add_team_to_project, user=request.user, project=project, team=team)
-        qs = project.members.select_related("user", "user__profile")
+        qs = project.members.filter(status=ProjectMember.Status.ACTIVE).select_related(
+            "user", "user__profile"
+        )
+        return Response(ProjectMemberSerializer(qs, many=True).data)
+
+    @extend_schema(
+        summary="Remove a team from this desk",
+        description="Desk manager only. `{team_id}`. Members who only came from this team leave the assignee list. Existing tasks stay.",
+        request=AddProjectTeamSerializer,
+        responses={200: ProjectMemberSerializer(many=True)},
+    )
+    @action(detail=True, methods=["post"], url_path="remove-team")
+    def remove_team(self, request, pk=None):
+        project = self.get_object()
+        serializer = AddProjectTeamSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        team = Team.objects.filter(pk=serializer.validated_data["team_id"]).first()
+        if team is None:
+            raise ValidationError({"team_id": "Team not found."})
+        call_service(remove_team_from_project, user=request.user, project=project, team=team)
+        qs = project.members.filter(status=ProjectMember.Status.ACTIVE).select_related(
+            "user", "user__profile"
+        )
         return Response(ProjectMemberSerializer(qs, many=True).data)
 
     @extend_schema(
@@ -693,6 +725,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             qs = (
                 Team.objects.filter(project_links__project=project)
                 .select_related("company", "owner")
+                .prefetch_related("project_links__project")
                 .distinct()
             )
             return Response(TeamSerializer(qs, many=True, context={"request": request}).data)

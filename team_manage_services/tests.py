@@ -148,6 +148,89 @@ class WorkAPISmokeTests(APITestCase):
         self.assertEqual(media.data["kind"], "image")
         self.assertTrue(media.data.get("file_url"))
 
+    def test_invite_after_link_then_remove_team(self):
+        desk = self.manager_client.post(
+            f"{WORK}/projects/",
+            {"name": "میز تیم ب"},
+            format="json",
+        )
+        self.assertEqual(desk.status_code, status.HTTP_201_CREATED, desk.data)
+        desk_id = desk.data["id"]
+        team = self.manager_client.post(
+            f"{WORK}/projects/{desk_id}/teams/",
+            {"name": "تیم الف"},
+            format="json",
+        )
+        self.assertEqual(team.status_code, status.HTTP_201_CREATED, team.data)
+        team_id = team.data["id"]
+        detail = self.manager_client.get(f"{WORK}/teams/{team_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        self.assertTrue(any(row["id"] == desk_id for row in detail.data.get("linked_desks", [])))
+
+        invite = self.manager_client.post(
+            f"{WORK}/teams/{team_id}/invite/",
+            {"phone_number": self.employee.phone_number, "position_title": "عضو"},
+            format="json",
+        )
+        self.assertEqual(invite.status_code, status.HTTP_201_CREATED, invite.data)
+        accept = self.employee_client.post(
+            f"{WORK}/invitations/{invite.data['id']}/accept/"
+        )
+        self.assertEqual(accept.status_code, status.HTTP_200_OK, accept.data)
+
+        members = self.manager_client.get(f"{WORK}/projects/{desk_id}/members/")
+        self.assertEqual(members.status_code, status.HTTP_200_OK, members.data)
+        employee_pm = next(row for row in members.data if row["user"] == self.employee.id)
+        self.assertEqual(employee_pm["status"], "active")
+
+        task = self.manager_client.post(
+            f"{WORK}/tasks/",
+            {
+                "project": desk_id,
+                "title": "کار الف",
+                "assigned_to": employee_pm["id"],
+            },
+            format="json",
+        )
+        self.assertEqual(task.status_code, status.HTTP_201_CREATED, task.data)
+        self.assertEqual(task.data["assigned_to"], employee_pm["id"])
+
+        blocked = self.employee_client.post(
+            f"{WORK}/projects/{desk_id}/remove-team/",
+            {"team_id": team_id},
+            format="json",
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_403_FORBIDDEN)
+
+        removed = self.manager_client.post(
+            f"{WORK}/projects/{desk_id}/remove-team/",
+            {"team_id": team_id},
+            format="json",
+        )
+        self.assertEqual(removed.status_code, status.HTTP_200_OK, removed.data)
+        self.assertFalse(any(row["user"] == self.employee.id for row in removed.data))
+
+        linked = self.manager_client.get(f"{WORK}/projects/{desk_id}/teams/")
+        self.assertEqual(linked.status_code, status.HTTP_200_OK, linked.data)
+        self.assertFalse(any(row["id"] == team_id for row in linked.data))
+
+        members_after = self.manager_client.get(f"{WORK}/projects/{desk_id}/members/")
+        self.assertFalse(any(row["user"] == self.employee.id for row in members_after.data))
+
+        reassign = self.manager_client.post(
+            f"{WORK}/tasks/",
+            {
+                "project": desk_id,
+                "title": "کار ب",
+                "assigned_to": employee_pm["id"],
+            },
+            format="json",
+        )
+        self.assertEqual(reassign.status_code, status.HTTP_400_BAD_REQUEST)
+
+        hidden = self.employee_client.get(f"{WORK}/projects/{desk_id}/")
+        self.assertEqual(hidden.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_work_api_happy_path(self):
         today = date.today()
         yesterday = today - timedelta(days=1)

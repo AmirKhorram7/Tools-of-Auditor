@@ -23,6 +23,7 @@ export type WorkTeam = {
   member_count?: number;
   project_count?: number;
   preview_members?: WorkTeamMember[];
+  linked_desks?: Array<{ id: number; name: string }>;
 };
 
 export type WorkTeamMember = {
@@ -133,6 +134,15 @@ export type WorkProjectMember = {
   status: string;
   added_from_team?: number | null;
 };
+
+export function assignableMembers(
+  members: WorkProjectMember[],
+  currentId?: number | null,
+): WorkProjectMember[] {
+  return members.filter(
+    (member) => member.status !== "inactive" || member.id === currentId,
+  );
+}
 
 export type WorkTaskStatus =
   | "todo"

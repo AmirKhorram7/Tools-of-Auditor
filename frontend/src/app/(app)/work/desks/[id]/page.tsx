@@ -36,6 +36,7 @@ import { useAuth } from "@/lib/auth";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
+  assignableMembers,
   deskSettingsHref,
   formatWorkDate,
   formatWorkDateTime,
@@ -197,6 +198,7 @@ export default function DeskPage() {
   }, [load]);
 
   const columns = board?.columns || [];
+  const taskAssignees = useMemo(() => assignableMembers(members), [members]);
   const myUserId = members.find((member) => member.phone_number === profile?.phone_number)?.user;
   const visibleTasks = useMemo(() => {
     if (!mineOnly) return tasks;
@@ -261,6 +263,20 @@ export default function DeskPage() {
       setError(err instanceof ApiError ? err.message : t("work.deleteTaskFail"));
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const unlinkTeam = async (team: WorkTeam) => {
+    if (!window.confirm(t("work.removeTeamConfirm", { name: team.name }))) return;
+    setError(null);
+    try {
+      await apiFetch(`/work/projects/${projectId}/remove-team/`, {
+        method: "POST",
+        body: { team_id: team.id },
+      });
+      await load(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("work.removeTeamFail"));
     }
   };
 
@@ -403,6 +419,7 @@ export default function DeskPage() {
                 members={members}
                 teams={projectTeams}
                 currentUserId={myUserId}
+                canManage={project.can_manage}
                 title={project.chat_name}
                 theme={project.chat_theme}
                 wallpaper={project.chat_wallpaper}
@@ -411,6 +428,7 @@ export default function DeskPage() {
                   setChatVisible(chatLayout === "full" ? "side" : "full")
                 }
                 onCollapse={() => setChatVisible("closed")}
+                onRemoveTeam={unlinkTeam}
               />
             </div>
           ) : (
@@ -584,7 +602,7 @@ export default function DeskPage() {
             <Field label={t("work.assignee")}>
               <Select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                 <option value="">{t("work.assignLater")}</option>
-                {members.map((member) => (
+                {taskAssignees.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.full_name || member.phone_number}
                   </option>

@@ -128,7 +128,7 @@ export default function TaskBoard({
             <button
               type="button"
               onClick={() => onAddTask?.(column)}
-              className="mx-2 mb-2 shrink-0 rounded-lg bg-[#F2F3F5] px-2 py-2 text-[12px] font-bold text-gray-600 hover:bg-surface hover:text-navy-800"
+              className="mx-2 mb-2 shrink-0 rounded-lg bg-surface px-2 py-2 text-[12px] font-bold text-ink hover:bg-gray-200 dark:!text-white dark:hover:bg-white/10"
             >
               + {t("work.addTask")}
             </button>

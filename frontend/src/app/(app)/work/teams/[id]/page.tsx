@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -22,6 +23,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
   ASSIGNABLE_TEAM_ROLES,
+  deskHref,
   labelTextColor,
   teamColor,
   workRoleLabel,
@@ -144,6 +146,24 @@ export default function WorkTeamPage() {
     }
   };
 
+  const unlinkDesk = async (desk: { id: number; name: string }) => {
+    if (!team) return;
+    if (!window.confirm(t("work.removeTeamConfirm", { name: team.name }))) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch(`/work/projects/${desk.id}/remove-team/`, {
+        method: "POST",
+        body: { team_id: teamId },
+      });
+      await load();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t("work.removeTeamFail"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const removeMember = async (member: WorkTeamMember) => {
     setSaving(true);
     setError(null);
@@ -243,6 +263,36 @@ export default function WorkTeamPage() {
           </p>
         )}
       </div>
+
+      {(team.linked_desks || []).length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-ink">{t("work.linkedDesks")}</h2>
+          <ul className="divide-y divide-navy-900/10 overflow-hidden rounded-2xl border border-navy-900/10 bg-white">
+            {(team.linked_desks || []).map((desk) => (
+              <li key={desk.id} className="flex items-center gap-2 px-3 py-2.5">
+                <Link
+                  href={deskHref(desk.id)}
+                  className="min-w-0 flex-1 truncate text-sm font-semibold text-navy-900 hover:text-brand-600"
+                >
+                  {desk.name}
+                </Link>
+                {canManage && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void unlinkDesk(desk)}
+                    className="shrink-0 rounded-lg p-1.5 text-navy-900/70 hover:bg-navy-900/5 hover:text-red-600 disabled:opacity-50"
+                    title={t("work.removeTeam")}
+                    aria-label={t("work.removeTeam")}
+                  >
+                    <IconTrash />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-ink">{t("work.members")}</h2>
@@ -413,5 +463,15 @@ export default function WorkTeamPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden>
+      <path d="M4 6h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M8 6V4.8A1.3 1.3 0 0 1 9.3 3.5h1.4A1.3 1.3 0 0 1 12 4.8V6" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 6v9.2A1.3 1.3 0 0 0 7.3 16.5h5.4A1.3 1.3 0 0 0 14 15.2V6" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
   );
 }

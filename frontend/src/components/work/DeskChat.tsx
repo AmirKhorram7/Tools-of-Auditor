@@ -241,14 +241,28 @@ function roleLabel(t: (key: string) => string, role: string): string {
   return label === key ? role : label;
 }
 
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-3.5" fill="none" aria-hidden>
+      <path d="M4 6h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M8 6V4.8A1.3 1.3 0 0 1 9.3 3.5h1.4A1.3 1.3 0 0 1 12 4.8V6" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 6v9.2A1.3 1.3 0 0 0 7.3 16.5h5.4A1.3 1.3 0 0 0 14 15.2V6" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
 function ChatInfo({
   members,
   teams,
+  canManage,
   onBack,
+  onRemoveTeam,
 }: {
   members: WorkProjectMember[];
   teams: WorkTeam[];
+  canManage?: boolean;
   onBack: () => void;
+  onRemoveTeam?: (team: WorkTeam) => void;
 }) {
   const { t, n, dir } = useI18n();
   return (
@@ -275,11 +289,11 @@ function ChatInfo({
           ) : (
             <ul className="space-y-1.5">
               {teams.map((team) => (
-                <li key={team.id}>
-                  <Link
-                    href={`/work/teams/${team.id}`}
-                    className="flex items-center gap-2.5 rounded-xl border border-navy-900/10 bg-white px-2.5 py-2 hover:border-brand-500"
-                  >
+                <li
+                  key={team.id}
+                  className="flex items-center gap-1 rounded-xl border border-navy-900/10 bg-white hover:border-brand-500"
+                >
+                  <Link href={`/work/teams/${team.id}`} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2">
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-navy-900 text-[11px] font-bold text-white">
                       {teamInitials(team.name)}
                     </span>
@@ -290,6 +304,17 @@ function ChatInfo({
                       </span>
                     </span>
                   </Link>
+                  {canManage && onRemoveTeam && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveTeam(team)}
+                      className="me-1.5 shrink-0 rounded-lg p-1.5 text-navy-900/70 hover:bg-navy-900/5 hover:text-red-600"
+                      title={t("work.removeTeam")}
+                      aria-label={t("work.removeTeam")}
+                    >
+                      <IconTrash />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -340,23 +365,27 @@ export default function DeskChat({
   members,
   teams,
   currentUserId,
+  canManage,
   title,
   theme,
   wallpaper,
   expanded = false,
   onToggleExpand,
   onCollapse,
+  onRemoveTeam,
 }: {
   projectId: number;
   members: WorkProjectMember[];
   teams: WorkTeam[];
   currentUserId?: number | null;
+  canManage?: boolean;
   title?: string;
   theme?: string;
   wallpaper?: string;
   expanded?: boolean;
   onToggleExpand?: () => void;
   onCollapse?: () => void;
+  onRemoveTeam?: (team: WorkTeam) => void;
 }) {
   const { t, n, locale, dir } = useI18n();
   const look = chatTheme(theme);
@@ -544,7 +573,13 @@ export default function DeskChat({
       className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-navy-900/10 bg-white shadow-[0_1px_4px_rgba(20,35,58,0.06)]"
     >
       {infoOpen ? (
-        <ChatInfo members={members} teams={teams} onBack={() => setInfoOpen(false)} />
+        <ChatInfo
+          members={members.filter((member) => member.status !== "inactive")}
+          teams={teams}
+          canManage={canManage}
+          onBack={() => setInfoOpen(false)}
+          onRemoveTeam={onRemoveTeam}
+        />
       ) : (
         <>
           <div className="flex shrink-0 items-center gap-0.5 border-b border-navy-900/10 px-1.5 py-1.5">

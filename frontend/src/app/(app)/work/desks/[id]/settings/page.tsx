@@ -196,6 +196,23 @@ export default function DeskSettingsPage() {
     }
   };
 
+  const unlinkTeam = async (team: WorkTeam) => {
+    if (!window.confirm(t("work.removeTeamConfirm", { name: team.name }))) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await apiFetch(`/work/projects/${projectId}/remove-team/`, {
+        method: "POST",
+        body: { team_id: team.id },
+      });
+      await load();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t("work.removeTeamFail"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const inviteToTeam = async () => {
     if (!inviteTeamId) {
       setFormError(t("work.selectTeam"));
@@ -606,18 +623,34 @@ export default function DeskSettingsPage() {
               <p className="text-xs text-gray-500 sm:col-span-2">{t("work.noLinkedTeam")}</p>
             )}
             {projectTeams.map((team) => (
-              <Link
+              <div
                 key={team.id}
-                href={`/work/teams/${team.id}`}
-                className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-bold transition hover:opacity-90"
+                className="flex items-center rounded-xl text-sm font-bold"
                 style={{
                   backgroundColor: teamColor(team.id),
                   color: labelTextColor(teamColor(team.id)),
                 }}
               >
-                <span className="truncate">{team.name}</span>
-                <span className="text-[11px] font-medium opacity-80">{t("work.openTeam")}</span>
-              </Link>
+                <Link
+                  href={`/work/teams/${team.id}`}
+                  className="flex min-w-0 flex-1 items-center justify-between px-3 py-3 transition hover:opacity-90"
+                >
+                  <span className="truncate">{team.name}</span>
+                  <span className="text-[11px] font-medium opacity-80">{t("work.openTeam")}</span>
+                </Link>
+                {canManage && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void unlinkTeam(team)}
+                    className="me-2 shrink-0 rounded-lg p-1.5 opacity-90 hover:bg-black/15 disabled:opacity-50"
+                    title={t("work.removeTeam")}
+                    aria-label={t("work.removeTeam")}
+                  >
+                    <IconTrash />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
           {canManage && (
@@ -988,6 +1021,16 @@ export default function DeskSettingsPage() {
       </div>
       <WorkMeetModal />
     </WorkMeetScope>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-4" fill="none" aria-hidden>
+      <path d="M4 6h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M8 6V4.8A1.3 1.3 0 0 1 9.3 3.5h1.4A1.3 1.3 0 0 1 12 4.8V6" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 6v9.2A1.3 1.3 0 0 0 7.3 16.5h5.4A1.3 1.3 0 0 0 14 15.2V6" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
   );
 }
 

@@ -23,6 +23,7 @@ import WorkBreadcrumb from "@/components/work/WorkBreadcrumb";
 import { ApiError, apiFetch, apiList } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
+  assignableMembers,
   isOverdue,
   labelTextColor,
   workPriorityLabel,
@@ -290,7 +291,7 @@ export default function WorkTaskPage() {
               onChange={(e) => setAssignee(e.target.value)}
             >
               <option value="">{t("work.unassigned")}</option>
-              {members.map((member) => (
+              {assignableMembers(members, task.assigned_to).map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.full_name || member.phone_number}
                 </option>
