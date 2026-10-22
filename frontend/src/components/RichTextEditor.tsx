@@ -141,6 +141,7 @@ type Props = {
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: number;
+  maxHeight?: number;
   readOnly?: boolean;
   /** Other steps in this process. When set, `/` opens a picker and inserts a link. */
   mentions?: EditorMention[];
@@ -376,6 +377,7 @@ export default function RichTextEditor({
   onChange,
   placeholder,
   minHeight = 180,
+  maxHeight = 520,
   readOnly = false,
   mentions,
   onSave,
@@ -1029,9 +1031,9 @@ export default function RichTextEditor({
         onMouseLeave={() => {
           if (!resizeRef.current) setTableCursor("");
         }}
-        style={{ minHeight, cursor: tableCursor || undefined }}
+        style={{ minHeight, maxHeight, cursor: tableCursor || undefined }}
         className={cx(
-          "rich-content max-h-[520px] overflow-y-auto px-3 py-2.5 text-sm outline-none",
+          "rich-content overflow-y-auto px-3 py-2.5 text-sm outline-none",
           readOnly && "bg-gray-50 text-gray-800",
         )}
       />

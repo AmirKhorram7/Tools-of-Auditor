@@ -18,6 +18,7 @@ type Props = {
   readOnly?: boolean;
   /** When the body is shown/hidden. Used to grow the editor on the step page. */
   onExpandedChange?: (expanded: boolean) => void;
+  defaultExpanded?: boolean;
 };
 
 export default function MediaPanel({
@@ -29,6 +30,7 @@ export default function MediaPanel({
   onChanged,
   readOnly = false,
   onExpandedChange,
+  defaultExpanded,
 }: Props) {
   const { t } = useI18n();
   const [kind, setKind] = useState<MediaKind>("image");
@@ -38,9 +40,10 @@ export default function MediaPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(
-    onExpandedChange ? items.length > 0 : true,
-  );
+  const [expanded, setExpanded] = useState(() => {
+    if (defaultExpanded != null) return defaultExpanded;
+    return onExpandedChange ? items.length > 0 : true;
+  });
 
   useEffect(() => {
     onExpandedChange?.(expanded);

@@ -32,6 +32,19 @@ import type { EditorMention } from "@/components/RichTextEditor";
 
 type Tab = "explanation" | "risk" | "control";
 
+function useStepEditorHeight() {
+  const [height, setHeight] = useState(560);
+  useEffect(() => {
+    const measure = () => {
+      setHeight(Math.max(520, window.innerHeight - 320));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  return height;
+}
+
 export default function StepDetailPage() {
   const params = useParams<{ id: string }>();
   const { t } = useI18n();
@@ -53,7 +66,7 @@ export default function StepDetailPage() {
   const [itemTitle, setItemTitle] = useState("");
   const [savingItem, setSavingItem] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const editorHeight = useStepEditorHeight();
 
   const load = useCallback(async () => {
     if (!Number.isFinite(stepId)) return;
@@ -155,7 +168,7 @@ export default function StepDetailPage() {
     }));
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto flex w-[98%] flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <BackButton fallbackHref={`/explanation/processes/${step.process}`} />
         <nav className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
@@ -255,38 +268,42 @@ export default function StepDetailPage() {
       </div>
 
       {tab === "explanation" && (
-        <Card className="space-y-3">
-          <RichTextEditor
-            value={explanation}
-            onChange={setExplanation}
-            placeholder={t("exp.explanationPlaceholder")}
-            minHeight={attachmentsOpen ? 240 : 480}
-            readOnly={!editable}
-            mentions={stepMentions}
-            onSave={editable ? saveExplanation : undefined}
-            saving={savingExplanation}
-            savedTick={explanationSaveTick}
-          />
-
-          <MediaPanel
-            stepId={step.id}
-            section="explanation"
-            items={step.explanation_media}
-            onChanged={load}
-            readOnly={!editable}
-            onExpandedChange={setAttachmentsOpen}
-          />
+        <>
+          <Card className="!p-2">
+            <RichTextEditor
+              value={explanation}
+              onChange={setExplanation}
+              placeholder={t("exp.explanationPlaceholder")}
+              minHeight={editorHeight}
+              maxHeight={editorHeight}
+              readOnly={!editable}
+              mentions={stepMentions}
+              onSave={editable ? saveExplanation : undefined}
+              saving={savingExplanation}
+              savedTick={explanationSaveTick}
+            />
+          </Card>
 
           {savedNote && <Alert tone="success">{savedNote}</Alert>}
 
-          {editable && (
-            <div className="flex justify-end">
-              <Button loading={savingExplanation} onClick={saveExplanation}>
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <MediaPanel
+                stepId={step.id}
+                section="explanation"
+                items={step.explanation_media}
+                onChanged={load}
+                readOnly={!editable}
+                defaultExpanded={false}
+              />
+            </div>
+            {editable && (
+              <Button size="sm" loading={savingExplanation} onClick={saveExplanation}>
                 {t("exp.saveExplanation")}
               </Button>
-            </div>
-          )}
-        </Card>
+            )}
+          </div>
+        </>
       )}
 
       {tab === "risk" && (
