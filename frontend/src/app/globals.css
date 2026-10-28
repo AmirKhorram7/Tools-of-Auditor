@@ -321,6 +321,69 @@ html.dark .rich-content a.step-mention:hover {
   color: #1a2b49;
 }
 
+/* Opt-in foldable section — VS Code-style gutter, only when the writer adds one. */
+.rich-content .rte-fold {
+  margin: 0.35rem 0;
+  border-inline-start: 2px solid #d1d5db;
+  padding-inline-start: 0.15rem;
+}
+
+.rich-content .rte-fold-head {
+  position: relative;
+  padding-inline-start: 1.25rem;
+  font-weight: 700;
+}
+
+.rich-content .rte-fold-head::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0.15rem;
+  top: 0.55em;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  border-style: solid;
+  border-width: 5px 4px 0 4px;
+  border-color: #6b7280 transparent transparent transparent;
+}
+
+.rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
+  top: 0.45em;
+  border-width: 4px 0 4px 5px;
+  border-color: transparent transparent transparent #6b7280;
+}
+
+[dir="rtl"] .rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
+  border-width: 4px 5px 4px 0;
+  border-color: transparent #6b7280 transparent transparent;
+}
+
+.rich-content .rte-fold[data-collapsed="true"] .rte-fold-body {
+  display: none;
+}
+
+.rich-content .rte-fold-body {
+  padding-inline-start: 0.35rem;
+}
+
+html.dark .rich-content .rte-fold {
+  border-inline-start-color: #4d5d70;
+}
+
+html.dark .rich-content .rte-fold-head::before {
+  border-top-color: #8b939e;
+}
+
+html.dark .rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
+  border-top-color: transparent;
+  border-inline-start-color: #8b939e;
+}
+
+html.dark [dir="rtl"] .rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
+  border-inline-start-color: transparent;
+  border-inline-end-color: #8b939e;
+}
+
 /*
   Writer name: only on hover, and above the sentence — never on the text.
   Hidden while that block is being typed.
