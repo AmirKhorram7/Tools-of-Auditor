@@ -1,0 +1,685 @@
+/* Story detail — pixel clone of tauditor-news-detail.html. Scoped under .signal-root.detail */
+
+html.signal-active:has(.signal-root.detail) {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(80px + env(safe-area-inset-top, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.signal-active:has(.signal-root.detail) {
+    scroll-behavior: auto;
+  }
+}
+
+.signal-root.detail {
+  --c: #e8a87c;
+  --fs: 18px;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.signal-root.detail::before {
+  background:
+    radial-gradient(60% 40% at 80% -10%, color-mix(in srgb, var(--c) 26%, transparent), transparent),
+    radial-gradient(40% 30% at 0% 40%, #6a4cff1f, transparent);
+}
+
+.signal-root.detail .d-bar {
+  position: fixed;
+  top: 0;
+  inset-inline: 0;
+  height: 3px;
+  z-index: 50;
+  background: var(--c);
+  transform-origin: left;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+
+.signal-root.detail[dir="rtl"] .d-bar {
+  transform-origin: right;
+}
+
+.signal-root.detail .d-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 24px 12px;
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+.signal-root.detail .d-logo {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.signal-root.detail .d-logo i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--acc) 25%, transparent);
+  animation: signal-p 2.4s infinite;
+}
+
+.signal-root.detail .d-sp {
+  flex: 1;
+}
+
+.signal-root.detail .d-ib {
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  border-radius: 99px;
+  padding: 6px 14px;
+  color: var(--mut);
+  transition: 0.2s;
+  text-decoration: none;
+  display: inline-block;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+}
+
+.signal-root.detail .d-ib:hover,
+.signal-root.detail .d-ib.on {
+  color: var(--tx);
+  border-color: var(--acc);
+}
+
+.signal-root.detail .d-ib:focus-visible,
+.signal-root.detail .d-btn:focus-visible,
+.signal-root.detail .d-seg button:focus-visible,
+.signal-root.detail .d-rc:focus-visible,
+.signal-root.detail .d-toc a:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.signal-root.detail .d-seg {
+  display: flex;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 3px;
+}
+
+.signal-root.detail .d-seg button {
+  border: 0;
+  background: none;
+  padding: 5px 13px;
+  border-radius: 99px;
+  color: var(--mut);
+  font-weight: 500;
+  cursor: pointer;
+  font: inherit;
+}
+
+.signal-root.detail .d-seg button.on {
+  background: var(--acc);
+  color: var(--acc-i);
+}
+
+.signal-root.detail .d-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  max-width: 1240px;
+  margin: 22px auto 0;
+  border-radius: 30px;
+  border: 1px solid var(--line);
+  padding: clamp(24px, 5vw, 56px);
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: var(--card);
+  width: calc(100% - 32px);
+}
+
+.signal-root.detail .d-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 85% 15%, var(--c), transparent 55%),
+    radial-gradient(circle at 5% 110%, color-mix(in srgb, var(--c) 45%, transparent), transparent 60%);
+  opacity: 0.55;
+  animation: signal-detail-drift 16s ease-in-out infinite alternate;
+}
+
+@keyframes signal-detail-drift {
+  to {
+    transform: scale(1.25) translate(-4%, 4%);
+  }
+}
+
+.signal-root.detail .d-kick {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--acc);
+  font-weight: 700;
+}
+
+.signal-root.detail[dir="rtl"] .d-kick {
+  letter-spacing: 0;
+  font-size: 13px;
+  text-transform: none;
+}
+
+.signal-root.detail .d-hero h1 {
+  font-size: clamp(28px, 4.6vw, 56px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  margin: 12px 0 18px;
+  max-width: 20ch;
+  text-wrap: balance;
+}
+
+.signal-root.detail[dir="rtl"] .d-hero h1 {
+  line-height: 1.45;
+  letter-spacing: 0;
+  max-width: 24ch;
+}
+
+.signal-root.detail .d-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.signal-root.detail .d-pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--tx) 18%, transparent);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  padding: 4px 13px;
+  font-size: 13px;
+}
+
+.signal-root.detail .d-pill i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+  display: inline-block;
+}
+
+.signal-root.detail .d-pill.live i {
+  background: var(--acc);
+  animation: signal-p 2s infinite;
+}
+
+.signal-root.detail .d-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--acc);
+  border: 1px solid color-mix(in srgb, var(--acc) 40%, transparent);
+  border-radius: 99px;
+  padding: 2px 8px;
+  margin-inline-start: 8px;
+  vertical-align: middle;
+}
+
+.signal-root.detail .d-page {
+  max-width: 1240px;
+  margin: 28px auto;
+  padding: 0 16px 90px;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 270px;
+  gap: 34px;
+  align-items: start;
+}
+
+.signal-root.detail .d-rail,
+.signal-root.detail .d-side {
+  position: sticky;
+  top: calc(84px + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.signal-root.detail .d-ring {
+  width: 84px;
+  height: 84px;
+  position: relative;
+}
+
+.signal-root.detail .d-ring svg {
+  transform: rotate(-90deg);
+}
+
+.signal-root.detail .d-ring b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+}
+
+.signal-root.detail .d-toc {
+  display: flex;
+  flex-direction: column;
+  border-inline-start: 2px solid var(--line);
+}
+
+.signal-root.detail .d-toc a {
+  color: var(--mut);
+  text-decoration: none;
+  padding: 6px 14px;
+  margin-inline-start: -2px;
+  border-inline-start: 2px solid transparent;
+  font-size: 14px;
+  transition: 0.2s;
+}
+
+.signal-root.detail .d-toc a.on {
+  color: var(--tx);
+  border-color: var(--c);
+  font-weight: 700;
+}
+
+.signal-root.detail .d-left {
+  font-size: 12.5px;
+  color: var(--mut);
+}
+
+.signal-root.detail .d-art {
+  min-width: 0;
+}
+
+.signal-root.detail .d-art section {
+  margin-bottom: 46px;
+}
+
+.signal-root.detail .d-art h2 {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mut);
+  margin: 0 0 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-weight: 700;
+}
+
+.signal-root.detail[dir="rtl"] .d-art h2 {
+  letter-spacing: 0;
+  font-size: 14px;
+  text-transform: none;
+}
+
+.signal-root.detail .d-art h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.signal-root.detail .d-brief {
+  border: 1px solid var(--c);
+  background: color-mix(in srgb, var(--c) 9%, var(--card));
+  border-radius: 24px;
+  padding: 24px 26px;
+}
+
+.signal-root.detail .d-brief ul {
+  margin: 0;
+  padding-inline-start: 20px;
+  font-size: 19px;
+  line-height: 1.55;
+}
+
+.signal-root.detail .d-brief li {
+  margin: 8px 0;
+}
+
+.signal-root.detail .d-brief li::marker {
+  color: var(--c);
+}
+
+.signal-root.detail .d-pts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.signal-root.detail .d-pt {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 18px;
+  transition: 0.25s;
+}
+
+.signal-root.detail .d-pt:hover {
+  transform: translateY(-4px);
+  border-color: var(--c);
+}
+
+.signal-root.detail .d-pt b {
+  font-size: 34px;
+  color: var(--c);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.signal-root.detail .d-pt p {
+  margin: 8px 0 0;
+  color: var(--mut);
+  font-size: 14.5px;
+}
+
+.signal-root.detail .d-body {
+  font-size: var(--fs);
+  line-height: 1.85;
+}
+
+.signal-root.detail[dir="rtl"] .d-body {
+  line-height: 2.05;
+}
+
+.signal-root.detail .d-para {
+  padding: 6px 14px;
+  margin-inline-start: -14px;
+  border-inline-start: 3px solid transparent;
+  border-radius: 6px;
+  transition: 0.3s;
+}
+
+.signal-root.detail .d-para:hover {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 6%, transparent);
+}
+
+.signal-root.detail.focus .d-para {
+  opacity: 0.28;
+}
+
+.signal-root.detail.focus .d-para:hover,
+.signal-root.detail.focus .d-para.cur {
+  opacity: 1;
+}
+
+.signal-root.detail .d-body p {
+  margin: 0;
+}
+
+.signal-root.detail .d-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+}
+
+.signal-root.detail .d-pair > div:last-child {
+  font-family: var(--font-vazirmatn), Vazirmatn, sans-serif;
+  line-height: 2.05;
+}
+
+.signal-root.detail .d-pair > div:first-child {
+  font-family: var(--font-signal), "Space Grotesk", sans-serif;
+}
+
+.signal-root.detail .d-why {
+  font-size: clamp(22px, 3vw, 32px);
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  border-inline-start: 4px solid var(--c);
+  padding-inline-start: 22px;
+  margin: 0;
+}
+
+.signal-root.detail[dir="rtl"] .d-why {
+  line-height: 1.7;
+}
+
+.signal-root.detail .d-ents {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.signal-root.detail .d-ents a,
+.signal-root.detail .d-ents span {
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  border-radius: 12px;
+  padding: 5px 12px;
+  font-size: 14px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.signal-root.detail .d-ents em {
+  font-style: normal;
+  color: var(--c);
+  font-size: 11.5px;
+  display: block;
+  line-height: 1.2;
+}
+
+.signal-root.detail .d-rel {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.signal-root.detail .d-rc {
+  text-align: start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: 0.25s;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.signal-root.detail .d-rc:hover {
+  border-color: var(--c);
+  transform: translateY(-4px);
+}
+
+.signal-root.detail .d-rc small {
+  color: var(--c);
+  font-weight: 700;
+}
+
+.signal-root.detail .d-rc span {
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.signal-root.detail .d-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.signal-root.detail .d-box h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+
+.signal-root.detail[dir="rtl"] .d-box h3 {
+  letter-spacing: 0;
+  font-size: 13px;
+  text-transform: none;
+}
+
+.signal-root.detail .d-box dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+
+.signal-root.detail .d-box dt {
+  color: var(--mut);
+}
+
+.signal-root.detail .d-box dd {
+  margin: 0;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.signal-root.detail .d-box code {
+  font-size: 12px;
+  background: var(--bg2);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.signal-root.detail .d-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.signal-root.detail .d-row .d-ib {
+  flex: 1;
+  text-align: center;
+}
+
+.signal-root.detail .d-btn {
+  background: var(--acc);
+  color: var(--acc-i);
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+  display: block;
+  font: inherit;
+  cursor: pointer;
+}
+
+.signal-root.detail .d-toast {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translate(-50%, 30px);
+  background: var(--tx);
+  color: var(--bg);
+  padding: 8px 18px;
+  border-radius: 99px;
+  opacity: 0;
+  transition: 0.3s;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.signal-root.detail .d-toast.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.signal-root.detail .d-hint {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--mut);
+  margin: 0 0 30px;
+}
+
+.signal-root.detail .d-hint kbd {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 7px;
+  margin: 0 2px;
+}
+
+.signal-root.detail.split .d-page {
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+
+.signal-root.detail.split .d-side {
+  grid-column: 2;
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.signal-root.detail .d-skel {
+  background: color-mix(in srgb, var(--line) 55%, transparent);
+  border-radius: 12px;
+  min-height: 18px;
+}
+
+.signal-root.detail .d-banner {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin: 18px auto;
+  max-width: 1240px;
+  width: calc(100% - 32px);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 1060px) {
+  .signal-root.detail .d-page {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .signal-root.detail .d-rail {
+    display: none;
+  }
+  .signal-root.detail .d-side {
+    position: static !important;
+    grid-column: auto !important;
+    display: flex !important;
+  }
+  .signal-root.detail .d-pts,
+  .signal-root.detail .d-rel {
+    grid-template-columns: 1fr;
+  }
+  .signal-root.detail .d-pair {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .signal-root.detail .d-hint {
+    display: none;
+  }
+  .signal-root.detail .d-top {
+    padding-inline: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-root.detail *,
+  .signal-root.detail *::before,
+  .signal-root.detail *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -6,6 +6,7 @@ import { LauncherMark, ServiceGlyph } from "@/components/ServiceIcons";
 import { cx } from "@/components/ui";
 import { useI18n } from "@/lib/i18n";
 import { APP_SERVICES } from "@/lib/services";
+import { useNewsAccess } from "@/news/useAccess";
 
 export default function ServiceLauncher({
   open,
@@ -15,6 +16,7 @@ export default function ServiceLauncher({
   onToggle: () => void;
 }) {
   const { t } = useI18n();
+  const news = useNewsAccess();
 
   return (
     <div className="relative">
@@ -63,6 +65,19 @@ export default function ServiceLauncher({
                 </Link>
               );
             })}
+            {news?.allowed ? (
+              <Link
+                href="/news"
+                className="flex flex-col items-center rounded-2xl px-1 py-2.5 transition hover:bg-gray-50"
+              >
+                <span className="inline-flex size-12 items-center justify-center overflow-hidden rounded-[13px] bg-[#07080c] shadow-[0_2px_6px_rgba(19,26,34,0.16)]">
+                  <span className="size-2.5 rounded-full bg-[#b8ff5c] shadow-[0_0_0_4px_rgba(184,255,92,0.28)]" />
+                </span>
+                <span className="mt-1.5 line-clamp-2 text-center text-[11px] font-medium leading-4 text-ink">
+                  {t("nav.news")}
+                </span>
+              </Link>
+            ) : null}
           </div>
         </div>
       ) : null}

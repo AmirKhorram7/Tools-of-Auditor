@@ -1,14 +1,37 @@
 # Tauditor production stack (~1000 active users)
 #
+# Images already on disk are reused. Hub images use pull_policy: missing.
+# Local API/frontend images are named and pull_policy: never (never hit Hub
+# for ta_code-backend / ta_code-frontend). build.pull: false so --build does
+# not re-download python:3.13-slim or node:22-alpine.
+#
+# Daily start (no downloads, no rebuild):
+#   docker compose up -d --pull missing --no-build
+#
+# After YOU change code, rebuild only what changed (layer cache, no Hub pull):
+#   docker compose build --pull never backend frontend
+#   docker compose up -d --no-build
+#
+# Do NOT make `up -d --build` a habit. --build rebuilds local Dockerfiles
+# (pip/npm layers stay cached if requirements/lockfile did not change) but it
+# is slower than starting the existing images. Python workers share
+# ta_code-backend:latest — they are not built four times.
+#
+# First-time / missing Hub image (Postgres, Redis, nginx, Grafana): the one
+# pull happens automatically with --pull missing, then never again.
+# ClickHouse is built locally (`ta_code-clickhouse:local`) so Hub is not used.
+#
 # Usage on server:
 #   1. cp .env.example .env   && edit secrets / domains
-#   2. docker compose up -d --build
-#      If Docker Hub times out (python:3.13-slim ... EOF), start without rebuild:
-#        docker compose up -d --pull never
+#   2. First boot: docker compose build --pull never backend frontend
+#      then: docker compose up -d --pull missing --no-build
+#      If Docker Hub times out on a *new* base image, tag a mirror first:
+#        docker pull public.ecr.aws/docker/library/python:3.13-slim
+#        docker tag  public.ecr.aws/docker/library/python:3.13-slim python:3.13-slim
 #      If pip times out on pypi.org during backend build, set in .env:
 #        PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 #        PIP_TRUSTED_HOST=mirrors.aliyun.com
-#      then: docker compose up -d --build backend
+#      then: docker compose build --pull never backend
 #   3. open http://YOUR_SERVER_IP  (or configure TLS in deploy/nginx/nginx.conf)
 #
 # Monitoring (Grafana is the only UI you open):
@@ -57,7 +80,41 @@ services:
       timeout: 5s
       retries: 10
 
+  # News warehouse only. Not on the public site. Live traffic stays on Postgres.
+  # Built locally from python:3.13-slim (already on disk). Do not `docker pull`
+  # clickhouse/clickhouse-server — Hub/GCR TLS often times out here. After the
+  # first `compose build clickhouse`, `up --no-build` reuses this tag forever.
+  clickhouse:
+    image: ta_code-clickhouse:local
+    pull_policy: never
+    build:
+      context: ./deploy/clickhouse
+      dockerfile: Dockerfile
+      pull: false
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-tauditor_news}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-tauditor}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+    # Not published — backend talks to it on the Docker network only.
+
   backend:
+    image: ta_code-backend:latest
+    pull_policy: never
     build:
       context: .
       dockerfile: Dockerfile
@@ -81,6 +138,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-changeme}
       REDIS_URL: redis://redis:6379/1
       USE_REDIS_CACHE: "True"
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-tauditor_news}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-tauditor}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
       GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-180}
@@ -101,13 +163,8 @@ services:
       start_period: 40s
 
   reminder-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      pull: false
-      args:
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-pypi.org}
+    image: ta_code-backend:latest
+    pull_policy: never
     restart: unless-stopped
     logging: *default-logging
     command: ["python", "manage.py", "send_due_reminders", "--loop"]
@@ -133,7 +190,79 @@ services:
       backend:
         condition: service_healthy
 
+  news-worker:
+    image: ta_code-backend:latest
+    pull_policy: never
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["celery", "-A", "ta_code.celery", "worker", "-l", "info"]
+    env_file:
+      - .env
+    environment:
+      DB_ENGINE: postgres
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-tauditor}
+      DB_USER: ${DB_USER:-tauditor}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/2
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      USE_REDIS_CACHE: "True"
+      SKIP_STARTUP_MIGRATE: "1"
+      CELERY_TASK_ALWAYS_EAGER: "False"
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-tauditor_news}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-tauditor}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  news-beat:
+    image: ta_code-backend:latest
+    pull_policy: never
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["celery", "-A", "ta_code.celery", "beat", "-l", "info"]
+    env_file:
+      - .env
+    environment:
+      DB_ENGINE: postgres
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-tauditor}
+      DB_USER: ${DB_USER:-tauditor}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/2
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      USE_REDIS_CACHE: "True"
+      SKIP_STARTUP_MIGRATE: "1"
+      CELERY_TASK_ALWAYS_EAGER: "False"
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-tauditor_news}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-tauditor}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
   frontend:
+    image: ta_code-frontend:latest
+    pull_policy: never
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -142,7 +271,7 @@ services:
         # Same-origin API via nginx → browser calls /api/v1/...
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/v1}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://localhost}
-        CACHEBUST: "dashboard-19"
+        CACHEBUST: "dashboard-24"
     restart: unless-stopped
     logging: *default-logging
     depends_on:
@@ -286,6 +415,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  clickhouse_data:
   media_data:
   static_data:
   prometheus_data:

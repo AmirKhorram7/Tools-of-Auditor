@@ -1,0 +1,20 @@
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <console>1</console>
+    </logger>
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+    <listen_host>0.0.0.0</listen_host>
+    <max_connections>256</max_connections>
+    <keep_alive_timeout>3</keep_alive_timeout>
+    <max_concurrent_queries>50</max_concurrent_queries>
+    <path>/var/lib/clickhouse/</path>
+    <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+    <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+    <format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path>
+    <users_config>users.xml</users_config>
+    <mlock_executable>false</mlock_executable>
+    <mark_cache_size>536870912</mark_cache_size>
+    <timezone>UTC</timezone>
+</clickhouse>

@@ -2,6 +2,7 @@
 Django settings for tauditor (ta_code).
 """
 
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
     "knowledge_management.apps.KnowledgeManagementConfig",
     "subscription_services.apps.SubscriptionServicesConfig",
     "reminder_services.apps.ReminderServicesConfig",
+    "news.apps.NewsConfig",
 ]
 
 MIDDLEWARE = [
@@ -302,8 +304,39 @@ LOGGING = {
             "propagate": False,
         },
         "reminder_services": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "news": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
+
+# --- News (global AI news panel; not tenant-scoped) ---
+# Broker defaults to Redis db 2 so cache (db 1) is untouched.
+_celery_broker = config("CELERY_BROKER_URL", default="")
+if not _celery_broker:
+    _celery_broker = REDIS_URL.rsplit("/", 1)[0] + "/2" if REDIS_URL else "redis://127.0.0.1:6379/2"
+CELERY_BROKER_URL = _celery_broker
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=_celery_broker)
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+_testing = "test" in sys.argv or "pytest" in sys.modules
+CELERY_TASK_ALWAYS_EAGER = config(
+    "CELERY_TASK_ALWAYS_EAGER",
+    default=DEBUG or _testing,
+    cast=bool,
+)
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_IMPORTS = ("news.tasks",)
+NEWS_TRANSLATE_PROVIDER = config("NEWS_TRANSLATE_PROVIDER", default="anthropic")
+NEWS_ANTHROPIC_API_KEY = config("NEWS_ANTHROPIC_API_KEY", default="")
+NEWS_ANTHROPIC_MODEL = config("NEWS_ANTHROPIC_MODEL", default="claude-haiku-4-5-20251001")
+NEWS_HYDRATE_BODIES = config("NEWS_HYDRATE_BODIES", default=not _testing, cast=bool)
+
+# ClickHouse warehouse (optional). Empty host = copy job is a no-op with last_error set.
+CLICKHOUSE_HOST = config("CLICKHOUSE_HOST", default="")
+CLICKHOUSE_PORT = config("CLICKHOUSE_PORT", default=8123, cast=int)
+CLICKHOUSE_DB = config("CLICKHOUSE_DB", default="tauditor_news")
+CLICKHOUSE_USER = config("CLICKHOUSE_USER", default="default")
+CLICKHOUSE_PASSWORD = config("CLICKHOUSE_PASSWORD", default="")
+CLICKHOUSE_SECURE = config("CLICKHOUSE_SECURE", default=False, cast=bool)
 
 # SMS / OTP (sms.ir verify)
 SMS_IR_API_URL = config("SMS_IR_API_URL", default="https://api.sms.ir/v1/send/verify")

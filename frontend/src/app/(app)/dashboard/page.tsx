@@ -10,6 +10,7 @@ import { displayName, useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import type { MinutesInvitation } from "@/lib/minutes";
 import type { WorkDashboard, WorkInvitation } from "@/lib/work";
+import { useNewsAccess } from "@/news/useAccess";
 
 type HomeInvite = {
   key: string;
@@ -33,6 +34,7 @@ const TOOLS = [
 export default function DashboardPage() {
   const { profile } = useAuth();
   const { t, n, locale } = useI18n();
+  const news = useNewsAccess();
   const [workInvites, setWorkInvites] = useState<WorkInvitation[]>([]);
   const [minutesInvites, setMinutesInvites] = useState<MinutesInvitation[]>([]);
   const [board, setBoard] = useState<WorkDashboard | null>(null);
@@ -256,6 +258,23 @@ export default function DashboardPage() {
               {t("dash.services")}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
+              {news?.allowed ? (
+                <Link href="/news" className="dash-card flex flex-col p-4">
+                  <span
+                    className="dash-tile"
+                    style={{ background: "#07080c", color: "#b8ff5c" }}
+                  >
+                    <span className="inline-block size-2.5 rounded-full bg-[#b8ff5c] shadow-[0_0_0_4px_rgba(184,255,92,0.28)]" />
+                  </span>
+                  <span className="mt-3 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">{t("dash.enterNews")}</h3>
+                    <Chevron />
+                  </span>
+                  <p className="mt-1 text-xs leading-5" style={{ color: "var(--d-muted)" }}>
+                    {t("dash.newsBlurb")}
+                  </p>
+                </Link>
+              ) : null}
               {TOOLS.map((tool) => (
                 <Link key={tool.href} href={tool.href} className="dash-card flex flex-col p-4">
                   <span className="dash-tile">

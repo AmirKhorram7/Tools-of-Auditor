@@ -24,6 +24,7 @@ urlpatterns = [
     path("api/v1/knowledge/", include("knowledge_management.api.v1.urls")),
     path("api/v1/subscription/", include("subscription_services.api.v1.urls")),
     path("api/v1/reminders/", include("reminder_services.api.v1.urls")),
+    path("api/v1/news/", include("news.api.v1.urls")),
 ]
 
 if settings.ENABLE_API_DOCS:

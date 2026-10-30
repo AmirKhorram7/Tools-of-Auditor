@@ -81,6 +81,13 @@ class CustomUserAdmin(BaseUserAdmin):
     )
     inlines = [ProfileInline]
 
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if not request.user.is_superuser:
+            ro.extend(["groups", "user_permissions", "is_superuser"])
+        # Preserve order, drop dupes.
+        return list(dict.fromkeys(ro))
+
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         if obj.is_staff or obj.is_superuser:
