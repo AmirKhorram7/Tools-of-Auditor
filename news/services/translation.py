@@ -20,9 +20,13 @@ PROMPT = (
 
 
 class TranslationService:
-    def translate_article(self, article_id: int) -> Article:
+    def translate_article(self, article_id: int, *, force: bool = False) -> Article:
         article = Article.objects.get(pk=article_id)
-        if article.translation_status == TranslationStatus.DONE and article.title_fa:
+        if (
+            not force
+            and article.translation_status == TranslationStatus.DONE
+            and article.title_fa
+        ):
             return article
         if article.language == "fa":
             article.title_fa = article.title
@@ -32,20 +36,27 @@ class TranslationService:
             return article
 
         cache_key = f"news:tr:{article.content_hash}"
-        cached = cache.get(cache_key)
-        if cached:
-            article.title_fa = cached.get("title_fa", "")
-            article.summary_fa = cached.get("summary_fa", "")
-            article.translation_status = TranslationStatus.DONE
-            article.save(update_fields=["title_fa", "summary_fa", "translation_status"])
-            return article
+        if not force:
+            cached = cache.get(cache_key)
+            if cached:
+                article.title_fa = cached.get("title_fa", "")
+                article.summary_fa = cached.get("summary_fa", "")
+                article.translation_status = TranslationStatus.DONE
+                article.save(update_fields=["title_fa", "summary_fa", "translation_status"])
+                self._fill_reader_fa(article)
+                return article
 
         provider = getattr(settings, "NEWS_TRANSLATE_PROVIDER", "anthropic")
         key = getattr(settings, "NEWS_ANTHROPIC_API_KEY", "") or ""
         if provider != "test" and not key:
+            # Root cause of blank FA: no API key → skip instead of calling Anthropic.
+            log.info("translate skipped article=%s (NEWS_ANTHROPIC_API_KEY empty)", article.pk)
             article.translation_status = TranslationStatus.SKIPPED
             article.save(update_fields=["translation_status"])
             return article
+
+        article.translation_status = TranslationStatus.PENDING
+        article.save(update_fields=["translation_status"])
         try:
             title_fa, summary_fa = self._call_provider(provider, article.title, article.summary)
         except Exception as exc:  # noqa: BLE001
@@ -58,8 +69,39 @@ class TranslationService:
         article.summary_fa = summary_fa[:4000]
         article.translation_status = TranslationStatus.DONE
         article.save(update_fields=["title_fa", "summary_fa", "translation_status"])
-        cache.set(cache_key, {"title_fa": article.title_fa, "summary_fa": article.summary_fa}, CACHE_TTL)
+        cache.set(
+            cache_key,
+            {"title_fa": article.title_fa, "summary_fa": article.summary_fa},
+            CACHE_TTL,
+        )
+        self._fill_reader_fa(article)
         return article
+
+    def _fill_reader_fa(self, article: Article) -> None:
+        """Derive detail FA fields from summary_fa when the reader rows are still English-only."""
+        changed: list[str] = []
+        if article.summary_fa and not (article.brief_fa or []):
+            bits = [p[:220].strip() for p in article.summary_fa.split("\n") if p.strip()]
+            if not bits:
+                bits = [article.summary_fa[:220]]
+            article.brief_fa = bits[:3]
+            changed.append("brief_fa")
+        if article.summary_fa and not (article.why_it_matters_fa or "").strip():
+            article.why_it_matters_fa = (article.summary_fa or "")[:800]
+            changed.append("why_it_matters_fa")
+        paras = article.paragraphs or []
+        if article.summary_fa and paras and not any((p or {}).get("fa") for p in paras):
+            # First paragraph gets summary_fa; rest stay empty until a richer pass exists.
+            next_paras = []
+            for i, row in enumerate(paras):
+                item = dict(row or {})
+                if i == 0 and not (item.get("fa") or "").strip():
+                    item["fa"] = article.summary_fa[:2000]
+                next_paras.append(item)
+            article.paragraphs = next_paras
+            changed.append("paragraphs")
+        if changed:
+            article.save(update_fields=changed)
 
     def _call_provider(self, provider: str, title: str, summary: str) -> tuple[str, str]:
         if provider == "test":
@@ -106,5 +148,3 @@ def _parse_translated(text: str, fallback_title: str, fallback_summary: str) -> 
     if not summary:
         summary = fallback_summary
     return title, summary
-
-

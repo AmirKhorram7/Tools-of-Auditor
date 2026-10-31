@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import GroupAdmin
 from django.contrib.auth.models import Group
 from django.utils.translation import gettext_lazy as _
@@ -7,15 +8,46 @@ from news.constants import NEWS_GROUP_NAME
 from news.models import Article, FetchJob, NewsPanelSettings, NewsPreference, NewsSource, NewsWarehouseSettings
 from news.permissions import user_is_news_admin
 
+User = get_user_model()
+
 try:
     admin.site.unregister(Group)
 except admin.sites.NotRegistered:
     pass
 
 
+class NewsTeamMembershipInline(admin.TabularInline):
+    """Add / remove News Team members from the Group change page."""
+
+    model = User.groups.through
+    fk_name = "group"
+    extra = 1
+    verbose_name = _("Member")
+    verbose_name_plural = _("News Team members")
+    autocomplete_fields = ("user",)
+
+
 @admin.register(Group)
 class LockedGroupAdmin(GroupAdmin):
-    """News Team membership is superuser-only. Other groups follow Django defaults."""
+    """News Team membership is superuser-only. Other groups follow Django defaults.
+
+    Open **Groups → News Team** and use the members inline to grant feed access.
+    Members can read the news feed only; settings / fetch / update stay superuser-only.
+    """
+
+    list_display = ("name", "member_count")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("user_set")
+
+    @admin.display(description=_("Members"))
+    def member_count(self, obj):
+        return obj.user_set.count()
+
+    def get_inline_instances(self, request, obj=None):
+        if obj is not None and obj.name == NEWS_GROUP_NAME and request.user.is_superuser:
+            return [NewsTeamMembershipInline(self.model, self.admin_site)]
+        return []
 
     def has_change_permission(self, request, obj=None):
         if obj is not None and obj.name == NEWS_GROUP_NAME and not request.user.is_superuser:
@@ -138,7 +170,15 @@ class FetchJobAdmin(admin.ModelAdmin):
 class NewsPanelSettingsAdmin(admin.ModelAdmin):
     """Backup editor. The real settings page is GET/PATCH /api/v1/news/panel/."""
 
-    list_display = ("fetch_mode", "interval_hours", "last_scheduled_at", "updated_at", "updated_by")
+    list_display = (
+        "fetch_mode",
+        "interval_hours",
+        "run_hour",
+        "run_minute",
+        "last_scheduled_at",
+        "updated_at",
+        "updated_by",
+    )
     readonly_fields = ("last_scheduled_at", "updated_at", "updated_by")
 
     def has_add_permission(self, request):

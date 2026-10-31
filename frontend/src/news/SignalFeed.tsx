@@ -18,6 +18,7 @@ export default function SignalFeed() {
   const pathname = usePathname();
   const params = useSearchParams();
   const searchRef = useRef<HTMLInputElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
 
   const qParam = params.get("q") ?? "";
   const range = (Number(params.get("range") ?? "2") || 0) as RangeKey;
@@ -195,6 +196,19 @@ export default function SignalFeed() {
     write({ source: [...next] });
   };
 
+  useEffect(() => {
+    const el = chipsRef.current;
+    if (!el) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      if (el.scrollWidth <= el.clientWidth) return;
+      event.preventDefault();
+      el.scrollLeft += event.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [sources.length]);
+
   return (
     <>
       {access?.is_fetch_admin ? <SignalAdmin open={adminOpen} sources={sources} /> : null}
@@ -273,7 +287,7 @@ export default function SignalFeed() {
         </button>
       </div>
 
-      <div className="chips">
+      <div className="chips" ref={chipsRef}>
         {sources
           .filter((source) => counts[source.slug])
           .map((source) => (

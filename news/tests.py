@@ -405,21 +405,32 @@ class NewsPanelSettingsTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
         self.assertEqual(res.data["fetch_mode"], FETCH_MODE_MANUAL)
         self.assertEqual(res.data["interval_hours"], 24)
+        self.assertEqual(res.data["run_hour"], 8)
+        self.assertEqual(res.data["run_minute"], 0)
         self.assertIsNone(res.data["next_run_at"])
         self.assertTrue(res.data["can_edit"])
         self.assertIn(24, res.data["interval_presets"])
+        self.assertIn(0, res.data["minute_presets"])
+        self.assertTrue(res.data["timezone"])
         member = self.member_c.get(f"{API}/panel/")
         self.assertFalse(member.data["can_edit"])
 
     def test_superuser_sets_daily_schedule(self):
         res = self.admin_c.patch(
             f"{API}/panel/",
-            {"fetch_mode": FETCH_MODE_SCHEDULED, "interval_hours": 24},
+            {
+                "fetch_mode": FETCH_MODE_SCHEDULED,
+                "interval_hours": 24,
+                "run_hour": 9,
+                "run_minute": 30,
+            },
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
         self.assertEqual(res.data["fetch_mode"], FETCH_MODE_SCHEDULED)
         self.assertEqual(res.data["interval_hours"], 24)
+        self.assertEqual(res.data["run_hour"], 9)
+        self.assertEqual(res.data["run_minute"], 30)
         self.assertIsNotNone(res.data["next_run_at"])
         row = NewsPanelSettings.objects.get(pk=1)
         self.assertEqual(row.updated_by_id, self.admin.pk)
@@ -479,7 +490,13 @@ class NewsPanelSettingsTests(APITestCase):
 
 class ScheduledFetchTests(TestCase):
     def setUp(self):
+        from django.utils import timezone as dj_tz
+
         self.panel = PanelSettingsService().load()
+        local = dj_tz.localtime()
+        self.panel.run_hour = local.hour
+        self.panel.run_minute = (local.minute // 15) * 15
+        self.panel.save(update_fields=["run_hour", "run_minute"])
 
     def test_manual_mode_never_auto_runs(self):
         self.panel.fetch_mode = FETCH_MODE_MANUAL
@@ -508,10 +525,25 @@ class ScheduledFetchTests(TestCase):
         self.panel.save()
         with patch("news.services.ingest.IngestService.run_job"):
             self.assertEqual(PanelSettingsService().run_if_due(), 1)
+        self.panel.refresh_from_db()
         self.panel.last_scheduled_at = datetime.now(timezone.utc) - timedelta(hours=2)
         self.panel.save()
         with patch("news.services.ingest.IngestService.run_job"):
             self.assertEqual(PanelSettingsService().run_if_due(), 0)
+
+    def test_outside_run_window_does_not_fire(self):
+        from django.utils import timezone as dj_tz
+
+        local = dj_tz.localtime()
+        self.panel.fetch_mode = FETCH_MODE_SCHEDULED
+        self.panel.interval_hours = 1
+        self.panel.last_scheduled_at = None
+        self.panel.run_hour = (local.hour + 12) % 24
+        self.panel.run_minute = 0
+        self.panel.save()
+        with patch("news.services.ingest.IngestService.run_job") as run_job:
+            self.assertEqual(PanelSettingsService().run_if_due(), 0)
+        run_job.assert_not_called()
 
 
 class NewsBackendSmokeTests(APITestCase):
@@ -890,3 +922,28 @@ class ArticleDetailApiTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
         self.assertEqual(res.data["prev_id"], self.other.pk)
         self.assertIsNone(res.data["next_id"])
+
+    def test_member_can_translate_on_demand(self):
+        with self.settings(NEWS_TRANSLATE_PROVIDER="test", NEWS_ANTHROPIC_API_KEY=""):
+            res = self.member_c.post(f"{API}/articles/{self.other.pk}/translate/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["translation_status"], TranslationStatus.DONE)
+        self.assertIn("[fa]", res.data["title_fa"])
+        self.other.refresh_from_db()
+        self.assertEqual(self.other.translation_status, TranslationStatus.DONE)
+
+    def test_translate_skips_without_api_key(self):
+        pending = Article.objects.create(
+            source=self.source,
+            url="https://example.com/need-key",
+            canonical_url="https://example.com/need-key",
+            title="Needs key",
+            summary="Summary.",
+            fetched_at=datetime.now(timezone.utc),
+            content_hash="need-key-hash",
+            translation_status=TranslationStatus.PENDING,
+        )
+        with self.settings(NEWS_TRANSLATE_PROVIDER="anthropic", NEWS_ANTHROPIC_API_KEY=""):
+            res = self.member_c.post(f"{API}/articles/{pending.pk}/translate/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["translation_status"], TranslationStatus.SKIPPED)

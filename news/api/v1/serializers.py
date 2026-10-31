@@ -7,6 +7,7 @@ from news.constants import (
     LANGUAGE_CHOICES,
     LANGUAGE_EN,
     LANGUAGE_FA,
+    PANEL_MINUTE_PRESETS,
     WAREHOUSE_INTERVAL_PRESETS,
     WAREHOUSE_MINUTE_PRESETS,
 )
@@ -27,7 +28,11 @@ class NewsSettingsSerializer(serializers.Serializer):
 class NewsPanelSerializer(serializers.Serializer):
     fetch_mode = serializers.ChoiceField(choices=FETCH_MODE_CHOICES)
     interval_hours = serializers.IntegerField(min_value=INTERVAL_HOURS_MIN, max_value=INTERVAL_HOURS_MAX)
+    run_hour = serializers.IntegerField()
+    run_minute = serializers.IntegerField()
     interval_presets = serializers.ListField(child=serializers.IntegerField(), read_only=True)
+    minute_presets = serializers.ListField(child=serializers.IntegerField(), read_only=True)
+    timezone = serializers.CharField(read_only=True)
     last_scheduled_at = serializers.DateTimeField(read_only=True, allow_null=True)
     next_run_at = serializers.DateTimeField(read_only=True, allow_null=True)
     can_edit = serializers.BooleanField(read_only=True)
@@ -85,6 +90,17 @@ class NewsPanelWriteSerializer(serializers.Serializer):
         max_value=INTERVAL_HOURS_MAX,
         required=False,
     )
+    run_hour = serializers.IntegerField(min_value=0, max_value=23, required=False)
+    run_minute = serializers.IntegerField(required=False)
+
+    def validate_run_minute(self, value):
+        if value not in PANEL_MINUTE_PRESETS:
+            raise serializers.ValidationError("Use 0, 15, 30, or 45 (beat ticks every 15 minutes).")
+        return value
+
+
+class ArticleTranslateSerializer(serializers.Serializer):
+    force = serializers.BooleanField(required=False, default=False)
 
 
 class NewsSourceSerializer(serializers.ModelSerializer):

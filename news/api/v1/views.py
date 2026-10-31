@@ -1,6 +1,7 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,6 +11,7 @@ from news.constants import NEWS_GROUP_NAME
 from news.api.v1.serializers import (
     ArticleDetailSerializer,
     ArticleSerializer,
+    ArticleTranslateSerializer,
     FetchJobCreateSerializer,
     FetchJobSerializer,
     FreshnessSerializer,
@@ -32,6 +34,7 @@ from news.services.access import preference_for
 from news.services.articles import ArticleQueryService
 from news.services.ingest import IngestService
 from news.services.panel import PanelSettingsService
+from news.services.translation import TranslationService
 from news.services.warehouse.settings import WarehouseSettingsService
 from news.services.warehouse.sync import WarehouseSyncService
 
@@ -128,10 +131,10 @@ class NewsPanelView(APIView):
             "How the scraper job runs. Global, not tenant-scoped.\n\n"
             "- `fetch_mode=manual`: nothing runs until a superuser hits **Start fetch**.\n"
             "- `fetch_mode=scheduled`: Celery beat starts one job for all active sources "
-            "every `interval_hours` (24 = daily). Beat ticks every 15 minutes and only "
-            "fires when the interval has elapsed.\n"
-            "- `interval_presets`: suggested values for the settings page.\n"
-            "- `next_run_at`: null in manual mode; now (or last run + interval) when scheduled.\n"
+            "every `interval_hours` (24 = daily) inside the `run_hour`/`run_minute` window. "
+            "Beat ticks every 15 minutes.\n"
+            "- `interval_presets` / `minute_presets`: suggested values for the settings page.\n"
+            "- `next_run_at`: null in manual mode; next clock window when scheduled.\n"
             "- `can_edit`: true only for superusers.\n\n"
             "News Team may **read**. Only superusers **PATCH**.\n\n"
             + PANEL_NOTE
@@ -145,8 +148,10 @@ class NewsPanelView(APIView):
         tags=["News"],
         summary="Update news panel fetch settings",
         description=(
-            "Superuser only. Body: `{fetch_mode?: \"manual\"|\"scheduled\", interval_hours?: 1–168}`.\n\n"
-            "Example daily: `{fetch_mode: \"scheduled\", interval_hours: 24}`.\n"
+            "Superuser only. Body: "
+            "`{fetch_mode?, interval_hours?, run_hour?, run_minute?}`.\n\n"
+            "Example daily at 08:00: "
+            '`{fetch_mode: "scheduled", interval_hours: 24, run_hour: 8, run_minute: 0}`.\n'
             "Example on-demand: `{fetch_mode: \"manual\"}`."
         ),
         request=NewsPanelWriteSerializer,
@@ -156,7 +161,9 @@ class NewsPanelView(APIView):
         serializer = NewsPanelWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         if not serializer.validated_data:
-            raise ValidationError("Provide fetch_mode and/or interval_hours.")
+            raise ValidationError(
+                "Provide fetch_mode, interval_hours, run_hour, and/or run_minute."
+            )
         data = PanelSettingsService().update(request.user, **serializer.validated_data)
         return Response(NewsPanelSerializer(data).data)
 
@@ -349,6 +356,31 @@ class ArticleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
             id_list = [int(x) for x in raw.split(",") if x.strip().isdigit()]
         staff = bool(request.user and (request.user.is_staff or request.user.is_superuser))
         payload = build_detail(article, staff=staff, id_list=id_list)
+        return Response(ArticleDetailSerializer(payload).data)
+
+    @extend_schema(
+        tags=["News articles"],
+        summary="Translate article to Persian (on demand)",
+        description=(
+            "News Team (and superusers). Runs title/summary translation when the user "
+            "asks from the story detail page — not on ingest.\n\n"
+            "Empty `NEWS_ANTHROPIC_API_KEY` → `translation_status=skipped`.\n"
+            "Body optional: `{force?: true}` to retry after failed/skipped.\n\n"
+            + PANEL_NOTE
+        ),
+        request=ArticleTranslateSerializer,
+        responses={200: ArticleDetailSerializer},
+    )
+    @action(detail=True, methods=["post"], url_path="translate")
+    def translate(self, request, pk=None):
+        serializer = ArticleTranslateSerializer(data=request.data or {}, partial=True)
+        serializer.is_valid(raise_exception=True)
+        force = bool(serializer.validated_data.get("force"))
+        article = self.get_object()
+        TranslationService().translate_article(article.pk, force=force)
+        article.refresh_from_db()
+        staff = bool(request.user and (request.user.is_staff or request.user.is_superuser))
+        payload = build_detail(article, staff=staff, id_list=None)
         return Response(ArticleDetailSerializer(payload).data)
 
 

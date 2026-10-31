@@ -170,7 +170,11 @@ export type FreshnessSnapshot = {
 export type PanelSettings = {
   fetch_mode: FetchMode;
   interval_hours: number;
+  run_hour: number;
+  run_minute: number;
   interval_presets: number[];
+  minute_presets: number[];
+  timezone: string;
   last_scheduled_at: string | null;
   next_run_at: string | null;
   can_edit: boolean;

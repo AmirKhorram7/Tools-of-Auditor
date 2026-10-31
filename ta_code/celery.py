@@ -13,10 +13,7 @@ app.conf.beat_schedule = {
         "task": "news.tasks.fetch_due_sources",
         "schedule": crontab(minute="*/15"),
     },
-    "news-translate-pending": {
-        "task": "news.tasks.translate_pending_articles",
-        "schedule": crontab(minute="*/10"),
-    },
+    # Persian translation is on-demand from the story detail page — no batch beat.
     "news-warehouse-due": {
         "task": "news.tasks.sync_warehouse_if_due",
         "schedule": crontab(minute="*/15"),

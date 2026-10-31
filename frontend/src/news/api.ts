@@ -29,7 +29,12 @@ export function getPanel() {
   return apiFetch<PanelSettings>("/news/panel/");
 }
 
-export function patchPanel(body: { fetch_mode?: "manual" | "scheduled"; interval_hours?: number }) {
+export function patchPanel(body: {
+  fetch_mode?: "manual" | "scheduled";
+  interval_hours?: number;
+  run_hour?: number;
+  run_minute?: number;
+}) {
   return apiFetch<PanelSettings>("/news/panel/", { method: "PATCH", body });
 }
 
@@ -99,6 +104,13 @@ export function getArticleDetail(id: number, ids?: number[]) {
   if (ids?.length) search.set("ids", ids.join(","));
   const q = search.toString();
   return apiFetch<ArticleDetail>(`/news/articles/${id}/${q ? `?${q}` : ""}`);
+}
+
+export function translateArticle(id: number, force = false) {
+  return apiFetch<ArticleDetail>(`/news/articles/${id}/translate/`, {
+    method: "POST",
+    body: { force },
+  });
 }
 
 export async function listAllArticles(opts: {

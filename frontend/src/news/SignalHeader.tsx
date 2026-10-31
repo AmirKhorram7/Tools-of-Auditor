@@ -26,12 +26,9 @@ export default function SignalHeader() {
           {L.adm}
         </button>
       ) : null}
-      {/* Home: settings only — never on the /news feed */}
-      {onSettings ? (
-        <Link href="/dashboard" className="ib">
-          {L.homeBtn}
-        </Link>
-      ) : null}
+      <Link href="/dashboard" className="ib">
+        {L.homeBtn}
+      </Link>
       {onSettings ? (
         <Link href="/news" className="ib">
           {L.feed}

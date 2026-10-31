@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { getArticleDetail } from "./api";
+import { getArticleDetail, translateArticle } from "./api";
 import { sourceColor } from "./colors";
 import { catLabel, copy, fmtN } from "./copy";
 import { useSignal } from "./SignalContext";
@@ -67,6 +67,7 @@ export default function SignalDetail({ articleId }: { articleId: number }) {
   const [toast, setToast] = useState("");
   const [progress, setProgress] = useState(0);
   const [activeToc, setActiveToc] = useState("brief");
+  const [translating, setTranslating] = useState(false);
   const toastTimer = useRef<number | null>(null);
   const idsParam = params.get("ids") || "";
   const feedIds = useMemo(() => {
@@ -205,6 +206,34 @@ export default function SignalDetail({ articleId }: { articleId: number }) {
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(""), 1600);
+  };
+
+  const runTranslate = async () => {
+    if (!data || translating) return;
+    const status = data.translation_status;
+    if (status === "done" && data.title_fa) {
+      setLang("fa");
+      showToast(L.dTranslateDone);
+      return;
+    }
+    setTranslating(true);
+    try {
+      const force = status === "failed" || status === "skipped";
+      const next = await translateArticle(data.id, force);
+      setData(next);
+      if (next.translation_status === "done") {
+        setLang("fa");
+        showToast(L.dTranslateDone);
+      } else if (next.translation_status === "skipped") {
+        showToast(L.dTranslateSkipped);
+      } else {
+        showToast(L.dTranslateFail);
+      }
+    } catch {
+      showToast(L.dTranslateFail);
+    } finally {
+      setTranslating(false);
+    }
   };
 
   const goBack = () => {
@@ -544,6 +573,33 @@ export default function SignalDetail({ articleId }: { articleId: number }) {
               <a className="d-btn" href={data.url} target="_blank" rel="noopener noreferrer">
                 {L.dOrig}
               </a>
+              <div className="d-box">
+                <h3>{L.dTl}</h3>
+                <dl>
+                  <dt>{L.dSrc}</dt>
+                  <dd>{data.source.name}</dd>
+                  <dt>{L.dTl}</dt>
+                  <dd>{tlLabel(data.translation_status, L)}</dd>
+                </dl>
+                <div className="d-row" style={{ marginTop: 12 }}>
+                  <button
+                    type="button"
+                    className="d-ib"
+                    disabled={translating}
+                    onClick={runTranslate}
+                  >
+                    {translating
+                      ? L.dTranslatingBtn
+                      : data.translation_status === "done"
+                        ? L.dTranslateDone
+                        : data.translation_status === "skipped"
+                          ? L.dTranslateSkipped
+                          : data.translation_status === "failed"
+                            ? L.dTranslateFail
+                            : L.dTranslate}
+                  </button>
+                </div>
+              </div>
               <div className="d-box">
                 <div className="d-row">
                   <button

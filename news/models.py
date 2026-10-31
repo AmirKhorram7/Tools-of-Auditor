@@ -10,6 +10,8 @@ from django.utils.translation import gettext_lazy as _
 
 from news.constants import (
     DEFAULT_INTERVAL_HOURS,
+    DEFAULT_PANEL_HOUR,
+    DEFAULT_PANEL_MINUTE,
     DEFAULT_WAREHOUSE_HOUR,
     DEFAULT_WAREHOUSE_INTERVAL_HOURS,
     DEFAULT_WAREHOUSE_MINUTE,
@@ -242,6 +244,14 @@ class NewsPanelSettings(models.Model):
         default=DEFAULT_INTERVAL_HOURS,
         help_text=_("Used when fetch_mode is scheduled. 24 = once a day."),
     )
+    run_hour = models.PositiveSmallIntegerField(
+        default=DEFAULT_PANEL_HOUR,
+        help_text=_("Local hour (TIME_ZONE) when a scheduled fetch may start."),
+    )
+    run_minute = models.PositiveSmallIntegerField(
+        default=DEFAULT_PANEL_MINUTE,
+        help_text=_("Local minute. Beat ticks every 15 minutes; use 0, 15, 30, or 45."),
+    )
     last_scheduled_at = models.DateTimeField(
         null=True,
         blank=True,
@@ -263,7 +273,10 @@ class NewsPanelSettings(models.Model):
     def __str__(self):
         if self.fetch_mode == FETCH_MODE_MANUAL:
             return "News fetch: manual"
-        return f"News fetch: every {self.interval_hours}h"
+        return (
+            f"News fetch: every {self.interval_hours}h "
+            f"at {self.run_hour:02d}:{self.run_minute:02d}"
+        )
 
     def save(self, *args, **kwargs):
         self.pk = self.SINGLETON_PK
@@ -273,15 +286,11 @@ class NewsPanelSettings(models.Model):
         return None
 
     def next_run_at(self):
-        from datetime import timedelta
-
-        from django.utils import timezone as dj_tz
+        from news.services.panel import next_run_at as panel_next_run
 
         if self.fetch_mode != FETCH_MODE_SCHEDULED:
             return None
-        if not self.last_scheduled_at:
-            return dj_tz.now()
-        return self.last_scheduled_at + timedelta(hours=self.interval_hours)
+        return panel_next_run(self)
 
 
 class NewsWarehouseSettings(models.Model):

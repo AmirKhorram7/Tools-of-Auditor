@@ -308,10 +308,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- Monitoring: Prometheus stores metrics; Grafana is the dashboard UI. ---
-  # Prometheus / exporters / cAdvisor are internal. Only Grafana is published.
+  # --- Monitoring (opt-in). Off by default — cAdvisor was heavy on the host. ---
+  # Re-enable later: docker compose --profile monitoring up -d
+  # Prometheus / exporters / cAdvisor stay internal. Only Grafana is published.
 
   node-exporter:
+    profiles: ["monitoring"]
     image: prom/node-exporter:v1.8.2
     pull_policy: missing
     restart: unless-stopped
@@ -328,6 +330,7 @@ services:
     # Host CPU / RAM / disk. On Docker Desktop this is the Linux VM, not Windows.
 
   cadvisor:
+    profiles: ["monitoring"]
     image: gcr.io/cadvisor/cadvisor:v0.47.2
     pull_policy: missing
     restart: unless-stopped
@@ -344,6 +347,7 @@ services:
     # Per-container CPU, RAM, network.
 
   postgres-exporter:
+    profiles: ["monitoring"]
     image: prometheuscommunity/postgres-exporter:v0.16.0
     pull_policy: missing
     restart: unless-stopped
@@ -357,6 +361,7 @@ services:
         condition: service_healthy
 
   redis-exporter:
+    profiles: ["monitoring"]
     image: oliver006/redis_exporter:v1.66.0
     pull_policy: missing
     restart: unless-stopped
@@ -368,6 +373,7 @@ services:
         condition: service_healthy
 
   prometheus:
+    profiles: ["monitoring"]
     image: prom/prometheus:v2.55.1
     pull_policy: missing
     restart: unless-stopped
@@ -388,6 +394,7 @@ services:
     # Not published — Grafana talks to it on the Docker network.
 
   grafana:
+    profiles: ["monitoring"]
     image: grafana/grafana:11.3.0
     pull_policy: missing
     restart: unless-stopped

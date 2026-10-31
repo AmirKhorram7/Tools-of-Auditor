@@ -28,6 +28,10 @@ INTERVAL_PRESETS_HOURS = (1, 3, 6, 12, 24, 48, 72, 168)
 INTERVAL_HOURS_MIN = 1
 INTERVAL_HOURS_MAX = 168
 DEFAULT_INTERVAL_HOURS = 24
+# Clock for scheduled fetch (same beat window pattern as warehouse).
+DEFAULT_PANEL_HOUR = 8
+DEFAULT_PANEL_MINUTE = 0
+PANEL_MINUTE_PRESETS = (0, 15, 30, 45)  # beat ticks every 15 minutes
 
 # ClickHouse warehouse (ML / history). Superuser-only. Off-peak clock time.
 WAREHOUSE_INTERVAL_PRESETS = (24, 48, 72, 168, 720)  # 24h, 48h, 72h, weekly, monthly

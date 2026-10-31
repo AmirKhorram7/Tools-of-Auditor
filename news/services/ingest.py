@@ -165,11 +165,7 @@ class IngestService:
                 "last_modified",
             ]
         )
-        if created_ids:
-            from news.tasks import translate_article
-
-            for pk in created_ids:
-                translate_article.delay(pk)
+        # Translation is on-demand from the story detail page (saves Anthropic spend).
         return counts
 
     def _upsert(

@@ -366,10 +366,25 @@ html.signal-active[data-signal-theme="light"] body {
 
 .signal-root .chips {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 4px 0 14px;
-  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.signal-root .chips::-webkit-scrollbar {
+  height: 6px;
+}
+
+.signal-root .chips::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
 }
 
 .signal-root .chip {
