@@ -17,7 +17,7 @@
 # is slower than starting the existing images. Python workers share
 # ta_code-backend:latest — they are not built four times.
 #
-# First-time / missing Hub image (Postgres, Redis, nginx, Grafana): the one
+# First-time / missing Hub image (Postgres, Redis, nginx): the one
 # pull happens automatically with --pull missing, then never again.
 # ClickHouse is built locally (`ta_code-clickhouse:local`) so Hub is not used.
 #
@@ -34,11 +34,14 @@
 #      then: docker compose build --pull never backend
 #   3. open http://YOUR_SERVER_IP  (or configure TLS in deploy/nginx/nginx.conf)
 #
-# Monitoring (Grafana is the only UI you open):
-#   http://127.0.0.1:3030  — default bind is localhost only (not on public :80)
-#   Login: GRAFANA_ADMIN_USER / GRAFANA_ADMIN_PASSWORD in .env
-#   Remote server: ssh -L 3030:127.0.0.1:3030 user@YOUR_SERVER
-#     then open http://127.0.0.1:3030 on your laptop.
+# Monitoring is OFF by default (profile: monitoring). Core `up -d` does not
+# start Prometheus / Grafana / cAdvisor / exporters.
+#   Stop leftover containers after this change (once):
+#     docker compose stop node-exporter cadvisor postgres-exporter redis-exporter prometheus grafana
+#   Re-enable later:
+#     docker compose --profile monitoring up -d
+#   Grafana UI (only when profile is on): http://127.0.0.1:3030
+#     ssh -L 3030:127.0.0.1:3030 user@YOUR_SERVER
 
 # Cap container logs so a long-running server never fills the disk.
 x-logging: &default-logging
