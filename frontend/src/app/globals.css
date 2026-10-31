@@ -323,39 +323,65 @@ html.dark .rich-content a.step-mention:hover {
 
 /* Opt-in foldable section — VS Code-style gutter, only when the writer adds one. */
 .rich-content .rte-fold {
+  position: relative;
   margin: 0.35rem 0;
   border-inline-start: 2px solid #d1d5db;
   padding-inline-start: 0.15rem;
 }
 
-.rich-content .rte-fold-head {
-  position: relative;
-  padding-inline-start: 1.25rem;
-  font-weight: 700;
+.rich-content .rte-fold-toggle {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.28em;
+  z-index: 2;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.rich-content .rte-fold-head::before {
+.rich-content .rte-fold-toggle:hover,
+.rich-content .rte-fold-toggle:focus-visible {
+  background: rgba(15, 17, 17, 0.06);
+  outline: none;
+}
+
+.rich-content .rte-fold-toggle::before {
   content: "";
-  position: absolute;
-  inset-inline-start: 0.15rem;
-  top: 0.55em;
+  display: block;
   width: 0;
   height: 0;
-  pointer-events: none;
   border-style: solid;
   border-width: 5px 4px 0 4px;
-  border-color: #6b7280 transparent transparent transparent;
+  border-color: currentColor transparent transparent transparent;
 }
 
-.rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
-  top: 0.45em;
+.rich-content .rte-fold[data-collapsed="true"] .rte-fold-toggle::before {
   border-width: 4px 0 4px 5px;
-  border-color: transparent transparent transparent #6b7280;
+  border-color: transparent transparent transparent currentColor;
 }
 
-[dir="rtl"] .rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
+[dir="rtl"] .rich-content .rte-fold[data-collapsed="true"] .rte-fold-toggle::before,
+.rich-content[dir="rtl"] .rte-fold[data-collapsed="true"] .rte-fold-toggle::before {
   border-width: 4px 5px 4px 0;
-  border-color: transparent #6b7280 transparent transparent;
+  border-color: transparent currentColor transparent transparent;
+}
+
+.rich-content .rte-fold-head {
+  position: relative;
+  padding-inline-start: 1.45rem;
+  font-weight: 700;
 }
 
 .rich-content .rte-fold[data-collapsed="true"] .rte-fold-body {
@@ -370,18 +396,13 @@ html.dark .rich-content .rte-fold {
   border-inline-start-color: #4d5d70;
 }
 
-html.dark .rich-content .rte-fold-head::before {
-  border-top-color: #8b939e;
+html.dark .rich-content .rte-fold-toggle {
+  color: #8b939e;
 }
 
-html.dark .rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
-  border-top-color: transparent;
-  border-inline-start-color: #8b939e;
-}
-
-html.dark [dir="rtl"] .rich-content .rte-fold[data-collapsed="true"] .rte-fold-head::before {
-  border-inline-start-color: transparent;
-  border-inline-end-color: #8b939e;
+html.dark .rich-content .rte-fold-toggle:hover,
+html.dark .rich-content .rte-fold-toggle:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /*

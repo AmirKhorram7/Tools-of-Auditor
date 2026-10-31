@@ -128,7 +128,8 @@ const EDITOR_COLORS: Array<{ hex: string; fa: string; en: string }> = [
 const FOLD = "rte-fold";
 const FOLD_HEAD = "rte-fold-head";
 const FOLD_BODY = "rte-fold-body";
-const FOLD_GUTTER = 22;
+const FOLD_TOGGLE = "rte-fold-toggle";
+const FOLD_GUTTER = 28;
 
 type InlineStyle = "fontFamily" | "fontSize" | "color";
 const MAX_TABLE_COLS = 8;
@@ -253,9 +254,12 @@ function markWritingBlock(editor: HTMLElement | null) {
 }
 
 function serializeEditorHtml(html: string): string {
+  // Collapse is session UI only — never persist open/closed into saved HTML.
   return html
     .replace(/\sdata-self(?:="[^"]*")?/gi, "")
-    .replace(/\sdata-writing(?:="[^"]*")?/gi, "");
+    .replace(/\sdata-writing(?:="[^"]*")?/gi, "")
+    .replace(/\sdata-collapsed(?:="[^"]*")?/gi, "")
+    .replace(/<button\b[^>]*\brte-fold-toggle\b[^>]*>[\s\S]*?<\/button>/gi, "");
 }
 
 function findSlashTrigger(editor: HTMLElement): { node: Text; start: number; query: string } | null {
@@ -409,12 +413,29 @@ function editorBlock(node: Node | null, editor: HTMLElement): HTMLElement | null
   let current: Node | null = node;
   while (current && current !== editor) {
     const parent = current.parentElement;
-    if (
-      current instanceof HTMLElement &&
-      parent &&
-      (parent === editor || parent.classList.contains(FOLD_BODY))
-    ) {
-      if (current.classList.contains(FOLD_BODY) || INLINE_TAGS.has(current.tagName)) {
+    if (!(current instanceof HTMLElement) || !parent) {
+      current = parent;
+      continue;
+    }
+    // Skip the toggle chrome — it is not a content block.
+    if (current.classList.contains(FOLD_TOGGLE)) {
+      current = parent;
+      continue;
+    }
+    // Fold title lives under `.rte-fold`, not directly under the editor.
+    if (current.classList.contains(FOLD_HEAD) && parent.classList.contains(FOLD)) {
+      return current;
+    }
+    if (current.classList.contains(FOLD) && (parent === editor || parent.classList.contains(FOLD_BODY))) {
+      const head = current.querySelector(`:scope > .${FOLD_HEAD}`);
+      return head instanceof HTMLElement ? head : current;
+    }
+    if (parent === editor || parent.classList.contains(FOLD_BODY)) {
+      if (
+        current.classList.contains(FOLD_BODY) ||
+        current.classList.contains(FOLD) ||
+        INLINE_TAGS.has(current.tagName)
+      ) {
         current = parent;
         continue;
       }
@@ -423,6 +444,29 @@ function editorBlock(node: Node | null, editor: HTMLElement): HTMLElement | null
     current = parent;
   }
   return null;
+}
+
+function makeFoldToggle(): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = FOLD_TOGGLE;
+  btn.setAttribute("contenteditable", "false");
+  btn.setAttribute("tabindex", "-1");
+  btn.setAttribute("aria-label", "Toggle section");
+  return btn;
+}
+
+function syncFoldToggle(fold: HTMLElement) {
+  const collapsed = fold.getAttribute("data-collapsed") === "true";
+  let btn = fold.querySelector(`:scope > .${FOLD_TOGGLE}`);
+  if (!(btn instanceof HTMLButtonElement)) {
+    fold.querySelectorAll(`.${FOLD_TOGGLE}`).forEach((node) => node.remove());
+    btn = makeFoldToggle();
+    const head = fold.querySelector(`:scope > .${FOLD_HEAD}`);
+    if (head) fold.insertBefore(btn, head);
+    else fold.insertBefore(btn, fold.firstChild);
+  }
+  btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
 }
 
 function unwrapFold(fold: HTMLElement) {
@@ -445,13 +489,14 @@ function wrapFold(head: HTMLElement, following: HTMLElement[]) {
   body.className = FOLD_BODY;
   head.classList.add(FOLD_HEAD);
   head.replaceWith(fold);
-  fold.append(head, body);
+  fold.append(makeFoldToggle(), head, body);
   for (const node of following) body.appendChild(node);
   if (!body.childNodes.length) {
     const paragraph = document.createElement("p");
     paragraph.innerHTML = "<br>";
     body.appendChild(paragraph);
   }
+  syncFoldToggle(fold);
   return fold;
 }
 
@@ -460,6 +505,11 @@ function foldFromHead(block: HTMLElement): HTMLElement | null {
   if (block.classList.contains(FOLD_HEAD)) {
     const fold = block.closest(`.${FOLD}`);
     return fold instanceof HTMLElement ? fold : null;
+  }
+  const nested = block.closest(`.${FOLD}`);
+  if (nested instanceof HTMLElement) {
+    const head = nested.querySelector(`:scope > .${FOLD_HEAD}`);
+    if (head === block) return nested;
   }
   return null;
 }
@@ -475,12 +525,49 @@ function isFoldGutterClick(
 
 function repairFolds(editor: HTMLElement | null) {
   if (!editor) return;
-  editor.querySelectorAll(`.${FOLD}`).forEach((fold) => {
-    if (!(fold instanceof HTMLElement)) return;
-    if (fold.querySelector(`:scope > .${FOLD_HEAD}`)) return;
-    const first = Array.from(fold.children).find((el) => !el.classList.contains(FOLD_BODY));
-    if (first) first.classList.add(FOLD_HEAD);
-    else unwrapFold(fold);
+  editor.querySelectorAll(`.${FOLD}`).forEach((node) => {
+    if (!(node instanceof HTMLElement)) return;
+    const fold = node;
+
+    let head = fold.querySelector(`:scope > .${FOLD_HEAD}`);
+    if (!(head instanceof HTMLElement)) {
+      const first = Array.from(fold.children).find(
+        (el) =>
+          el instanceof HTMLElement &&
+          !el.classList.contains(FOLD_BODY) &&
+          !el.classList.contains(FOLD_TOGGLE),
+      );
+      if (first instanceof HTMLElement) {
+        first.classList.add(FOLD_HEAD);
+        head = first;
+      } else {
+        unwrapFold(fold);
+        return;
+      }
+    }
+
+    let body = fold.querySelector(`:scope > .${FOLD_BODY}`);
+    if (!(body instanceof HTMLElement)) {
+      body = document.createElement("div");
+      body.className = FOLD_BODY;
+      const stray = Array.from(fold.childNodes).filter((child) => {
+        if (!(child instanceof HTMLElement)) return child !== head;
+        return (
+          !child.classList.contains(FOLD_HEAD) &&
+          !child.classList.contains(FOLD_TOGGLE) &&
+          !child.classList.contains(FOLD_BODY)
+        );
+      });
+      head.after(body);
+      for (const child of stray) body.appendChild(child);
+      if (!body.childNodes.length) {
+        const paragraph = document.createElement("p");
+        paragraph.innerHTML = "<br>";
+        body.appendChild(paragraph);
+      }
+    }
+
+    syncFoldToggle(fold);
   });
 }
 
@@ -532,13 +619,17 @@ export default function RichTextEditor({
     .slice(0, 8);
 
   // Only sync from props when the saved HTML differs, so typing keeps the caret.
+  // Collapse chrome is stripped from both sides so open/close never fights React value.
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    if (serializeEditorHtml(editor.innerHTML) !== value) {
-      editor.innerHTML = value || "";
+    const incoming = serializeEditorHtml(value || "");
+    if (serializeEditorHtml(editor.innerHTML) !== incoming) {
+      editor.innerHTML = incoming;
       repairFolds(editor);
       markSelfBlocks(editor, authorLabelRef.current);
+    } else {
+      repairFolds(editor);
     }
   }, [value]);
 
@@ -692,9 +783,25 @@ export default function RichTextEditor({
 
   const run = (action: ToolbarAction) => {
     if (readOnly) return;
-    editorRef.current?.focus();
+    const editor = editorRef.current;
+    editor?.focus();
+    const selection = window.getSelection();
+    const before = editor ? editorBlock(selection?.anchorNode ?? null, editor) : null;
+    const wasFoldHead = Boolean(before?.classList.contains(FOLD_HEAD));
     document.execCommand(action.command, false, action.value);
-    stampWriter(editorRef.current, authorLabelRef.current);
+    // formatBlock often replaces the head node and drops rte-fold-head — restore it.
+    if (wasFoldHead && action.command === "formatBlock" && editor) {
+      const after = editorBlock(window.getSelection()?.anchorNode ?? null, editor);
+      const fold = after?.closest(`.${FOLD}`);
+      if (after && fold instanceof HTMLElement) {
+        fold.querySelectorAll(`:scope > .${FOLD_HEAD}`).forEach((node) => {
+          if (node !== after) node.classList.remove(FOLD_HEAD);
+        });
+        after.classList.add(FOLD_HEAD);
+      }
+      repairFolds(editor);
+    }
+    stampWriter(editor, authorLabelRef.current);
     emit();
     readCurrentStyle();
   };
@@ -769,6 +876,7 @@ export default function RichTextEditor({
 
   const toggleFold = (fold: HTMLElement | null) => {
     if (!fold) return;
+    repairFolds(editorRef.current);
     const collapsing = fold.getAttribute("data-collapsed") !== "true";
     if (collapsing) {
       fold.setAttribute("data-collapsed", "true");
@@ -791,7 +899,8 @@ export default function RichTextEditor({
     } else {
       fold.removeAttribute("data-collapsed");
     }
-    if (!readOnly) emit();
+    syncFoldToggle(fold);
+    // Do not emit — open/closed is UI state only and must not rewrite `value`.
   };
 
   const applyFold = () => {
@@ -838,6 +947,7 @@ export default function RichTextEditor({
       }
     }
     wrapFold(block, following);
+    repairFolds(editor);
     emit();
     readCurrentStyle();
   };
@@ -997,8 +1107,15 @@ export default function RichTextEditor({
   };
 
   const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const toggle = (event.target as HTMLElement | null)?.closest(`.${FOLD_TOGGLE}`);
+    if (toggle instanceof HTMLElement && editorRef.current?.contains(toggle)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const head = (event.target as HTMLElement | null)?.closest(`.${FOLD_HEAD}`);
     if (head instanceof HTMLElement && isFoldGutterClick(event, head, dir === "rtl")) {
+      event.preventDefault();
       return;
     }
     const target = (event.target as HTMLElement | null)?.closest("a");
@@ -1025,6 +1142,7 @@ export default function RichTextEditor({
         const body = fold?.querySelector(`:scope > .${FOLD_BODY}`);
         if (fold instanceof HTMLElement && fold.getAttribute("data-collapsed") === "true") {
           fold.removeAttribute("data-collapsed");
+          syncFoldToggle(fold);
         }
         const paragraph = document.createElement("p");
         paragraph.innerHTML = "<br>";
@@ -1080,13 +1198,24 @@ export default function RichTextEditor({
   };
 
   const handleEditorMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    const head = (event.target as HTMLElement | null)?.closest(`.${FOLD_HEAD}`);
+    const editor = editorRef.current;
+    const target = event.target as HTMLElement | null;
+    const toggle = target?.closest(`.${FOLD_TOGGLE}`);
+    if (toggle instanceof HTMLElement && editor?.contains(toggle)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const fold = toggle.closest(`.${FOLD}`);
+      toggleFold(fold instanceof HTMLElement ? fold : null);
+      return;
+    }
+    const head = target?.closest(`.${FOLD_HEAD}`);
     if (
       head instanceof HTMLElement &&
-      editorRef.current?.contains(head) &&
+      editor?.contains(head) &&
       isFoldGutterClick(event, head, dir === "rtl")
     ) {
       event.preventDefault();
+      event.stopPropagation();
       const fold = head.closest(`.${FOLD}`);
       toggleFold(fold instanceof HTMLElement ? fold : null);
       return;
