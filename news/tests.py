@@ -4,13 +4,12 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from news.constants import FETCH_MODE_MANUAL, FETCH_MODE_SCHEDULED, NEWS_GROUP_NAME
+from news.constants import FETCH_MODE_MANUAL, FETCH_MODE_SCHEDULED
 from news.models import (
     Article,
     FetchJob,
@@ -119,12 +118,17 @@ def _client_for(user):
     return client
 
 
+def _add_news_team(user):
+    from news.services.team import add_member
+
+    add_member(user)
+    return user
+
+
 class NewsPermissionTests(APITestCase):
     def setUp(self):
-        self.group, _ = Group.objects.get_or_create(name=NEWS_GROUP_NAME)
         self.outsider = _user("09121110001")
-        self.member = _user("09121110002")
-        self.member.groups.add(self.group)
+        self.member = _add_news_team(_user("09121110002"))
         self.admin = _user("09121110003", is_staff=True, is_superuser=True)
         self.outsider_c = _client_for(self.outsider)
         self.member_c = _client_for(self.member)
@@ -323,11 +327,17 @@ class TranslationTests(TestCase):
         self.assertEqual(self.article.translation_status, TranslationStatus.DONE)
         self.assertIn("[fa]", self.article.title_fa)
 
-    def test_missing_key_skips(self):
-        with self.settings(NEWS_TRANSLATE_PROVIDER="anthropic", NEWS_ANTHROPIC_API_KEY=""):
-            TranslationService().translate_article(self.article.pk)
+    def test_missing_anthropic_key_falls_back_to_mymemory(self):
+        with self.settings(NEWS_TRANSLATE_PROVIDER="auto", NEWS_ANTHROPIC_API_KEY=""):
+            with patch.object(
+                TranslationService,
+                "_call_mymemory",
+                return_value=("عنوان", "خلاصه"),
+            ):
+                TranslationService().translate_article(self.article.pk)
         self.article.refresh_from_db()
-        self.assertEqual(self.article.translation_status, TranslationStatus.SKIPPED)
+        self.assertEqual(self.article.translation_status, TranslationStatus.DONE)
+        self.assertEqual(self.article.title_fa, "عنوان")
 
 
 class UserAdminLockTests(TestCase):
@@ -353,7 +363,6 @@ class UserAdminLockTests(TestCase):
 
 class FetchJobApiTests(APITestCase):
     def setUp(self):
-        group, _ = Group.objects.get_or_create(name=NEWS_GROUP_NAME)
         self.admin = _user("09121110999", is_staff=True, is_superuser=True)
         self.client_a = _client_for(self.admin)
         self.source = NewsSource.objects.create(
@@ -392,9 +401,7 @@ class FetchJobApiTests(APITestCase):
 
 class NewsPanelSettingsTests(APITestCase):
     def setUp(self):
-        group, _ = Group.objects.get_or_create(name=NEWS_GROUP_NAME)
-        self.member = _user("09121112001")
-        self.member.groups.add(group)
+        self.member = _add_news_team(_user("09121112001"))
         self.admin = _user("09121112002", is_staff=True, is_superuser=True)
         self.member_c = _client_for(self.member)
         self.admin_c = _client_for(self.admin)
@@ -460,9 +467,7 @@ class NewsPanelSettingsTests(APITestCase):
 
     def test_staff_even_in_news_team_cannot_write_settings(self):
         """Settings page is superuser-only. Django is_staff is not enough."""
-        group = Group.objects.get(name=NEWS_GROUP_NAME)
-        staff = _user("09121112004", is_staff=True)
-        staff.groups.add(group)
+        staff = _add_news_team(_user("09121112004", is_staff=True))
         client = _client_for(staff)
         access = client.get(f"{API}/access/")
         self.assertTrue(access.data["allowed"])
@@ -550,7 +555,6 @@ class NewsBackendSmokeTests(APITestCase):
     """Operating path a superuser hits on the future settings + list pages."""
 
     def setUp(self):
-        group, _ = Group.objects.get_or_create(name=NEWS_GROUP_NAME)
         self.admin = _user("09121113001", is_staff=True, is_superuser=True)
         self.client_a = _client_for(self.admin)
         self.source = NewsSource.objects.create(
@@ -780,11 +784,8 @@ class WarehouseScheduleTests(TestCase):
 
 class WarehousePermissionTests(APITestCase):
     def setUp(self):
-        group, _ = Group.objects.get_or_create(name=NEWS_GROUP_NAME)
-        self.member = _user("09121114001")
-        self.member.groups.add(group)
-        self.staff = _user("09121114002", is_staff=True)
-        self.staff.groups.add(group)
+        self.member = _add_news_team(_user("09121114001"))
+        self.staff = _add_news_team(_user("09121114002", is_staff=True))
         self.admin = _user("09121114003", is_staff=True, is_superuser=True)
         self.member_c = _client_for(self.member)
         self.staff_c = _client_for(self.staff)
@@ -823,11 +824,8 @@ class WarehousePermissionTests(APITestCase):
 
 class ArticleDetailApiTests(APITestCase):
     def setUp(self):
-        group, _ = Group.objects.get_or_create(name=NEWS_GROUP_NAME)
-        self.member = _user("09121115001")
-        self.member.groups.add(group)
-        self.staff = _user("09121115002", is_staff=True)
-        self.staff.groups.add(group)
+        self.member = _add_news_team(_user("09121115001"))
+        self.staff = _add_news_team(_user("09121115002", is_staff=True))
         self.outsider = _user("09121115003")
         self.member_c = _client_for(self.member)
         self.staff_c = _client_for(self.staff)
@@ -932,7 +930,7 @@ class ArticleDetailApiTests(APITestCase):
         self.other.refresh_from_db()
         self.assertEqual(self.other.translation_status, TranslationStatus.DONE)
 
-    def test_translate_skips_without_api_key(self):
+    def test_translate_without_anthropic_key_uses_fallback(self):
         pending = Article.objects.create(
             source=self.source,
             url="https://example.com/need-key",
@@ -943,7 +941,13 @@ class ArticleDetailApiTests(APITestCase):
             content_hash="need-key-hash",
             translation_status=TranslationStatus.PENDING,
         )
-        with self.settings(NEWS_TRANSLATE_PROVIDER="anthropic", NEWS_ANTHROPIC_API_KEY=""):
-            res = self.member_c.post(f"{API}/articles/{pending.pk}/translate/", {}, format="json")
+        with self.settings(NEWS_TRANSLATE_PROVIDER="auto", NEWS_ANTHROPIC_API_KEY=""):
+            with patch.object(
+                TranslationService,
+                "_call_mymemory",
+                return_value=("عنوان", "خلاصه"),
+            ):
+                res = self.member_c.post(f"{API}/articles/{pending.pk}/translate/", {}, format="json")
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
-        self.assertEqual(res.data["translation_status"], TranslationStatus.SKIPPED)
+        self.assertEqual(res.data["translation_status"], TranslationStatus.DONE)
+        self.assertEqual(res.data["title_fa"], "عنوان")

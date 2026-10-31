@@ -4,19 +4,20 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
 
-from news.constants import NEWS_GROUP_NAME
-
 
 def user_in_news_team(user) -> bool:
+    """Feed + detail access: NewsTeamMember roster, or superuser."""
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if user.is_superuser:
         return True
-    return user.groups.filter(name=NEWS_GROUP_NAME).exists()
+    from news.models import NewsTeamMember
+
+    return NewsTeamMember.objects.filter(user_id=user.pk).exists()
 
 
 def user_is_news_admin(user) -> bool:
-    """Fetch controls: superuser only (staff without the flag cannot start jobs)."""
+    """Fetch / settings / update: superuser only."""
     return bool(user and getattr(user, "is_authenticated", False) and user.is_superuser)
 
 

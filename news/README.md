@@ -1,6 +1,6 @@
 # News (AI panel) — backend
 
-Global, not tenant-scoped. Access is the Django group **News Team** (`news.constants.NEWS_GROUP_NAME`) plus superusers. Superusers add/remove people from that group in Django admin.
+Global, not tenant-scoped. Access is the **News Team members** table (`news.NewsTeamMember`) plus superusers. Superusers add/remove members in Django admin → **News Team members**. Members can read feed/detail only; settings / fetch / update stay superuser-only.
 
 Product UI: `/news` and `/news/settings`. Full map (tech, usage, permissions, code): [`app-knowledge/news.md`](../app-knowledge/news.md).
 

@@ -325,7 +325,8 @@ CELERY_TASK_ALWAYS_EAGER = config(
 )
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_IMPORTS = ("news.tasks",)
-NEWS_TRANSLATE_PROVIDER = config("NEWS_TRANSLATE_PROVIDER", default="anthropic")
+# auto = Anthropic when NEWS_ANTHROPIC_API_KEY is set, else MyMemory (free, on-demand).
+NEWS_TRANSLATE_PROVIDER = config("NEWS_TRANSLATE_PROVIDER", default="auto")
 NEWS_ANTHROPIC_API_KEY = config("NEWS_ANTHROPIC_API_KEY", default="")
 NEWS_ANTHROPIC_MODEL = config("NEWS_ANTHROPIC_MODEL", default="claude-haiku-4-5-20251001")
 NEWS_HYDRATE_BODIES = config("NEWS_HYDRATE_BODIES", default=not _testing, cast=bool)

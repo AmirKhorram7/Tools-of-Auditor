@@ -46,21 +46,13 @@ class TranslationService:
                 self._fill_reader_fa(article)
                 return article
 
-        provider = getattr(settings, "NEWS_TRANSLATE_PROVIDER", "anthropic")
-        key = getattr(settings, "NEWS_ANTHROPIC_API_KEY", "") or ""
-        if provider != "test" and not key:
-            # Root cause of blank FA: no API key → skip instead of calling Anthropic.
-            log.info("translate skipped article=%s (NEWS_ANTHROPIC_API_KEY empty)", article.pk)
-            article.translation_status = TranslationStatus.SKIPPED
-            article.save(update_fields=["translation_status"])
-            return article
-
+        provider = self._resolve_provider()
         article.translation_status = TranslationStatus.PENDING
         article.save(update_fields=["translation_status"])
         try:
             title_fa, summary_fa = self._call_provider(provider, article.title, article.summary)
         except Exception as exc:  # noqa: BLE001
-            log.warning("translate failed article=%s: %s", article.pk, exc)
+            log.warning("translate failed article=%s provider=%s: %s", article.pk, provider, exc)
             article.translation_status = TranslationStatus.FAILED
             article.save(update_fields=["translation_status"])
             return article
@@ -77,6 +69,19 @@ class TranslationService:
         self._fill_reader_fa(article)
         return article
 
+    def _resolve_provider(self) -> str:
+        """Prefer Anthropic when keyed; otherwise use free MyMemory so Translate works."""
+        configured = (getattr(settings, "NEWS_TRANSLATE_PROVIDER", "auto") or "auto").lower()
+        key = getattr(settings, "NEWS_ANTHROPIC_API_KEY", "") or ""
+        if configured == "test":
+            return "test"
+        if configured == "mymemory":
+            return "mymemory"
+        if configured == "anthropic":
+            return "anthropic" if key else "mymemory"
+        # auto (default): Anthropic when available, else MyMemory.
+        return "anthropic" if key else "mymemory"
+
     def _fill_reader_fa(self, article: Article) -> None:
         """Derive detail FA fields from summary_fa when the reader rows are still English-only."""
         changed: list[str] = []
@@ -91,7 +96,6 @@ class TranslationService:
             changed.append("why_it_matters_fa")
         paras = article.paragraphs or []
         if article.summary_fa and paras and not any((p or {}).get("fa") for p in paras):
-            # First paragraph gets summary_fa; rest stay empty until a richer pass exists.
             next_paras = []
             for i, row in enumerate(paras):
                 item = dict(row or {})
@@ -106,6 +110,11 @@ class TranslationService:
     def _call_provider(self, provider: str, title: str, summary: str) -> tuple[str, str]:
         if provider == "test":
             return f"{title} [fa]", (summary or title)
+        if provider == "mymemory":
+            return self._call_mymemory(title, summary)
+        return self._call_anthropic(title, summary)
+
+    def _call_anthropic(self, title: str, summary: str) -> tuple[str, str]:
         key = getattr(settings, "NEWS_ANTHROPIC_API_KEY", "") or ""
         if not key:
             raise RuntimeError("NEWS_ANTHROPIC_API_KEY is not set")
@@ -132,6 +141,32 @@ class TranslationService:
             if block.get("type") == "text":
                 text += block.get("text") or ""
         return _parse_translated(text, title, summary)
+
+    def _call_mymemory(self, title: str, summary: str) -> tuple[str, str]:
+        """On-demand FA without Anthropic. Title + summary only (length-capped)."""
+        title_fa = _mymemory_one(title or "")
+        summary_fa = _mymemory_one((summary or title or "")[:450])
+        if not title_fa and not summary_fa:
+            raise RuntimeError("MyMemory returned empty translation")
+        return title_fa or title, summary_fa or summary or title
+
+
+def _mymemory_one(text: str) -> str:
+    text = (text or "").strip()
+    if not text:
+        return ""
+    response = httpx.get(
+        "https://api.mymemory.translated.net/get",
+        params={"q": text[:500], "langpair": "en|fa"},
+        timeout=25.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    translated = ((data.get("responseData") or {}).get("translatedText") or "").strip()
+    # MyMemory sometimes echoes the source when it cannot translate.
+    if not translated or translated.lower() == text.lower():
+        return ""
+    return translated
 
 
 def _parse_translated(text: str, fallback_title: str, fallback_summary: str) -> tuple[str, str]:

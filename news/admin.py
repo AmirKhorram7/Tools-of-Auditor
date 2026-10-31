@@ -1,14 +1,19 @@
 from django.contrib import admin, messages
-from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import GroupAdmin
 from django.contrib.auth.models import Group
 from django.utils.translation import gettext_lazy as _
 
 from news.constants import NEWS_GROUP_NAME
-from news.models import Article, FetchJob, NewsPanelSettings, NewsPreference, NewsSource, NewsWarehouseSettings
+from news.models import (
+    Article,
+    FetchJob,
+    NewsPanelSettings,
+    NewsPreference,
+    NewsSource,
+    NewsTeamMember,
+    NewsWarehouseSettings,
+)
 from news.permissions import user_is_news_admin
-
-User = get_user_model()
 
 try:
     admin.site.unregister(Group)
@@ -16,38 +21,12 @@ except admin.sites.NotRegistered:
     pass
 
 
-class NewsTeamMembershipInline(admin.TabularInline):
-    """Add / remove News Team members from the Group change page."""
-
-    model = User.groups.through
-    fk_name = "group"
-    extra = 1
-    verbose_name = _("Member")
-    verbose_name_plural = _("News Team members")
-    autocomplete_fields = ("user",)
-
-
 @admin.register(Group)
 class LockedGroupAdmin(GroupAdmin):
-    """News Team membership is superuser-only. Other groups follow Django defaults.
+    """Protect the legacy News Team group name from accidental delete.
 
-    Open **Groups → News Team** and use the members inline to grant feed access.
-    Members can read the news feed only; settings / fetch / update stay superuser-only.
+    Membership is managed on **News Team members** — not here.
     """
-
-    list_display = ("name", "member_count")
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("user_set")
-
-    @admin.display(description=_("Members"))
-    def member_count(self, obj):
-        return obj.user_set.count()
-
-    def get_inline_instances(self, request, obj=None):
-        if obj is not None and obj.name == NEWS_GROUP_NAME and request.user.is_superuser:
-            return [NewsTeamMembershipInline(self.model, self.admin_site)]
-        return []
 
     def has_change_permission(self, request, obj=None):
         if obj is not None and obj.name == NEWS_GROUP_NAME and not request.user.is_superuser:
@@ -58,6 +37,70 @@ class LockedGroupAdmin(GroupAdmin):
         if obj is not None and obj.name == NEWS_GROUP_NAME:
             return False
         return super().has_delete_permission(request, obj)
+
+
+@admin.register(NewsTeamMember)
+class NewsTeamMemberAdmin(admin.ModelAdmin):
+    """Add / remove who can read the news feed and story detail."""
+
+    list_display = ("user", "phone", "full_name", "added_by", "created_at")
+    search_fields = (
+        "user__phone_number",
+        "user__first_name",
+        "user__last_name",
+        "notes",
+    )
+    autocomplete_fields = ("user", "added_by")
+    readonly_fields = ("created_at",)
+    list_select_related = ("user", "added_by")
+
+    @admin.display(description=_("Phone"), ordering="user__phone_number")
+    def phone(self, obj):
+        return getattr(obj.user, "phone_number", "") or "—"
+
+    @admin.display(description=_("Name"))
+    def full_name(self, obj):
+        user = obj.user
+        name = f"{getattr(user, 'first_name', '')} {getattr(user, 'last_name', '')}".strip()
+        return name or "—"
+
+    def save_model(self, request, obj, form, change):
+        from news.services.team import add_member, sync_user_into_legacy_group
+
+        if not obj.added_by_id:
+            obj.added_by = request.user
+        if change:
+            super().save_model(request, obj, form, change)
+            sync_user_into_legacy_group(obj.user)
+            return
+        member = add_member(obj.user, added_by=obj.added_by, notes=obj.notes or "")
+        obj.pk = member.pk
+
+    def delete_model(self, request, obj):
+        from news.services.team import remove_membership
+
+        remove_membership(obj)
+
+    def delete_queryset(self, request, queryset):
+        from news.services.team import remove_membership
+
+        for member in queryset:
+            remove_membership(member)
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
 
 
 @admin.register(NewsSource)

@@ -1,9 +1,10 @@
 """News panel constants.
 
-The news panel is **global**, not tenant-scoped: every News Team member sees
+The news panel is **global**, not tenant-scoped: every NewsTeamMember sees
 the same sources and articles. There is no company/desk/project filter.
 """
 
+# Legacy Django auth Group kept in sync when adding/removing NewsTeamMember rows.
 NEWS_GROUP_NAME = "News Team"
 
 # Honest crawler identity. Used on every outbound fetch.

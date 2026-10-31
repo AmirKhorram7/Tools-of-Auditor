@@ -224,8 +224,6 @@ export default function SignalDetail({ articleId }: { articleId: number }) {
       if (next.translation_status === "done") {
         setLang("fa");
         showToast(L.dTranslateDone);
-      } else if (next.translation_status === "skipped") {
-        showToast(L.dTranslateSkipped);
       } else {
         showToast(L.dTranslateFail);
       }
@@ -592,11 +590,9 @@ export default function SignalDetail({ articleId }: { articleId: number }) {
                       ? L.dTranslatingBtn
                       : data.translation_status === "done"
                         ? L.dTranslateDone
-                        : data.translation_status === "skipped"
-                          ? L.dTranslateSkipped
-                          : data.translation_status === "failed"
-                            ? L.dTranslateFail
-                            : L.dTranslate}
+                        : data.translation_status === "failed" || data.translation_status === "skipped"
+                          ? L.dTranslateRetry
+                          : L.dTranslate}
                   </button>
                 </div>
               </div>

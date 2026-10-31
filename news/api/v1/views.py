@@ -40,8 +40,9 @@ from news.services.warehouse.sync import WarehouseSyncService
 
 PANEL_NOTE = (
     "The news panel is **global** (not tenant-scoped). "
-    "Only members of the Django group `News Team`, plus superusers, may call these endpoints. "
-    "Everyone else gets `403`. Superusers start fetch jobs."
+    "Only **News Team members** (Django admin → News Team members), plus superusers, "
+    "may call these endpoints. Everyone else gets `403`. "
+    "Members may read feed/detail; only superusers start fetch jobs or change settings."
 )
 
 
@@ -65,7 +66,7 @@ class NewsAccessView(APIView):
         summary="Can I open the news panel?",
         description=(
             "Any logged-in user. Use this to hide the sidebar link.\n\n"
-            "- `allowed`: in the **News Team** group or superuser.\n"
+            "- `allowed`: listed under **News Team members** in admin, or superuser.\n"
             "- `is_fetch_admin`: superuser (can start fetch jobs).\n"
             "- `language`: last EN/FA choice (`en` until they set it).\n\n"
             + PANEL_NOTE
@@ -364,8 +365,8 @@ class ArticleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         description=(
             "News Team (and superusers). Runs title/summary translation when the user "
             "asks from the story detail page — not on ingest.\n\n"
-            "Empty `NEWS_ANTHROPIC_API_KEY` → `translation_status=skipped`.\n"
-            "Body optional: `{force?: true}` to retry after failed/skipped.\n\n"
+            "Provider: Anthropic when `NEWS_ANTHROPIC_API_KEY` is set, otherwise MyMemory.\n"
+            "Body optional: `{force?: true}` to retry after failed.\n\n"
             + PANEL_NOTE
         ),
         request=ArticleTranslateSerializer,

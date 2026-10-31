@@ -1,7 +1,7 @@
 """News panel models.
 
 Global (not tenant-scoped): one catalog of sources and articles for the
-whole platform. Access is gated by the News Team group, not by company.
+whole platform. Access is gated by NewsTeamMember (admin roster), not by company.
 """
 
 from django.conf import settings
@@ -347,6 +347,38 @@ class NewsWarehouseSettings(models.Model):
 
     def delete(self, *args, **kwargs):
         return None
+
+
+class NewsTeamMember(models.Model):
+    """Who may open the news feed and story detail pages.
+
+    Superusers manage this roster in Django admin (add / remove).
+    Members can read news only — settings, fetch, and update stay superuser-only.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="news_team_membership",
+        help_text=_("User who can open /news (feed + detail)."),
+    )
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="news_team_members_added",
+    )
+    notes = models.CharField(max_length=200, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("News Team member")
+        verbose_name_plural = _("News Team members")
+
+    def __str__(self):
+        return f"News Team: {self.user_id}"
 
 
 class NewsPreference(models.Model):
