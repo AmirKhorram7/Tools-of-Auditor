@@ -334,10 +334,30 @@ class TranslationTests(TestCase):
                 "_call_mymemory",
                 return_value=("عنوان", "خلاصه"),
             ):
-                TranslationService().translate_article(self.article.pk)
+                with patch.object(
+                    TranslationService,
+                    "_translate_texts",
+                    return_value=[],
+                ):
+                    TranslationService().translate_article(self.article.pk)
         self.article.refresh_from_db()
         self.assertEqual(self.article.translation_status, TranslationStatus.DONE)
         self.assertEqual(self.article.title_fa, "عنوان")
+
+    def test_story_paragraphs_all_get_fa(self):
+        self.article.paragraphs = [
+            {"en": "First English paragraph about the leak.", "fa": ""},
+            {"en": "Second English paragraph about brokers.", "fa": ""},
+            {"en": "Third English paragraph about the settlement.", "fa": ""},
+        ]
+        self.article.save(update_fields=["paragraphs"])
+        with self.settings(NEWS_TRANSLATE_PROVIDER="test", NEWS_ANTHROPIC_API_KEY=""):
+            TranslationService().translate_article(self.article.pk)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.translation_status, TranslationStatus.DONE)
+        fas = [row.get("fa", "") for row in self.article.paragraphs]
+        self.assertEqual(len(fas), 3)
+        self.assertTrue(all("[fa]" in text for text in fas))
 
 
 class UserAdminLockTests(TestCase):

@@ -208,17 +208,21 @@ export default function SignalDetail({ articleId }: { articleId: number }) {
     toastTimer.current = window.setTimeout(() => setToast(""), 1600);
   };
 
+  const storyNeedsFa = (row: ArticleDetail) =>
+    row.paragraphs.some((p) => Boolean((p.en || "").trim()) && !(p.fa || "").trim());
+
   const runTranslate = async () => {
     if (!data || translating) return;
     const status = data.translation_status;
-    if (status === "done" && data.title_fa) {
+    const incompleteStory = storyNeedsFa(data);
+    if (status === "done" && data.title_fa && !incompleteStory) {
       setLang("fa");
       showToast(L.dTranslateDone);
       return;
     }
     setTranslating(true);
     try {
-      const force = status === "failed" || status === "skipped";
+      const force = status === "failed" || status === "skipped" || incompleteStory;
       const next = await translateArticle(data.id, force);
       setData(next);
       if (next.translation_status === "done") {
@@ -588,9 +592,11 @@ export default function SignalDetail({ articleId }: { articleId: number }) {
                   >
                     {translating
                       ? L.dTranslatingBtn
-                      : data.translation_status === "done"
+                      : data.translation_status === "done" && !storyNeedsFa(data)
                         ? L.dTranslateDone
-                        : data.translation_status === "failed" || data.translation_status === "skipped"
+                        : data.translation_status === "failed" ||
+                            data.translation_status === "skipped" ||
+                            (data.translation_status === "done" && storyNeedsFa(data))
                           ? L.dTranslateRetry
                           : L.dTranslate}
                   </button>
