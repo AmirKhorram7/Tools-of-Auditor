@@ -392,6 +392,11 @@ class StepRisk(BaseModel):
     def __str__(self):
         return self.title
 
+    def soft_delete(self):
+        now = timezone.now()
+        retire(self.control_links.all(), now)
+        super().soft_delete()
+
 
 class StepControl(BaseModel):
     """Control items documented for a process step."""
@@ -414,6 +419,54 @@ class StepControl(BaseModel):
 
     def __str__(self):
         return self.title
+
+    def soft_delete(self):
+        now = timezone.now()
+        retire(self.risk_links.all(), now)
+        super().soft_delete()
+
+
+class StepRiskControlLink(BaseModel):
+    """Many-to-many: which controls mitigate which risks on the same step.
+
+    Explicit through model (not a bare M2M) so soft-delete, same-step validation,
+    and admin/API stay consistent with the rest of this app.
+    """
+
+    risk = models.ForeignKey(
+        StepRisk,
+        on_delete=models.CASCADE,
+        related_name="control_links",
+    )
+    control = models.ForeignKey(
+        StepControl,
+        on_delete=models.CASCADE,
+        related_name="risk_links",
+    )
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["risk", "control"],
+                condition=models.Q(is_deleted=False),
+                name="uniq_active_step_risk_control_link",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["risk", "is_deleted"]),
+            models.Index(fields=["control", "is_deleted"]),
+        ]
+
+    def __str__(self):
+        return f"risk {self.risk_id} ↔ control {self.control_id}"
+
+    def clean(self):
+        if self.risk_id and self.control_id:
+            if self.risk.step_id != self.control.step_id:
+                raise ValidationError(
+                    {"control": _("Risk and control must belong to the same process step.")}
+                )
 
 
 class StepMedia(BaseModel):

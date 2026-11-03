@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { cx } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
+import { migrateLegacyFolds, SectionEditor } from "@/lib/sectionEditor";
 
 type ToolbarAction = {
   label?: string;
@@ -169,6 +170,8 @@ type Props = {
   saving?: boolean;
   /** Increment after a successful save to flash the border green for 1s. */
   savedTick?: number;
+  /** Expose SectionEditor on window + stable ids for Playwright (explanation tab). */
+  exposeSectionApi?: boolean;
 };
 
 const AUTHOR_BLOCKS = new Set(["P", "H1", "H2", "LI", "BLOCKQUOTE", "TD", "TH", "DIV"]);
@@ -254,12 +257,17 @@ function markWritingBlock(editor: HTMLElement | null) {
 }
 
 function serializeEditorHtml(html: string): string {
-  // Collapse is session UI only — never persist open/closed into saved HTML.
+  // Strip ephemeral UI attrs; section open state is part of DESIGN storage (data-open).
   return html
     .replace(/\sdata-self(?:="[^"]*")?/gi, "")
     .replace(/\sdata-writing(?:="[^"]*")?/gi, "")
     .replace(/\sdata-collapsed(?:="[^"]*")?/gi, "")
-    .replace(/<button\b[^>]*\brte-fold-toggle\b[^>]*>[\s\S]*?<\/button>/gi, "");
+    .replace(/<button\b[^>]*\brte-fold-toggle\b[^>]*>[\s\S]*?<\/button>/gi, "")
+    .replace(/<button\b[^>]*\bed-toggle\b[^>]*>[\s\S]*?<\/button>/gi, "");
+}
+
+function normalizeStoredHtml(html: string): string {
+  return serializeEditorHtml(migrateLegacyFolds(html || ""));
 }
 
 function findSlashTrigger(editor: HTMLElement): { node: Text; start: number; query: string } | null {
@@ -585,11 +593,16 @@ export default function RichTextEditor({
   onSave,
   saving = false,
   savedTick = 0,
+  exposeSectionApi = false,
 }: Props) {
   const { t, dir, locale } = useI18n();
   const { profile } = useAuth();
   const resolvedPlaceholder = placeholder ?? t("editor.placeholder");
   const editorRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<SectionEditor | null>(null);
+  const suppressEmitRef = useRef(false);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const paletteRef = useRef<HTMLDivElement>(null);
   const sizeInputRef = useRef<HTMLInputElement>(null);
   const sizeListId = useId();
@@ -618,17 +631,57 @@ export default function RichTextEditor({
     .filter((item) => item.title.toLowerCase().includes(mentionQuery.toLowerCase()))
     .slice(0, 8);
 
-  // Only sync from props when the saved HTML differs, so typing keeps the caret.
-  // Collapse chrome is stripped from both sides so open/close never fights React value.
+  // Mount DESIGN.md SectionEditor on the contenteditable root.
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    const incoming = serializeEditorHtml(value || "");
-    if (serializeEditorHtml(editor.innerHTML) !== incoming) {
-      editor.innerHTML = incoming;
-      repairFolds(editor);
-      markSelfBlocks(editor, authorLabelRef.current);
-    } else {
+    const section = new SectionEditor(editor, {
+      titlePlaceholder: t("editor.sectionTitlePlaceholder"),
+      onChange: (ed) => {
+        if (suppressEmitRef.current || readOnly) return;
+        onChangeRef.current(serializeEditorHtml(ed.getHTML()));
+      },
+    });
+    if (readOnly) editor.contentEditable = "false";
+    sectionRef.current = section;
+    if (exposeSectionApi) {
+      const w = window as unknown as { __sectionEditor?: SectionEditor; ed?: SectionEditor };
+      w.__sectionEditor = section;
+      w.ed = section;
+    }
+    return () => {
+      if (sectionRef.current === section) sectionRef.current = null;
+      if (exposeSectionApi) {
+        const w = window as unknown as { __sectionEditor?: SectionEditor; ed?: SectionEditor };
+        if (w.__sectionEditor === section) delete w.__sectionEditor;
+        if (w.ed === section) delete w.ed;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once per editor node
+  }, [readOnly, exposeSectionApi]);
+
+  // Only sync from props when the saved HTML differs, so typing keeps the caret.
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const incoming = normalizeStoredHtml(value || "");
+    const section = sectionRef.current;
+    const current = section
+      ? serializeEditorHtml(section.getHTML())
+      : serializeEditorHtml(editor.innerHTML);
+    if (current !== incoming) {
+      suppressEmitRef.current = true;
+      try {
+        if (section) section.load(incoming || "<p><br></p>");
+        else {
+          editor.innerHTML = incoming;
+          repairFolds(editor);
+        }
+        markSelfBlocks(editor, authorLabelRef.current);
+      } finally {
+        suppressEmitRef.current = false;
+      }
+    } else if (!section) {
       repairFolds(editor);
     }
   }, [value]);
@@ -641,7 +694,12 @@ export default function RichTextEditor({
   }, [savedTick]);
 
   const emit = () => {
-    onChange(serializeEditorHtml(editorRef.current?.innerHTML ?? ""));
+    const section = sectionRef.current;
+    onChange(
+      serializeEditorHtml(
+        section ? section.getHTML() : (editorRef.current?.innerHTML ?? ""),
+      ),
+    );
   };
 
   const refreshMention = () => {
@@ -706,7 +764,11 @@ export default function RichTextEditor({
     }
     setCurrentColor(toHexColor(style.color));
     setInTable(Boolean(element.closest("table")));
-    setInFold(Boolean(element.closest(`.${FOLD_HEAD}`)));
+    setInFold(
+      Boolean(
+        element.closest(".ed-section-title") || element.closest(`.${FOLD_HEAD}`),
+      ),
+    );
 
     const marks: string[] = [];
     try {
@@ -905,51 +967,18 @@ export default function RichTextEditor({
 
   const applyFold = () => {
     if (readOnly) return;
-    const editor = editorRef.current;
-    if (!editor) return;
     restoreSelection();
-    editor.focus();
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    let block = editorBlock(selection.anchorNode, editor);
-    if (!block) {
-      document.execCommand("formatBlock", false, "p");
-      block = editorBlock(selection.anchorNode, editor);
-    }
-    if (!block || block.tagName === "TABLE") return;
-
-    const existing = foldFromHead(block);
-    if (existing) {
-      unwrapFold(existing);
+    const section = sectionRef.current;
+    if (section) {
+      section.insertSection();
       emit();
       readCurrentStyle();
       return;
     }
-
-    const following: HTMLElement[] = [];
-    if (!selection.isCollapsed) {
-      const end = editorBlock(selection.getRangeAt(0).endContainer, editor);
-      let sibling = block.nextElementSibling;
-      while (
-        sibling instanceof HTMLElement &&
-        sibling.parentElement === block.parentElement &&
-        sibling !== end?.nextElementSibling
-      ) {
-        following.push(sibling);
-        sibling = sibling.nextElementSibling;
-      }
-    } else {
-      let sibling = block.nextElementSibling;
-      while (sibling instanceof HTMLElement) {
-        if (sibling.classList.contains(FOLD) || sibling.classList.contains(FOLD_HEAD)) break;
-        following.push(sibling);
-        sibling = sibling.nextElementSibling;
-      }
-    }
-    wrapFold(block, following);
-    repairFolds(editor);
-    emit();
-    readCurrentStyle();
+    // Fallback if SectionEditor is not mounted yet.
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
   };
 
   const addLink = () => {
@@ -1132,31 +1161,7 @@ export default function RichTextEditor({
   };
 
   const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" && !event.shiftKey && !mentionOpen) {
-      const editor = editorRef.current;
-      const selection = window.getSelection();
-      const block = editor ? editorBlock(selection?.anchorNode ?? null, editor) : null;
-      if (block?.classList.contains(FOLD_HEAD)) {
-        event.preventDefault();
-        const fold = block.closest(`.${FOLD}`);
-        const body = fold?.querySelector(`:scope > .${FOLD_BODY}`);
-        if (fold instanceof HTMLElement && fold.getAttribute("data-collapsed") === "true") {
-          fold.removeAttribute("data-collapsed");
-          syncFoldToggle(fold);
-        }
-        const paragraph = document.createElement("p");
-        paragraph.innerHTML = "<br>";
-        body?.insertBefore(paragraph, body.firstChild);
-        const caret = document.createRange();
-        caret.setStart(paragraph, 0);
-        caret.collapse(true);
-        selection?.removeAllRanges();
-        selection?.addRange(caret);
-        stampWriter(editor, authorLabelRef.current);
-        emit();
-        return;
-      }
-    }
+    // Section Enter/Backspace/Tab are handled by SectionEditor on beforeinput/keydown (DESIGN §4).
     if (!mentionOpen) return;
     if (event.key === "Escape") {
       event.preventDefault();
@@ -1198,26 +1203,9 @@ export default function RichTextEditor({
   };
 
   const handleEditorMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    const editor = editorRef.current;
     const target = event.target as HTMLElement | null;
-    const toggle = target?.closest(`.${FOLD_TOGGLE}`);
-    if (toggle instanceof HTMLElement && editor?.contains(toggle)) {
-      event.preventDefault();
-      event.stopPropagation();
-      const fold = toggle.closest(`.${FOLD}`);
-      toggleFold(fold instanceof HTMLElement ? fold : null);
-      return;
-    }
-    const head = target?.closest(`.${FOLD_HEAD}`);
-    if (
-      head instanceof HTMLElement &&
-      editor?.contains(head) &&
-      isFoldGutterClick(event, head, dir === "rtl")
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      const fold = head.closest(`.${FOLD}`);
-      toggleFold(fold instanceof HTMLElement ? fold : null);
+    // Section toggles are handled by SectionEditor (mousedown preventDefault + click).
+    if (target?.closest(".ed-toggle") || target?.closest(`.${FOLD_TOGGLE}`)) {
       return;
     }
     handleTableResizeStart(event);
@@ -1395,7 +1383,9 @@ export default function RichTextEditor({
 
           <button
             type="button"
-            title={inFold ? t("editor.unfoldTitle") : t("editor.foldTitle")}
+            id={exposeSectionApi ? "btn-section" : undefined}
+            data-action="insert-section"
+            title={t("editor.foldTitle")}
             aria-pressed={inFold}
             onMouseDown={(event) => event.preventDefault()}
             onClick={applyFold}
@@ -1489,15 +1479,17 @@ export default function RichTextEditor({
 
       <div
         ref={editorRef}
+        id={exposeSectionApi ? "explanation-editor" : undefined}
+        data-section-editor={exposeSectionApi ? "" : undefined}
         contentEditable={!readOnly}
-        dir={dir}
+        dir={dir === "rtl" ? "rtl" : "auto"}
         suppressContentEditableWarning
         data-placeholder={resolvedPlaceholder}
         onInput={() => {
           if (!readOnly) {
-            repairFolds(editorRef.current);
             stampWriter(editorRef.current, authorLabelRef.current);
             markWritingBlock(editorRef.current);
+            // SectionEditor MutationObserver also emits via getHTML(); keep emit for non-section edits.
             emit();
             refreshMention();
           }
@@ -1519,7 +1511,7 @@ export default function RichTextEditor({
         }}
         style={{ minHeight, maxHeight, cursor: tableCursor || undefined }}
         className={cx(
-          "rich-content overflow-y-auto px-3 py-2.5 text-sm outline-none",
+          "rich-content ed-root overflow-y-auto px-3 py-2.5 text-sm outline-none",
           readOnly && "bg-gray-50 text-gray-800",
         )}
       />

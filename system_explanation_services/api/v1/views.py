@@ -34,6 +34,7 @@ from system_explanation_services.models import (
     StepControl,
     StepMedia,
     StepRisk,
+    StepRiskControlLink,
 )
 from system_explanation_services.services.access import (
     can_delete_project,
@@ -368,11 +369,23 @@ class ProcessStepViewSet(viewsets.ModelViewSet):
             qs = qs.prefetch_related(
                 Prefetch(
                     "risks",
-                    queryset=StepRisk.objects.prefetch_related("media_items"),
+                    queryset=StepRisk.objects.prefetch_related(
+                        "media_items",
+                        Prefetch(
+                            "control_links",
+                            queryset=StepRiskControlLink.objects.select_related("control"),
+                        ),
+                    ),
                 ),
                 Prefetch(
                     "controls",
-                    queryset=StepControl.objects.prefetch_related("media_items"),
+                    queryset=StepControl.objects.prefetch_related(
+                        "media_items",
+                        Prefetch(
+                            "risk_links",
+                            queryset=StepRiskControlLink.objects.select_related("risk"),
+                        ),
+                    ),
                 ),
                 Prefetch("media_items", queryset=StepMedia.objects.all()),
             )
@@ -446,7 +459,13 @@ class StepRiskViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = StepRisk.objects.filter(
             step__process_id__in=processes_for_user(self.request.user).values("id")
-        ).prefetch_related("media_items")
+        ).prefetch_related(
+            "media_items",
+            Prefetch(
+                "control_links",
+                queryset=StepRiskControlLink.objects.select_related("control"),
+            ),
+        )
         step_id = self.request.query_params.get("step")
         if step_id:
             qs = qs.filter(step_id=step_id)
@@ -475,7 +494,13 @@ class StepControlViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = StepControl.objects.filter(
             step__process_id__in=processes_for_user(self.request.user).values("id")
-        ).prefetch_related("media_items")
+        ).prefetch_related(
+            "media_items",
+            Prefetch(
+                "risk_links",
+                queryset=StepRiskControlLink.objects.select_related("risk"),
+            ),
+        )
         step_id = self.request.query_params.get("step")
         if step_id:
             qs = qs.filter(step_id=step_id)

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import BackButton from "@/components/BackButton";
 import ExplanationGuide from "@/components/explanation/ExplanationGuide";
@@ -27,10 +27,17 @@ import {
   type ProcessStep,
   type ProcessStepDetail,
   type StepItem,
+  type StepLinkedRef,
 } from "@/lib/types";
 import type { EditorMention } from "@/components/RichTextEditor";
 
 type Tab = "explanation" | "risk" | "control";
+
+function displayNumber(items: StepItem[] | StepLinkedRef[], id: number) {
+  const sorted = [...items].sort((a, b) => a.order - b.order || a.id - b.id);
+  const index = sorted.findIndex((row) => row.id === id);
+  return index >= 0 ? index + 1 : 0;
+}
 
 function useStepEditorHeight() {
   const [height, setHeight] = useState(560);
@@ -66,6 +73,8 @@ export default function StepDetailPage() {
   const [itemTitle, setItemTitle] = useState("");
   const [savingItem, setSavingItem] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [focusRiskId, setFocusRiskId] = useState<number | null>(null);
+  const [focusControlId, setFocusControlId] = useState<number | null>(null);
   const editorHeight = useStepEditorHeight();
 
   const load = useCallback(async () => {
@@ -281,6 +290,7 @@ export default function StepDetailPage() {
               onSave={editable ? saveExplanation : undefined}
               saving={savingExplanation}
               savedTick={explanationSaveTick}
+              exposeSectionApi
             />
           </Card>
 
@@ -310,9 +320,16 @@ export default function StepDetailPage() {
         <ItemSection
           kind="risk"
           items={step.risks}
+          siblingItems={step.controls}
           stepId={step.id}
           mentions={stepMentions}
           editable={editable}
+          focusItemId={focusRiskId}
+          onFocusHandled={() => setFocusRiskId(null)}
+          onNavigateToControl={(id) => {
+            setTab("control");
+            setFocusControlId(id);
+          }}
           onAdd={() => {
             setFormError(null);
             setItemModal("risk");
@@ -326,6 +343,29 @@ export default function StepDetailPage() {
                     risks: current.risks.map((item) =>
                       item.id === updated.id ? { ...item, ...updated } : item,
                     ),
+                    // Keep control chips in sync when risk links change from the header.
+                    controls: current.controls.map((control) => {
+                      const ids = updated.linked_control_ids ?? [];
+                      const linked = control.linked_risks ?? [];
+                      const has = linked.some((row) => row.id === updated.id);
+                      const should = ids.includes(control.id);
+                      if (has === should) return control;
+                      const nextLinks = should
+                        ? [
+                            ...linked.filter((row) => row.id !== updated.id),
+                            {
+                              id: updated.id,
+                              title: updated.title,
+                              order: updated.order,
+                            },
+                          ]
+                        : linked.filter((row) => row.id !== updated.id);
+                      return {
+                        ...control,
+                        linked_risks: nextLinks,
+                        linked_risk_ids: nextLinks.map((row) => row.id),
+                      };
+                    }),
                   }
                 : current,
             )
@@ -333,7 +373,15 @@ export default function StepDetailPage() {
           onItemRemoved={(id) =>
             setStep((current) =>
               current
-                ? { ...current, risks: current.risks.filter((item) => item.id !== id) }
+                ? {
+                    ...current,
+                    risks: current.risks.filter((item) => item.id !== id),
+                    controls: current.controls.map((control) => ({
+                      ...control,
+                      linked_risks: (control.linked_risks ?? []).filter((row) => row.id !== id),
+                      linked_risk_ids: (control.linked_risk_ids ?? []).filter((x) => x !== id),
+                    })),
+                  }
                 : current,
             )
           }
@@ -344,9 +392,16 @@ export default function StepDetailPage() {
         <ItemSection
           kind="control"
           items={step.controls}
+          siblingItems={step.risks}
           stepId={step.id}
           mentions={stepMentions}
           editable={editable}
+          focusItemId={focusControlId}
+          onFocusHandled={() => setFocusControlId(null)}
+          onNavigateToRisk={(id) => {
+            setTab("risk");
+            setFocusRiskId(id);
+          }}
           onAdd={() => {
             setFormError(null);
             setItemModal("control");
@@ -360,6 +415,25 @@ export default function StepDetailPage() {
                     controls: current.controls.map((item) =>
                       item.id === updated.id ? { ...item, ...updated } : item,
                     ),
+                    // Keep risk chips in sync when control links change.
+                    risks: current.risks.map((risk) => {
+                      const ids = updated.linked_risk_ids ?? [];
+                      const linked = risk.linked_controls ?? [];
+                      const has = linked.some((row) => row.id === updated.id);
+                      const should = ids.includes(risk.id);
+                      if (has === should) return risk;
+                      const nextLinks = should
+                        ? [
+                            ...linked.filter((row) => row.id !== updated.id),
+                            { id: updated.id, title: updated.title, order: updated.order },
+                          ]
+                        : linked.filter((row) => row.id !== updated.id);
+                      return {
+                        ...risk,
+                        linked_controls: nextLinks,
+                        linked_control_ids: nextLinks.map((row) => row.id),
+                      };
+                    }),
                   }
                 : current,
             )
@@ -370,6 +444,11 @@ export default function StepDetailPage() {
                 ? {
                     ...current,
                     controls: current.controls.filter((item) => item.id !== id),
+                    risks: current.risks.map((risk) => ({
+                      ...risk,
+                      linked_controls: (risk.linked_controls ?? []).filter((row) => row.id !== id),
+                      linked_control_ids: (risk.linked_control_ids ?? []).filter((x) => x !== id),
+                    })),
                   }
                 : current,
             )
@@ -423,6 +502,7 @@ export default function StepDetailPage() {
 function ItemSection({
   kind,
   items,
+  siblingItems,
   stepId,
   editable,
   onAdd,
@@ -430,9 +510,14 @@ function ItemSection({
   onItemUpdated,
   onItemRemoved,
   mentions,
+  focusItemId,
+  onFocusHandled,
+  onNavigateToRisk,
+  onNavigateToControl,
 }: {
   kind: "risk" | "control";
   items: StepItem[];
+  siblingItems: StepItem[];
   stepId: number;
   mentions?: EditorMention[];
   editable: boolean;
@@ -440,6 +525,10 @@ function ItemSection({
   onChanged: () => void;
   onItemUpdated: (item: StepItem) => void;
   onItemRemoved: (id: number) => void;
+  focusItemId?: number | null;
+  onFocusHandled?: () => void;
+  onNavigateToRisk?: (id: number) => void;
+  onNavigateToControl?: (id: number) => void;
 }) {
   const { t } = useI18n();
   const labels =
@@ -447,25 +536,62 @@ function ItemSection({
       ? { title: t("exp.tabRisks"), add: t("exp.addRisk"), empty: t("exp.noRisks") }
       : { title: t("exp.tabControls"), add: t("exp.addControl"), empty: t("exp.noControls") };
 
+  // Default expanded (empty set). Client-only; no persisted UI prefs in this editor.
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(() => new Set());
+
+  const sortedItems = useMemo(
+    () => [...items].sort((a, b) => a.order - b.order || a.id - b.id),
+    [items],
+  );
+
+  useEffect(() => {
+    if (focusItemId == null) return;
+    setCollapsedIds((prev) => {
+      if (!prev.has(focusItemId)) return prev;
+      const next = new Set(prev);
+      next.delete(focusItemId);
+      return next;
+    });
+    const timer = window.setTimeout(() => {
+      document.getElementById(`step-item-${kind}-${focusItemId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      onFocusHandled?.();
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [focusItemId, kind, onFocusHandled]);
+
+  const collapseAll = () => setCollapsedIds(new Set(sortedItems.map((item) => item.id)));
+  const expandAll = () => setCollapsedIds(new Set());
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-ink">{labels.title}</h2>
-        {editable && (
-          <Button size="sm" onClick={onAdd}>
-            {labels.add}
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {sortedItems.length > 0 ? (
+            <>
+              <Button type="button" size="sm" variant="secondary" onClick={expandAll}>
+                {t("exp.expandAll")}
+              </Button>
+              <Button type="button" size="sm" variant="secondary" onClick={collapseAll}>
+                {t("exp.collapseAll")}
+              </Button>
+            </>
+          ) : null}
+          {editable && (
+            <Button size="sm" onClick={onAdd}>
+              {labels.add}
+            </Button>
+          )}
+        </div>
       </div>
 
       {items.length === 0 ? (
         <EmptyState
           title={labels.empty}
-          description={
-            editable
-              ? t("exp.itemsHintEdit")
-              : t("exp.itemsHintView")
-          }
+          description={editable ? t("exp.itemsHintEdit") : t("exp.itemsHintView")}
           action={
             editable ? (
               <Button size="sm" onClick={onAdd}>
@@ -475,14 +601,27 @@ function ItemSection({
           }
         />
       ) : (
-        items.map((item) => (
+        sortedItems.map((item) => (
           <ItemEditor
             key={item.id}
             kind={kind}
             item={item}
+            number={displayNumber(sortedItems, item.id)}
+            siblingItems={siblingItems}
             stepId={stepId}
             editable={editable}
             mentions={mentions}
+            collapsed={collapsedIds.has(item.id)}
+            onToggleCollapsed={() =>
+              setCollapsedIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(item.id)) next.delete(item.id);
+                else next.add(item.id);
+                return next;
+              })
+            }
+            onNavigateToRisk={onNavigateToRisk}
+            onNavigateToControl={onNavigateToControl}
             onChanged={onChanged}
             onUpdated={onItemUpdated}
             onRemoved={onItemRemoved}
@@ -496,9 +635,15 @@ function ItemSection({
 function ItemEditor({
   kind,
   item,
+  number,
+  siblingItems,
   stepId,
   editable,
   mentions,
+  collapsed,
+  onToggleCollapsed,
+  onNavigateToRisk,
+  onNavigateToControl,
   onChanged,
   onUpdated,
   onRemoved,
@@ -506,8 +651,14 @@ function ItemEditor({
   kind: "risk" | "control";
   mentions?: EditorMention[];
   item: StepItem;
+  number: number;
+  siblingItems: StepItem[];
   stepId: number;
   editable: boolean;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  onNavigateToRisk?: (id: number) => void;
+  onNavigateToControl?: (id: number) => void;
   onChanged: () => void;
   onUpdated: (item: StepItem) => void;
   onRemoved: (id: number) => void;
@@ -515,34 +666,132 @@ function ItemEditor({
   const { t } = useI18n();
   const [content, setContent] = useState(item.content ?? "");
   const [title, setTitle] = useState(item.title);
+  const [linkedRiskIds, setLinkedRiskIds] = useState<number[]>(
+    () => item.linked_risk_ids ?? item.linked_risks?.map((row) => row.id) ?? [],
+  );
+  const [linkedControlIds, setLinkedControlIds] = useState<number[]>(
+    () => item.linked_control_ids ?? item.linked_controls?.map((row) => row.id) ?? [],
+  );
+  const [linkMenuOpen, setLinkMenuOpen] = useState(false);
+  const linkMenuRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [saveTick, setSaveTick] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [riskQuery, setRiskQuery] = useState("");
 
   const basePath = kind === "risk" ? "/risks" : "/controls";
+  const controlCount = linkedControlIds.length;
+  const linkedIdsForMenu = kind === "risk" ? linkedControlIds : linkedRiskIds;
+  const filteredLinkOptions = useMemo(() => {
+    const q = riskQuery.trim().toLowerCase();
+    const sorted = [...siblingItems].sort((a, b) => {
+      const aLinked = linkedIdsForMenu.includes(a.id) ? 0 : 1;
+      const bLinked = linkedIdsForMenu.includes(b.id) ? 0 : 1;
+      if (aLinked !== bLinked) return aLinked - bLinked;
+      return a.order - b.order || a.id - b.id;
+    });
+    if (!q) return sorted;
+    return sorted.filter((row) => {
+      const n = displayNumber(siblingItems, row.id);
+      const haystack = `${n} ${row.title}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [siblingItems, riskQuery, linkedIdsForMenu]);
+  const sortedSiblingControls = useMemo(
+    () => [...siblingItems].sort((a, b) => a.order - b.order || a.id - b.id),
+    [siblingItems],
+  );
 
-  // Keep local fields in sync when parent reloads (e.g. after media upload).
   useEffect(() => {
     setContent(item.content ?? "");
     setTitle(item.title);
-  }, [item.id, item.content, item.title]);
+    setLinkedRiskIds(item.linked_risk_ids ?? item.linked_risks?.map((row) => row.id) ?? []);
+    setLinkedControlIds(
+      item.linked_control_ids ?? item.linked_controls?.map((row) => row.id) ?? [],
+    );
+  }, [
+    item.id,
+    item.content,
+    item.title,
+    item.linked_risk_ids,
+    item.linked_risks,
+    item.linked_control_ids,
+    item.linked_controls,
+  ]);
+
+  useEffect(() => {
+    if (!linkMenuOpen) return;
+    const close = (event: MouseEvent) => {
+      if (linkMenuRef.current?.contains(event.target as Node)) return;
+      setLinkMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [linkMenuOpen]);
+
+  useEffect(() => {
+    if (!linkMenuOpen) {
+      setRiskQuery("");
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      linkMenuRef.current?.querySelector<HTMLInputElement>("input")?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [linkMenuOpen]);
+
+  const applyUpdatedItem = (
+    updated: StepItem,
+    opts?: { controlIds?: number[]; riskIds?: number[] },
+  ) => {
+    const nextControlIds =
+      updated.linked_control_ids ?? opts?.controlIds ?? linkedControlIds;
+    const nextRiskIds = updated.linked_risk_ids ?? opts?.riskIds ?? linkedRiskIds;
+    const nextControls =
+      updated.linked_controls ??
+      (kind === "risk"
+        ? sortedSiblingControls
+            .filter((row) => nextControlIds.includes(row.id))
+            .map((row) => ({ id: row.id, title: row.title, order: row.order }))
+        : item.linked_controls);
+    const nextRisks =
+      updated.linked_risks ??
+      (kind === "control"
+        ? [...siblingItems]
+            .sort((a, b) => a.order - b.order || a.id - b.id)
+            .filter((row) => nextRiskIds.includes(row.id))
+            .map((row) => ({ id: row.id, title: row.title, order: row.order }))
+        : item.linked_risks);
+    onUpdated({
+      ...item,
+      ...updated,
+      title: updated.title ?? title,
+      content: updated.content ?? content,
+      media_items: updated.media_items ?? item.media_items,
+      linked_risk_ids: nextRiskIds,
+      linked_risks: nextRisks,
+      linked_control_ids: nextControlIds,
+      linked_controls: nextControls,
+    });
+  };
 
   const save = async () => {
     setSaving(true);
     setNote(null);
     setError(null);
     try {
+      const body: Record<string, unknown> = { title, content };
+      if (kind === "control") body.linked_risk_ids = linkedRiskIds;
+      if (kind === "risk") body.linked_control_ids = linkedControlIds;
       const updated = await apiFetch<StepItem>(`${basePath}/${item.id}/`, {
         method: "PATCH",
-        body: { title, content },
+        body,
       });
-      onUpdated({
-        ...item,
-        ...updated,
-        title,
-        content,
-        media_items: updated.media_items ?? item.media_items,
+      applyUpdatedItem(updated, {
+        controlIds: linkedControlIds,
+        riskIds: linkedRiskIds,
       });
       setNote(t("exp.saved"));
       setSaveTick((tick) => tick + 1);
@@ -553,8 +802,67 @@ function ItemEditor({
     }
   };
 
+  const persistControlLinks = async (ids: number[]) => {
+    setLinkedControlIds(ids);
+    setLinking(true);
+    setError(null);
+    try {
+      const updated = await apiFetch<StepItem>(`${basePath}/${item.id}/`, {
+        method: "PATCH",
+        body: { linked_control_ids: ids },
+      });
+      applyUpdatedItem(updated, { controlIds: ids });
+    } catch (err) {
+      setLinkedControlIds(
+        item.linked_control_ids ?? item.linked_controls?.map((row) => row.id) ?? [],
+      );
+      setError(err instanceof ApiError ? err.message : t("exp.saveFail"));
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const persistRiskLinks = async (ids: number[]) => {
+    setLinkedRiskIds(ids);
+    setLinking(true);
+    setError(null);
+    try {
+      const updated = await apiFetch<StepItem>(`${basePath}/${item.id}/`, {
+        method: "PATCH",
+        body: { linked_risk_ids: ids },
+      });
+      applyUpdatedItem(updated, { riskIds: ids });
+    } catch (err) {
+      setLinkedRiskIds(
+        item.linked_risk_ids ?? item.linked_risks?.map((row) => row.id) ?? [],
+      );
+      setError(err instanceof ApiError ? err.message : t("exp.saveFail"));
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const toggleControlLink = (controlId: number) => {
+    const next = linkedControlIds.includes(controlId)
+      ? linkedControlIds.filter((id) => id !== controlId)
+      : [...linkedControlIds, controlId];
+    void persistControlLinks(next);
+  };
+
+  const toggleRiskLink = (riskId: number) => {
+    const next = linkedRiskIds.includes(riskId)
+      ? linkedRiskIds.filter((id) => id !== riskId)
+      : [...linkedRiskIds, riskId];
+    void persistRiskLinks(next);
+  };
+
   const remove = async () => {
-    if (!window.confirm(t("exp.confirmDeleteItem"))) return;
+    const linked = item.linked_controls?.length ?? item.linked_control_ids?.length ?? 0;
+    const message =
+      kind === "risk" && linked > 0
+        ? t("exp.confirmDeleteRiskLinked", { n: linked })
+        : t("exp.confirmDeleteItem");
+    if (!window.confirm(message)) return;
     try {
       await apiFetch(`${basePath}/${item.id}/`, { method: "DELETE" });
       onRemoved(item.id);
@@ -563,62 +871,300 @@ function ItemEditor({
     }
   };
 
+  const headerLabel = t("exp.riskNumberTitle", { n: number, title: title || item.title });
+  const linkCount = kind === "risk" ? controlCount : linkedRiskIds.length;
+  const linkMenuTitle = kind === "risk" ? t("exp.assignControls") : t("exp.assignRisks");
+  const linkMenuHint =
+    kind === "risk" ? t("exp.assignControlsHint") : t("exp.assignRisksHint");
+  const linkChipAria =
+    kind === "risk"
+      ? linkCount
+        ? t("exp.controlsCount", { n: linkCount })
+        : t("exp.controlsCountZero")
+      : linkCount
+        ? t("exp.risksCount", { n: linkCount })
+        : t("exp.risksCountZero");
+  const searchPlaceholder =
+    kind === "risk" ? t("exp.searchControls") : t("exp.searchRisks");
+  const emptyLinksLabel = kind === "risk" ? t("exp.noControls") : t("exp.noRisks");
+  const noMatchLabel = kind === "risk" ? t("exp.noControlsMatch") : t("exp.noRisksMatch");
+
   return (
-    <Card className="space-y-3">
+    <Card id={`step-item-${kind}-${item.id}`} className="space-y-3 scroll-mt-4">
       <div className="flex items-center gap-2">
-        {editable ? (
-          <Input
+        <button
+          type="button"
+          className="flex shrink-0 items-center rounded-lg px-1 py-1 text-start transition hover:bg-gray-50 dark:hover:bg-white/5"
+          onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-controls={`step-item-body-${kind}-${item.id}`}
+          title={collapsed ? t("exp.expandRisk") : t("exp.collapseRisk")}
+        >
+          <span className="text-xs text-gray-500" aria-hidden>
+            {collapsed ? "▸" : "▾"}
+          </span>
+        </button>
+
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-500">
+          {number}
+        </span>
+
+        {editable && !collapsed ? (
+          <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            className="font-medium"
+            onClick={(event) => event.stopPropagation()}
+            aria-label={t("exp.itemTitle")}
+            className="min-w-0 flex-1 border-0 bg-transparent px-0 py-1 text-sm font-semibold text-ink outline-none placeholder:text-gray-400 focus:ring-0"
+            placeholder={t("exp.itemTitle")}
           />
         ) : (
-          <h3 className="flex-1 text-sm font-semibold text-ink">{item.title}</h3>
+          <button
+            type="button"
+            className="min-w-0 flex-1 truncate text-start text-sm font-semibold text-ink"
+            onClick={onToggleCollapsed}
+            title={collapsed ? t("exp.expandRisk") : t("exp.collapseRisk")}
+          >
+            {title || item.title || headerLabel}
+          </button>
         )}
+
+        <div ref={linkMenuRef} className="relative shrink-0">
+          <button
+            type="button"
+            disabled={linking}
+            className={cx(
+              "inline-flex h-8 min-w-8 items-center justify-center gap-0.5 rounded-full px-1.5 transition",
+              kind === "risk"
+                ? "hover:bg-emerald-500/15"
+                : "hover:bg-amber-500/15",
+            )}
+            style={{ color: kind === "risk" ? "#10B981" : "#F59E0B" }}
+            aria-expanded={linkMenuOpen}
+            aria-haspopup="listbox"
+            aria-label={linkChipAria}
+            title={linkMenuHint}
+            onClick={(event) => {
+              event.stopPropagation();
+              setLinkMenuOpen((open) => !open);
+            }}
+          >
+            {kind === "risk" ? <ControlLinkIcon /> : <RiskLinkIcon />}
+            {linkCount > 0 ? (
+              <span className="min-w-3 text-center text-[10px] font-bold tabular-nums">
+                {linkCount}
+              </span>
+            ) : null}
+          </button>
+          {linkMenuOpen ? (
+            <div
+              className="absolute top-full z-20 mt-1 max-h-56 w-64 overflow-y-auto rounded-xl border border-line bg-white p-1.5 shadow-lg end-0 dark:bg-gray-900"
+              role="listbox"
+              aria-label={linkMenuTitle}
+              onClick={(event) => event.stopPropagation()}
+            >
+              {siblingItems.length > 0 ? (
+                <Input
+                  value={riskQuery}
+                  onChange={(event) => setRiskQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="mb-1"
+                  aria-label={searchPlaceholder}
+                  autoFocus
+                />
+              ) : null}
+              {filteredLinkOptions.length === 0 ? (
+                <p className="px-1.5 py-1 text-xs text-gray-500">
+                  {riskQuery.trim() ? noMatchLabel : emptyLinksLabel}
+                </p>
+              ) : (
+                filteredLinkOptions.map((row) => {
+                  const checked =
+                    kind === "risk"
+                      ? linkedControlIds.includes(row.id)
+                      : linkedRiskIds.includes(row.id);
+                  const n = displayNumber(siblingItems, row.id);
+                  if (!editable) {
+                    return (
+                      <button
+                        key={row.id}
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-xs hover:bg-gray-50 dark:hover:bg-white/5"
+                        onClick={() => {
+                          setLinkMenuOpen(false);
+                          if (kind === "risk") onNavigateToControl?.(row.id);
+                          else onNavigateToRisk?.(row.id);
+                        }}
+                      >
+                        {t("exp.riskNumberTitle", { n, title: row.title })}
+                      </button>
+                    );
+                  }
+                  return (
+                    <label
+                      key={row.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
+                      <input
+                        type="checkbox"
+                        className="size-3.5 accent-brand-500"
+                        checked={checked}
+                        disabled={linking}
+                        onChange={() =>
+                          kind === "risk"
+                            ? toggleControlLink(row.id)
+                            : toggleRiskLink(row.id)
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {t("exp.riskNumberTitle", { n, title: row.title })}
+                      </span>
+                      {checked ? (
+                        <button
+                          type="button"
+                          className="shrink-0 text-[10px] text-brand-700"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setLinkMenuOpen(false);
+                            if (kind === "risk") onNavigateToControl?.(row.id);
+                            else onNavigateToRisk?.(row.id);
+                          }}
+                        >
+                          {t("exp.openLinked")}
+                        </button>
+                      ) : null}
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
+        </div>
+
         {editable && (
-          <Button variant="ghost" size="sm" onClick={remove} className="text-red-600">
-            {t("common.delete")}
-          </Button>
+          <button
+            type="button"
+            onClick={remove}
+            className="inline-flex shrink-0 items-center justify-center rounded-full p-1.5 text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/15"
+            aria-label={t("common.delete")}
+            title={t("common.delete")}
+          >
+            <TrashIcon className="size-4" />
+          </button>
         )}
       </div>
 
-      <RichTextEditor
-        value={content}
-        onChange={setContent}
-        placeholder={
-          kind === "risk"
-            ? t("exp.riskContentPlaceholder")
-            : t("exp.controlContentPlaceholder")
-        }
-        minHeight={150}
-        readOnly={!editable}
-        mentions={mentions}
-        onSave={editable ? save : undefined}
-        saving={saving}
-        savedTick={saveTick}
-      />
+      {!collapsed ? (
+        <div id={`step-item-body-${kind}-${item.id}`} className="space-y-3">
+          <RichTextEditor
+            value={content}
+            onChange={setContent}
+            placeholder={
+              kind === "risk"
+                ? t("exp.riskContentPlaceholder")
+                : t("exp.controlContentPlaceholder")
+            }
+            minHeight={150}
+            readOnly={!editable}
+            mentions={mentions}
+            onSave={editable ? save : undefined}
+            saving={saving}
+            savedTick={saveTick}
+          />
 
-      <MediaPanel
-        stepId={stepId}
-        section={kind}
-        riskId={kind === "risk" ? item.id : undefined}
-        controlId={kind === "control" ? item.id : undefined}
-        items={item.media_items}
-        onChanged={onChanged}
-        readOnly={!editable}
-      />
+          <MediaPanel
+            stepId={stepId}
+            section={kind}
+            riskId={kind === "risk" ? item.id : undefined}
+            controlId={kind === "control" ? item.id : undefined}
+            items={item.media_items}
+            onChanged={onChanged}
+            readOnly={!editable}
+          />
 
-      {note && <Alert tone="success">{note}</Alert>}
-      {error && <Alert>{error}</Alert>}
+          {note && <Alert tone="success">{note}</Alert>}
+          {error && <Alert>{error}</Alert>}
 
-      {editable && (
-        <div className="flex justify-end">
-          <Button size="sm" loading={saving} onClick={save}>
-            {t("common.save")}
-          </Button>
+          {editable && (
+            <div className="flex justify-end">
+              <Button size="sm" loading={saving} onClick={save}>
+                {t("common.save")}
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+      ) : null}
     </Card>
+  );
+}
+
+/** Lucide `triangle-alert` — shown on controls (amber). */
+function RiskLinkIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0"
+      aria-hidden
+    >
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+/** Lucide `shield-check` — shown on risks (emerald). */
+function ControlLinkIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0"
+      aria-hidden
+    >
+      <path d="M20 13c0 5-3.5 7.5-7.55 8.95a1 1 0 0 1-.9 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
   );
 }
 

@@ -105,14 +105,17 @@ export function Select({
 }
 
 export function Card({
+  id,
   className,
   children,
 }: {
+  id?: string;
   className?: string;
   children: ReactNode;
 }) {
   return (
     <div
+      id={id}
       className={cx(
         "rounded-xl border border-gray-200 bg-white p-5 shadow-sm",
         className,

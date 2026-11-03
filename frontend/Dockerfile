@@ -18,7 +18,10 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+# Google Fonts fetch is flaky in some networks; retry the production build.
+RUN npm run build \
+    || (sleep 8 && npm run build) \
+    || (sleep 15 && npm run build)
 
 FROM node:22-alpine AS runner
 WORKDIR /app

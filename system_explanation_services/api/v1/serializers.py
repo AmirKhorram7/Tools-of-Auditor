@@ -1,7 +1,9 @@
 import re
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from system_explanation_services.models import (
     Process,
@@ -12,6 +14,10 @@ from system_explanation_services.models import (
     StepControl,
     StepMedia,
     StepRisk,
+)
+from system_explanation_services.services.risk_control_links import (
+    sync_control_risks,
+    sync_risk_controls,
 )
 from system_explanation_services.services.access import (
     can_edit_project,
@@ -296,6 +302,11 @@ class StepMediaSerializer(serializers.ModelSerializer):
 
 class StepRiskSerializer(serializers.ModelSerializer):
     media_items = StepMediaSerializer(many=True, read_only=True)
+    linked_control_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+    )
+    linked_controls = serializers.SerializerMethodField()
 
     class Meta:
         model = StepRisk
@@ -306,14 +317,61 @@ class StepRiskSerializer(serializers.ModelSerializer):
             "content",
             "order",
             "media_items",
+            "linked_controls",
+            "linked_control_ids",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_at", "updated_at", "media_items"]
+        read_only_fields = ["created_at", "updated_at", "media_items", "linked_controls"]
+
+    def get_linked_controls(self, obj):
+        links = getattr(obj, "_prefetched_objects_cache", {}).get("control_links")
+        if links is None:
+            links = obj.control_links.select_related("control").all()
+        rows = [
+            {"id": link.control_id, "title": link.control.title, "order": link.control.order}
+            for link in links
+            if not getattr(link, "is_deleted", False)
+        ]
+        rows.sort(key=lambda r: (r["order"], r["id"]))
+        return rows
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["linked_control_ids"] = [row["id"] for row in self.get_linked_controls(instance)]
+        return data
+
+    def create(self, validated_data):
+        control_ids = validated_data.pop("linked_control_ids", None)
+        risk = super().create(validated_data)
+        if control_ids is not None:
+            _apply_link_sync(lambda: sync_risk_controls(risk, control_ids))
+        return risk
+
+    def update(self, instance, validated_data):
+        control_ids = validated_data.pop("linked_control_ids", None)
+        risk = super().update(instance, validated_data)
+        if control_ids is not None:
+            _apply_link_sync(lambda: sync_risk_controls(risk, control_ids))
+        return risk
+
+
+def _apply_link_sync(fn):
+    try:
+        fn()
+    except DjangoValidationError as exc:
+        if hasattr(exc, "message_dict"):
+            raise DRFValidationError(exc.message_dict) from exc
+        raise DRFValidationError(exc.messages) from exc
 
 
 class StepControlSerializer(serializers.ModelSerializer):
     media_items = StepMediaSerializer(many=True, read_only=True)
+    linked_risk_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+    )
+    linked_risks = serializers.SerializerMethodField()
 
     class Meta:
         model = StepControl
@@ -324,10 +382,43 @@ class StepControlSerializer(serializers.ModelSerializer):
             "content",
             "order",
             "media_items",
+            "linked_risks",
+            "linked_risk_ids",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_at", "updated_at", "media_items"]
+        read_only_fields = ["created_at", "updated_at", "media_items", "linked_risks"]
+
+    def get_linked_risks(self, obj):
+        links = getattr(obj, "_prefetched_objects_cache", {}).get("risk_links")
+        if links is None:
+            links = obj.risk_links.select_related("risk").all()
+        rows = [
+            {"id": link.risk_id, "title": link.risk.title, "order": link.risk.order}
+            for link in links
+            if not getattr(link, "is_deleted", False)
+        ]
+        rows.sort(key=lambda r: (r["order"], r["id"]))
+        return rows
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["linked_risk_ids"] = [row["id"] for row in self.get_linked_risks(instance)]
+        return data
+
+    def create(self, validated_data):
+        risk_ids = validated_data.pop("linked_risk_ids", None)
+        control = super().create(validated_data)
+        if risk_ids is not None:
+            _apply_link_sync(lambda: sync_control_risks(control, risk_ids))
+        return control
+
+    def update(self, instance, validated_data):
+        risk_ids = validated_data.pop("linked_risk_ids", None)
+        control = super().update(instance, validated_data)
+        if risk_ids is not None:
+            _apply_link_sync(lambda: sync_control_risks(control, risk_ids))
+        return control
 
 
 class ProcessStepListSerializer(serializers.ModelSerializer):
@@ -412,6 +503,11 @@ class ProcessStepWriteSerializer(serializers.ModelSerializer):
             "order",
             "explanation",
         ]
+
+    def validate_explanation(self, value):
+        from system_explanation_services.services.html_sanitize import clean_explanation
+
+        return clean_explanation(value)
 
 
 class StepConnectionSerializer(serializers.ModelSerializer):

@@ -188,6 +188,12 @@ export type StepMedia = {
   order: number;
 };
 
+export type StepLinkedRef = {
+  id: number;
+  title: string;
+  order: number;
+};
+
 export type StepItem = {
   id: number;
   step: number;
@@ -195,6 +201,12 @@ export type StepItem = {
   content: string;
   order: number;
   media_items: StepMedia[];
+  /** Controls that mitigate this risk (risk payloads). */
+  linked_controls?: StepLinkedRef[];
+  linked_control_ids?: number[];
+  /** Risks this control mitigates (control payloads). */
+  linked_risks?: StepLinkedRef[];
+  linked_risk_ids?: number[];
 };
 
 export type ProcessStepDetail = ProcessStep & {

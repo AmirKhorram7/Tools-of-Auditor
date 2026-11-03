@@ -321,88 +321,117 @@ html.dark .rich-content a.step-mention:hover {
   color: #1a2b49;
 }
 
-/* Opt-in foldable section — VS Code-style gutter, only when the writer adds one. */
-.rich-content .rte-fold {
-  position: relative;
-  margin: 0.35rem 0;
-  border-inline-start: 2px solid #d1d5db;
-  padding-inline-start: 0.15rem;
+/* Section block (DESIGN.md) — logical CSS, RTL-safe. */
+.rich-content.ed-root,
+.rich-content {
+  --ed-accent: #f59e0b;
+  --ed-fg: inherit;
+  --ed-muted: #8493a8;
+  --ed-line: #d1d5db;
+  --ed-head-bg: rgba(15, 17, 17, 0.03);
+  --ed-indent: 1.4rem;
 }
 
-.rich-content .rte-fold-toggle {
-  position: absolute;
-  inset-inline-start: 0;
-  top: 0.28em;
-  z-index: 2;
-  box-sizing: border-box;
-  display: inline-flex;
+html.dark .rich-content {
+  --ed-line: #4d5d70;
+  --ed-head-bg: rgba(255, 255, 255, 0.04);
+  --ed-muted: #8b939e;
+}
+
+.rich-content .ed-section {
+  margin: 0.6rem 0;
+}
+
+.rich-content .ed-section-head {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 1.35rem;
-  height: 1.35rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: #6b7280;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
+  gap: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 8px;
+  background: var(--ed-head-bg);
 }
 
-.rich-content .rte-fold-toggle:hover,
-.rich-content .rte-fold-toggle:focus-visible {
-  background: rgba(15, 17, 17, 0.06);
-  outline: none;
-}
-
-.rich-content .rte-fold-toggle::before {
-  content: "";
-  display: block;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 5px 4px 0 4px;
-  border-color: currentColor transparent transparent transparent;
-}
-
-.rich-content .rte-fold[data-collapsed="true"] .rte-fold-toggle::before {
-  border-width: 4px 0 4px 5px;
-  border-color: transparent transparent transparent currentColor;
-}
-
-[dir="rtl"] .rich-content .rte-fold[data-collapsed="true"] .rte-fold-toggle::before,
-.rich-content[dir="rtl"] .rte-fold[data-collapsed="true"] .rte-fold-toggle::before {
-  border-width: 4px 5px 4px 0;
-  border-color: transparent currentColor transparent transparent;
-}
-
-.rich-content .rte-fold-head {
-  position: relative;
-  padding-inline-start: 1.45rem;
+.rich-content .ed-section-title {
+  flex: 1;
+  min-width: 0;
   font-weight: 700;
+  font-size: 1.05em;
+  outline: none;
+  white-space: pre-wrap;
 }
 
-.rich-content .rte-fold[data-collapsed="true"] .rte-fold-body {
+.rich-content .ed-section[data-depth="2"] > .ed-section-head > .ed-section-title {
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.rich-content .ed-section-title.is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--ed-muted);
+  font-weight: 400;
+  pointer-events: none;
+}
+
+.rich-content .ed-toggle {
+  all: unset;
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 6px;
+  user-select: none;
+}
+
+.rich-content .ed-toggle:hover {
+  background: rgba(15, 17, 17, 0.06);
+}
+
+html.dark .rich-content .ed-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rich-content .ed-toggle::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--ed-accent);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transition: transform 0.12s ease;
+}
+
+.rich-content .ed-section[data-open="false"] > .ed-section-head > .ed-toggle::before {
+  transform: rotate(-90deg);
+}
+
+.rich-content:dir(rtl) .ed-section[data-open="false"] > .ed-section-head > .ed-toggle::before,
+.rich-content[dir="rtl"] .ed-section[data-open="false"] > .ed-section-head > .ed-toggle::before {
+  transform: rotate(90deg);
+}
+
+.rich-content .ed-section-body {
+  margin-inline-start: 0.7rem;
+  padding-inline-start: var(--ed-indent);
+  border-inline-start: 2px solid var(--ed-line);
+  padding-block: 0.35rem 0.1rem;
+}
+
+.rich-content .ed-section[data-open="false"] > .ed-section-body {
   display: none;
 }
 
-.rich-content .rte-fold-body {
-  padding-inline-start: 0.35rem;
+.rich-content .ed-section:focus-within > .ed-section-body {
+  border-inline-start-color: var(--ed-accent);
 }
 
-html.dark .rich-content .rte-fold {
-  border-inline-start-color: #4d5d70;
-}
-
-html.dark .rich-content .rte-fold-toggle {
-  color: #8b939e;
-}
-
-html.dark .rich-content .rte-fold-toggle:hover,
-html.dark .rich-content .rte-fold-toggle:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+@media print {
+  .rich-content .ed-section[data-open="false"] > .ed-section-body {
+    display: block;
+  }
+  .rich-content .ed-toggle {
+    display: none;
+  }
 }
 
 /*

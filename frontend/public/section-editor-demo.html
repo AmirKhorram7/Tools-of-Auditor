@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Section block demo</title>
+<link rel="stylesheet" href="section-editor.css">
+<style>
+  body { margin: 0; background: #1b2433; color: #e8edf4; font: 15px/1.6 Tahoma, system-ui, sans-serif; }
+  .app { display: grid; grid-template-columns: 220px 1fr; gap: 16px; max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .bar button { background: #2a3a52; color: #e8edf4; border: 1px solid #3a4a61; border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  .bar button.primary { background: #f59e0b; color: #1b1b1b; border-color: #f59e0b; font-weight: 700; }
+  #editor { min-height: 360px; padding: 16px; border: 2px solid #f59e0b; border-radius: 12px; background: #243247; }
+  aside h4 { margin: 0 0 8px; color: #8493a8; font-weight: 600; font-size: .8rem; text-transform: uppercase; }
+  pre { background: #121a26; padding: 10px; border-radius: 8px; max-height: 220px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+  .hint { color: #8493a8; font-size: .82rem; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h4>Outline</h4>
+    <div id="outline" class="ed-outline"></div>
+  </aside>
+  <main>
+    <div class="bar">
+      <button class="primary" id="btn-section">Section</button>
+      <button id="btn-collapse">Collapse all</button>
+      <button id="btn-expand">Expand all</button>
+      <button id="btn-dir">Toggle RTL</button>
+    </div>
+    <div id="editor" class="ed-root" dir="auto"></div>
+    <p class="hint">
+      Enter in title → body · Enter on empty last line → exit section · Ctrl+Enter → new section ·
+      Tab / Shift+Tab → nest / un-nest · Backspace at start of title → unwrap
+    </p>
+    <pre id="out"></pre>
+  </main>
+</div>
+<script src="section-editor.js"></script>
+<script>
+  const ed = new SectionEditor(document.getElementById('editor'), {
+    outline: document.getElementById('outline'),
+    titlePlaceholder: 'Section title…',
+    onChange: (e) => { document.getElementById('out').textContent = e.getHTML(); },
+  });
+  ed.load(`
+    <p>Intro paragraph outside any section.</p>
+    <section data-section data-open="true"><h2 data-section-title>Scope</h2><div data-section-body><p>What the system does.</p></div></section>
+    <section data-section data-open="true"><h2 data-section-title>بخش دوم: ریسک‌ها</h2><div data-section-body><p>متن فارسی داخل این بخش.</p></div></section>
+    <p></p>`);
+  document.getElementById('btn-section').onclick = () => ed.insertSection();
+  document.getElementById('btn-collapse').onclick = () => ed.collapseAll();
+  document.getElementById('btn-expand').onclick = () => ed.expandAll();
+  document.getElementById('btn-dir').onclick = () => {
+    const e = document.getElementById('editor');
+    e.dir = e.dir === 'rtl' ? 'ltr' : 'rtl';
+  };
+  document.querySelectorAll('.bar button').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
+  window.ed = ed;
+  window.__sectionEditor = ed;
+</script>
+</body>
+</html>
